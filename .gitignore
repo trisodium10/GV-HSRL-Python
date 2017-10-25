@@ -1,0 +1,7 @@
+*.pyc
+*.py~
+*.json~
+*.nocommit
+.gitignore~
+*.DS_Store
+description~
