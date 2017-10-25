@@ -336,16 +336,16 @@ if file_select != -1 and file_select < len(file_list):
     if save_i2_str[0] == 'Y' or save_i2_str[0] == 'y':    
         
         header_str = ''
-        header_str = header_str+' Calibration scan as function of frequency offset from I2 line\n'
-        header_str = header_str+' calibration scan data aquired on ' + scan_start_dt.strftime('%d-%b-%y at %H:%M UT') + '\n'
-        header_str = header_str+' File created on '  + datetime.datetime.today().strftime('%d-%b-%y at %H:%m UT')
-        header_str = header_str+' t_begin_cal_pulse= %1.2e ;  start time of cal pulse (sec).\n'%tstart
-        header_str = header_str+' t_end_cal_pulse=   %1.2e ;  end time of cal pulse (sec).\n'%tend
-        header_str = header_str+' pulse_durration=   5.00e-08 ;  laser pulse durration (sec).'
-        header_str = header_str+' ratio of mol to combined channel gain =   %.2f\n' %(sol[5]/sol[6])
-        header_str = header_str+' Cam = %1.3e\n'%(np.min(mol_merge)*sol[6]/sol[5])
-        header_str = header_str+' Min iodine transmission =    %1.1e,  1/(min_trans) =  %1.1e\n\n'%(np.min(mol_merge),1/np.min(mol_merge))
-        header_str = header_str+'freq(GHz)  combined  molecular i2_measured i2_theory/n'
+        header_str = header_str+'Calibration scan as function of frequency offset from I2 line\n'
+        header_str = header_str+'calibration scan data aquired on ' + scan_start_dt.strftime('%d-%b-%y at %H:%M UT') + '\n'
+        header_str = header_str+'file created on '  + datetime.datetime.today().strftime('%d-%b-%y at %H:%m UT') + '\n'
+        header_str = header_str+'t_begin_cal_pulse= %1.2e ;  start time of cal pulse (sec).\n'%tstart
+        header_str = header_str+'t_end_cal_pulse=   %1.2e ;  end time of cal pulse (sec).\n'%tend
+        header_str = header_str+'pulse_durration=   5.00e-08 ;  laser pulse durration (sec).\n'
+        header_str = header_str+'ratio of mol to combined channel gain =   %.1f \n' %(sol[5]/sol[6])
+        header_str = header_str+'Cam = %1.3e \n'%(np.min(mol_merge)*sol[6]/sol[5])
+        header_str = header_str+'Min iodine transmission =    %1.1e,  1/(min_trans) =  %1.1e\n\n'%(np.min(mol_merge),1/np.min(mol_merge))
+        header_str = header_str+'freq(GHz)  combined  molecular i2_measured i2_theory'
         
         # may need 'i2-default-scan' in name
         save_cal_file = 'i2-default-scan-'+scan_start_dt.strftime('%Y%m%dT%H%M')+'.cal'
