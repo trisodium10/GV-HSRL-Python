@@ -15,6 +15,14 @@ import glob
 
 
 
+#def match_data_times(master_time,profiles,var_1d_data,time_sec):
+#    for iprof in range(len(profiles)):
+#        profiles[iprof].time_resample(tedges=master_time,update=True,remainder=False)
+#    
+#    itime = np.digitize(time_sec,master_time)
+    
+
+
 # input and raw_input are the same for python 3 and 2 respectively
 # this makes it so input always accepts a string
 try:
@@ -22,12 +30,22 @@ try:
 except NameError:
     pass
 
-print("Enter search range for diff_geo calibration:")
-year_in = np.int(input("Year: "))
-month_in = np.int(input("Month (#): "))
-day_in = np.int(input("Day: "))
-start_hr = np.float(input("Start Hour (UTC): "))
-stop_hr = np.float(input("Duration (hours): "))
+
+year_in = 2017
+month_in = 10
+day_in = 25
+start_hr = 15
+stop_hr = 6
+
+print('Default Date:')
+print('(M/D/Y) %d/%d/%d, starting %.1f UTC for %.1f h'%(month_in,day_in,year_in,start_hr,stop_hr))
+if input('Run this default date? [y/n]') != 'y':
+    print("Enter search range for diff_geo calibration:")
+    year_in = np.int(input("Year: "))
+    month_in = np.int(input("Month (#): "))
+    day_in = np.int(input("Day: "))
+    start_hr = np.float(input("Start Hour (UTC): "))
+    stop_hr = np.float(input("Duration (hours): "))
 
 cal_start = datetime.datetime(year_in,month_in,day_in)+datetime.timedelta(hours=start_hr)
 cal_stop = cal_start + datetime.timedelta(hours=stop_hr)
@@ -39,7 +57,7 @@ cal_stop = cal_start + datetime.timedelta(hours=stop_hr)
 #Year = 2017
 #HourLim = np.array([0,24])  # Limits on the processing time
 
-tres = 1*60.0  # resolution in time points (0.5 sec)
+tres = 1*60.0  # resolution in time in seconds (0.5 sec)
 zres = 10.0  # resolution in altitude points (7.5 m)
 
 # index for where to treat the profile as background only
@@ -62,23 +80,13 @@ var_1d_list = ['total_energy','RemoveLongI2Cell'\
 var_1d_data = dict(zip(var_1d_list,[np.array([])]*len(var_1d_list)))
 timeD = np.array([])
 
-#var_2d_list = ['cross','molecular','combined_hi','combined_lo']
-#var_2d_list
+var_2d_list = ['cross','molecular','combined_hi','combined_lo']
+var_2d_data = dict(zip(var_2d_list,[np.array([])]*len(var_2d_list)))
+
 
 #basepath = '/scr/eldora1/HSRL_data/'  # old path - still works with link from HSRL_data to /hsrl/raw/
 basepath = '/scr/eldora1/rsfdata/hsrl/raw/'  # new absolute path
 
-#if Day < 10:
-#    DayStr = '0' + str(Day)
-#else:
-#    DayStr = str(Day)
-#    
-#if Month < 10:
-#    MonthStr = '0' + str(Month)
-#else:
-#    MonthStr = str(Month)
-#
-#YearStr = str(Year)
 
 #FilePath0 = basepath + YearStr + '/' + MonthStr + '/' + DayStr + '/raw/'
 day_iter =  cal_start.date()
@@ -93,7 +101,7 @@ while day_iter <= cal_stop.date():
     
 
 
-firstFile = True
+#firstFile = True
 for idir in range(len(SubFiles)):
     # get the file start time from the file name
     iTime = np.char.find(SubFiles[idir],'T')
@@ -107,10 +115,16 @@ for idir in range(len(SubFiles)):
         
         f = nc4.Dataset(SubFiles[idir],'r')
         
-        for ivar in range(len(var_1d_data.keys())):
-            if any(var_1d_data.keys()[ivar] in s for s in f.variables):
-                var_data = lp.ncvar(f,var_1d_data.keys()[ivar])
-                var_1d_data[var_1d_data.keys()[ivar]] = np.concatenate((var_1d_data[var_1d_data.keys()[ivar]],var_data)) 
+        for var in var_1d_data.keys():
+            if any(var in s for s in f.variables):
+                var_data = lp.ncvar(f,var)
+#                print(var+' length: %d'var_data.size)
+                var_1d_data[var] = np.concatenate((var_1d_data[var],var_data)) 
+            
+#        for ivar in range(len(var_1d_data.keys())):
+#            if any(list(var_1d_data.keys())[ivar] in s for s in f.variables):
+#                var_data = lp.ncvar(f,list(var_1d_data.keys())[ivar])
+#                var_1d_data[list(var_1d_data.keys())[ivar]] = np.concatenate((var_1d_data[list(var_1d_data.keys())[ivar]],var_data)) 
         
         
         
@@ -120,14 +134,15 @@ for idir in range(len(SubFiles)):
 #        cell_status = lp.ncvar(f,'RemoveLongI2Cell')        
 #        
         # System for time array still needs work
-        timeD0 = np.array(f.variables['DATA_time'][:])
+        timeD0 = np.array(f.variables['DATA_time'][:]).astype(np.int)
+        timeD0[:,6] = timeD0[:,6]*1e3+timeD0[:,7]
         time_dt0 = [datetime.datetime(*x) for x in timeD0[:,:7]]
         time_sec0 = np.array([(x-time_dt0[0]).total_seconds() for x in time_dt0])
         
         if len(timeD)>0:
-            timeD = np.vstack((timeD,np.array(f.variables['DATA_time'][:])));          # time array [year,month,day,hour,minute,second,msec,usec]
+            timeD = np.vstack((timeD,np.array(f.variables['DATA_time'][:].astype(np.int))));          # time array [year,month,day,hour,minute,second,msec,usec]
         else:
-            timeD = np.array(f.variables['DATA_time'][:])
+            timeD = np.array(f.variables['DATA_time'][:]).astype(np.int)
 #        timeDsec0 = timeD[:,3]*3600.0+timeD[:,4]*60.0+timeD[:,5]+timeD[:,6]*1e-3;    # convert time to seconds starting at the hour
 #        
 #        shot_count0 = f.variables['DATA_shot_count'].data.copy()     # number of laser shots in the time bin
@@ -155,7 +170,14 @@ for idir in range(len(SubFiles)):
         print( 'Profile Integration Time: %f seconds' %np.median(np.diff(time_sec0)))
         print( 'Processing QWP as %s' %QWP_Status)
         
-        print(f.variables['cross'][:].shape())     
+        for var in var_2d_data.keys():
+            if len(var_2d_data[var]) == 0:
+                var_2d_data[var] = f.variables[var][:].copy()
+            else:
+                var_2d_data[var] = np.vstack((var_2d_data[var],f.variables[var][:]))
+                
+        
+#        print(f.variables['cross'][:].copy().shape)     
         
 #        if len(cross_data) != 0:
 #            cross_data = np.hstack()
@@ -168,9 +190,56 @@ for idir in range(len(SubFiles)):
 ##        print('%d,%d'(hi_data.data.shape[0],hi_data.data.shape[1]))
         f.close()
 #timeD = timeD[:,:8]
+timeD[:,6] = timeD[:,6]*1e3+timeD[:,7]
 time_dt = [datetime.datetime(*x) for x in timeD[:,:7]]
 time_sec = np.array([(x-time_dt[0]).total_seconds() for x in time_dt])
 
+time_dt = np.array(time_dt)
+
+plt.figure(); plt.plot(time_sec/3600,var_1d_data['RemoveLongI2Cell'])
+
+master_time = np.arange(time_sec[0]-tres/2,time_sec[-1]+tres/2,tres)
+
+#match_data_times(master_time,profiles,var_1d_data,time_sec)
+if 'cross' in var_2d_data.keys():
+    CrossPol = lp.LidarProfile(var_2d_data['cross'],time_sec,label='Cross Polarization Channel',descript = 'Cross Polarization\nCombined Aerosol and Molecular Returns',bin0=47,lidar='GV-HSRL',StartDate=cal_start.date())
+    CrossPol.time_resample(tedges=master_time,update=True,remainder=False)
+    CrossPol.bg_subtract(BGIndex)
+
+if 'molecular' in var_2d_data.keys():
+    Molecular = lp.LidarProfile(var_2d_data['molecular'],time_sec,label='Molecular Backscatter Channel',descript = 'Parallel Polarization\nMolecular Backscatter Returns',bin0=47,lidar='GV-HSRL',StartDate=cal_start.date())
+    Molecular.time_resample(tedges=master_time,update=True,remainder=False)
+    Molecular.bg_subtract(BGIndex)
+
+if 'combined_hi' in var_2d_data.keys():
+    CombHi = lp.LidarProfile(var_2d_data['combined_hi'],time_sec,label='High Gain Total Backscatter Channel',descript = 'Parallel Polarization\nHigh Gain\nCombined Aerosol and Molecular Returns',bin0=47,lidar='GV-HSRL',StartDate=cal_start.date())
+    CombHi.time_resample(tedges=master_time,update=True,remainder=False)
+    CombHi.bg_subtract(BGIndex)
+
+if 'combined_lo' in var_2d_data.keys():       
+    CombLo = lp.LidarProfile(var_2d_data['combined_lo'],time_sec,label='Low Gain Total Backscatter Channel',descript = 'Parallel Polarization\nLow Gain\nCombined Aerosol and Molecular Returns',bin0=47,lidar='GV-HSRL',StartDate=cal_start.date())            
+    CombLo.time_resample(tedges=master_time,update=True,remainder=False)
+    CombLo.bg_subtract(BGIndex)
+
+if FilterI2:
+    i2_size = var_1d_data['RemoveLongI2Cell'].size  # size of array.  Don't apply to any arrays that don't have matching time dimensions
+    i2_rem = np.nonzero(var_1d_data['RemoveLongI2Cell'] < 50)[0]  # data points where the I2 cell is removed
+    
+    for var in var_1d_data.keys():
+            if var_1d_data[var].size == i2_size:
+                var_1d_data[var] = var_1d_data[var][i2_rem]
+            else:
+                print(var+' does not have time dimension that matches RemoveLongI2Cell')
+#    for var in var_2d_data.keys():
+#            if var_2d_data[var].shape[0] == i2_size:
+#                var_2d_data[var] = var_2d_data[var][i2_rem,:]
+#            else:
+#                print(var+' does not have time dimension that matches RemoveLongI2Cell')
+    
+    time_dt = time_dt[i2_rem]
+    time_sec = time_sec[i2_rem]
+    
+fig_data = lp.pcolor_profiles([CombHi,Molecular],ylimits=[0,12])            
 
 
 #        # load profile data
