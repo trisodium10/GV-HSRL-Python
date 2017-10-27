@@ -13,7 +13,98 @@ import scipy.interpolate
 import datetime
 import glob
 
+def savitzky_golay(y, window_size, order, deriv=0, rate=1):
+    r"""Smooth (and optionally differentiate) data with a Savitzky-Golay filter.
+    The Savitzky-Golay filter removes high frequency noise from data.
+    It has the advantage of preserving the original shape and
+    features of the signal better than other types of filtering
+    approaches, such as moving averages techniques.
+    Parameters
+    ----------
+    y : array_like, shape (N,)
+        the values of the time history of the signal.
+    window_size : int
+        the length of the window. Must be an odd integer number.
+    order : int
+        the order of the polynomial used in the filtering.
+        Must be less then `window_size` - 1.
+    deriv: int
+        the order of the derivative to compute (default = 0 means only smoothing)
+    Returns
+    -------
+    ys : ndarray, shape (N)
+        the smoothed signal (or it's n-th derivative).
+    Notes
+    -----
+    The Savitzky-Golay is a type of low-pass filter, particularly
+    suited for smoothing noisy data. The main idea behind this
+    approach is to make for each point a least-square fit with a
+    polynomial of high order over a odd-sized window centered at
+    the point.
+    Examples
+    --------
+    t = np.linspace(-4, 4, 500)
+    y = np.exp( -t**2 ) + np.random.normal(0, 0.05, t.shape)
+    ysg = savitzky_golay(y, window_size=31, order=4)
+    import matplotlib.pyplot as plt
+    plt.plot(t, y, label='Noisy signal')
+    plt.plot(t, np.exp(-t**2), 'k', lw=1.5, label='Original signal')
+    plt.plot(t, ysg, 'r', label='Filtered signal')
+    plt.legend()
+    plt.show()
+    References
+    ----------
+    .. [1] A. Savitzky, M. J. E. Golay, Smoothing and Differentiation of
+       Data by Simplified Least Squares Procedures. Analytical
+       Chemistry, 1964, 36 (8), pp 1627-1639.
+    .. [2] Numerical Recipes 3rd Edition: The Art of Scientific Computing
+       W.H. Press, S.A. Teukolsky, W.T. Vetterling, B.P. Flannery
+       Cambridge University Press ISBN-13: 9780521880688
+    """
+#    import numpy as np
+    from math import factorial
 
+    try:
+        window_size = np.abs(np.int(window_size))
+        order = np.abs(np.int(order))
+    except ValueError:
+        raise ValueError("window_size and order have to be of type int")
+    if window_size % 2 != 1 or window_size < 1:
+        raise TypeError("window_size size must be a positive odd number")
+    if window_size < order + 2:
+        raise TypeError("window_size is too small for the polynomials order")
+    order_range = range(order+1)
+    half_window = (window_size -1) // 2
+    # precompute coefficients
+    b = np.mat([[k**i for i in order_range] for k in range(-half_window, half_window+1)])
+    m = np.linalg.pinv(b).A[deriv] * rate**deriv * factorial(deriv)
+    # pad the signal at the extremes with
+    # values taken from the signal itself
+    firstvals = y[0] - np.abs( y[1:half_window+1][::-1] - y[0] )
+    lastvals = y[-1] + np.abs(y[-half_window-1:-1][::-1] - y[-1])
+    y = np.concatenate((firstvals, y, lastvals))
+    return np.convolve( m[::-1], y, mode='valid')
+    
+def fit_high_range(profile,profile_var,i_min,i_max,order=1):
+    """
+    returns a profile with a polynomial fit to data between specified
+    integers.
+    profile - the profile to fit
+    profile_var - variance of the supplied profile
+    i_min - start of data used for the fit
+    i_max - end of data used for the fit
+    order - order of the polynomial fit (defaults to linear)
+    """    
+    
+    xfit = np.arange(profile[i_min:i_max].size)
+    yfit = profile[i_min:i_max]
+    wfit = 1.0/np.sqrt(profile_var[0,i_min:i_max].flatten())
+    wfit[0:5] = 10*np.max(wfit)
+    pfit = np.polyfit(xfit,yfit,order,w=wfit)
+    xprof = np.arange(hi_smooth[i_min:].size)
+    profile_out = profile.copy()
+    profile_out[i_const:] = np.polyval(pfit,xprof)    
+    return profile_out
 
 #def match_data_times(master_time,profiles,var_1d_data,time_sec):
 #    for iprof in range(len(profiles)):
@@ -34,8 +125,8 @@ except NameError:
 year_in = 2017
 month_in = 10
 day_in = 25
-start_hr = 15
-stop_hr = 6
+start_hr = 17
+stop_hr = 4
 
 print('Default Date:')
 print('(M/D/Y) %d/%d/%d, starting %.1f UTC for %.1f h'%(month_in,day_in,year_in,start_hr,stop_hr))
@@ -192,7 +283,8 @@ for idir in range(len(SubFiles)):
 #timeD = timeD[:,:8]
 timeD[:,6] = timeD[:,6]*1e3+timeD[:,7]
 time_dt = [datetime.datetime(*x) for x in timeD[:,:7]]
-time_sec = np.array([(x-time_dt[0]).total_seconds() for x in time_dt])
+time_dt0 = datetime.datetime(time_dt[0].year,time_dt[0].month,time_dt[0].day)
+time_sec = np.array([(x-time_dt0).total_seconds() for x in time_dt])
 
 time_dt = np.array(time_dt)
 
@@ -206,25 +298,37 @@ plt.title('RemoveLongI2Cell')
 master_time = np.arange(time_sec[0]-tres/2,time_sec[-1]+tres/2,tres)
 
 #match_data_times(master_time,profiles,var_1d_data,time_sec)
+prof_list = []
+prof_names = []
 if 'cross' in var_2d_data.keys():
     CrossPol = lp.LidarProfile(var_2d_data['cross'],time_sec,label='Cross Polarization Channel',descript = 'Cross Polarization\nCombined Aerosol and Molecular Returns',bin0=47,lidar='GV-HSRL',StartDate=cal_start.date())
     CrossPol.time_resample(tedges=master_time,update=True,remainder=False)
     CrossPol.bg_subtract(BGIndex)
+    prof_list = prof_list+[CrossPol]
+    prof_names = prof_names+['cross']
 
 if 'molecular' in var_2d_data.keys():
     Molecular = lp.LidarProfile(var_2d_data['molecular'],time_sec,label='Molecular Backscatter Channel',descript = 'Parallel Polarization\nMolecular Backscatter Returns',bin0=47,lidar='GV-HSRL',StartDate=cal_start.date())
     Molecular.time_resample(tedges=master_time,update=True,remainder=False)
     Molecular.bg_subtract(BGIndex)
+    prof_list = prof_list+[Molecular]
+    prof_names = prof_names+['molecular']
 
 if 'combined_hi' in var_2d_data.keys():
     CombHi = lp.LidarProfile(var_2d_data['combined_hi'],time_sec,label='High Gain Total Backscatter Channel',descript = 'Parallel Polarization\nHigh Gain\nCombined Aerosol and Molecular Returns',bin0=47,lidar='GV-HSRL',StartDate=cal_start.date())
     CombHi.time_resample(tedges=master_time,update=True,remainder=False)
     CombHi.bg_subtract(BGIndex)
+    prof_list = prof_list+[CombHi]
+    prof_names = prof_names+['combined_hi']
 
 if 'combined_lo' in var_2d_data.keys():       
     CombLo = lp.LidarProfile(var_2d_data['combined_lo'],time_sec,label='Low Gain Total Backscatter Channel',descript = 'Parallel Polarization\nLow Gain\nCombined Aerosol and Molecular Returns',bin0=47,lidar='GV-HSRL',StartDate=cal_start.date())            
     CombLo.time_resample(tedges=master_time,update=True,remainder=False)
     CombLo.bg_subtract(BGIndex)
+    prof_list = prof_list+[CombLo]
+    prof_names = prof_names+['combined_lo']
+
+profs = dict(zip(prof_names,prof_list))
 
 if FilterI2:
     i2_size = var_1d_data['RemoveLongI2Cell'].size  # size of array.  Don't apply to any arrays that don't have matching time dimensions
@@ -244,8 +348,10 @@ if FilterI2:
     time_dt = time_dt[i2_rem]
     time_sec = time_sec[i2_rem]
     
-fig_data = lp.pcolor_profiles([CombHi,Molecular],ylimits=[0,12])  
-fig_data[1][1].plot(time_sec/3600,var_1d_data['RemoveLongI2Cell']/15,'--')      
+fig_data = lp.pcolor_profiles([CombHi,Molecular],ylimits=[0,12],climits=[[1e-4,1e4],[1e-4,1e4]])  
+fig_data[1][1].plot(time_sec/3600,var_1d_data['RemoveLongI2Cell']/25,'b--')      
+plt.show(block=False)
+
 
 if all(var_1d_data['RemoveLongI2Cell'] > 50):
     print('No intervals found with I2 cell removed')
@@ -269,9 +375,122 @@ else:
             print('%d.)  %.2f - %.2f UTC'%(ai,time_sec[i0[ai]]/3600,time_sec[i1[ai]]/3600))
         else:
             print('%d.)  %.2f - End of file UTC'%(ai,time_sec[i0[ai]]/3600))
-    cal_index = np.int(input('Select Interval (invalid number quits cal)'))
+            i1 = np.concatenate((i1,np.array([-1])))
     
-
+    print('%d.)  custom'%(ai+1))    
+    cal_index = np.int(input('Select Interval (invalid number quits cal): '))
+    
+        
+    
+    if cal_index > len(i0):
+        RunCal = False
+    elif cal_index == len(i0):
+        t_input1 = np.float(input('Enter start time in h-UTC: '))
+        t_input2 = np.float(input('Enter stop time in h-UTC:'))
+        time_range = [t_input1, t_input2]
+        i0 = np.array(list(i0) + np.argmin(np.abs(time_sec-t_input1)))
+        i1 = np.array(list(i1) + np.argmin(np.abs(time_sec-t_input2)))
+    else:
+        time_range = [5*60+time_sec[i0[cal_index]],time_sec[i1[cal_index]]-5*60]
+if RunCal:
+    for pname in profs.keys():
+        profs[pname].slice_time(time_range)
+        profs[pname].time_integrate()
+    
+    pHi = profs['combined_hi'].copy()   
+    pLo = profs['combined_lo'].copy() 
+    pHiLo = profs['combined_hi'].copy()
+    
+    pHi.divide_prof(profs['molecular'])   
+    pLo.divide_prof(profs['molecular'])  
+    pHiLo.divide_prof(profs['combined_lo'])  
+  
+    hi_smooth = savitzky_golay(pHi.profile.flatten(), 11, 5, deriv=0)  
+    #    dhi_smooth = savitzky_golay(pHi.profile.flatten(), 11, 4, deriv=1)
+        
+    plt.figure()
+    plt.plot(pHi.profile.flatten())
+    plt.plot(hi_smooth)
+    plt.title('Hi/Mol Ratio')
+    plt.show(block=False)
+    
+    i_norm = 1000
+    i_const = np.int(input('Make constant above index (e.g. 500): '))
+    i_const_max = np.nonzero(pHi.SNR().flatten() < 0.2*pHi.SNR().flatten()[i_const])[0]
+    i_const_max = i_const_max[np.nonzero(i_const_max > i_const)[0][0]]
+    
+    
+    hi_diff_geo = hi_smooth
+#    hi_diff_geo[i_const:] = hi_diff_geo[i_const]
+#    plt.plot(hi_diff_geo)
+    
+    hi_diff_geo = fit_high_range(hi_diff_geo,pHi.profile_variance,i_const,i_const_max)
+    plt.plot(hi_diff_geo,'--')
+    
+    hi_diff_geo = hi_diff_geo/hi_diff_geo[i_norm]
+#    xfit = np.arange(hi_smooth[i_const:i_const_max].size)
+#    yfit = hi_smooth[i_const:i_const_max]
+#    wfit = 1.0/np.sqrt(pHi.profile_variance[0,i_const:i_const_max].flatten())
+#    wfit[0:5] = 10*np.max(wfit)
+#    #pfit = lp.polyfit_with_fixed_points(1,xfit,yfit, np.array([0]) ,np.array([geo_prof[200]]))
+#    pfit = np.polyfit(xfit,yfit,1,w=wfit)
+#    xprof = np.arange(hi_smooth[i_const:].size)
+#    hi_diff_geo[i_const:] = np.polyval(pfit,xprof)
+    
+    lo_smooth = savitzky_golay(pLo.profile.flatten(), 11, 5, deriv=0) 
+    
+    plt.figure()
+    plt.plot(pLo.profile.flatten())
+    plt.plot(lo_smooth)
+    plt.title('Lo/Mol Ratio')
+    plt.show(block=False)
+    
+    i_const = np.int(input('Make constant above index (e.g. 100): '))
+    i_const_max = np.nonzero(pLo.SNR().flatten() < 0.2*pLo.SNR().flatten()[i_const])[0]
+    i_const_max = i_const_max[np.nonzero(i_const_max > i_const)[0][0]]
+    
+    
+    lo_diff_geo = lo_smooth
+#    lo_diff_geo[i_const:] = lo_diff_geo[i_const]
+#    plt.plot(lo_diff_geo)
+    
+    lo_diff_geo = fit_high_range(lo_diff_geo,pLo.profile_variance,i_const,i_const_max)
+    plt.plot(lo_diff_geo,'--')
+    plt.show(block=False)
+    
+    lo_diff_geo = lo_diff_geo/lo_diff_geo[i_norm]
+    
+    save_cal = input("Save Calibrations[y/n]")
+    
+    if save_cal == 'y' or save_cal == 'Y':
+        write_data = np.ones((hi_diff_geo.size,4))
+        write_data[:,0] = np.arange(hi_diff_geo.size)
+        write_data[:,1] = hi_diff_geo
+        write_data[:,2] = lo_diff_geo
+        
+        header_str = 'profile data from ' + time_dt[i0[cal_index]].strftime('%d-%b-%y %H:%M')+' -->'+time_dt[i1[cal_index]].strftime('%H:%M UTC') +'\n'
+        header_str = header_str+'Gains normalized range bin = %d'%i_norm + '\n'
+        header_str = header_str+'bin #\tdiff_hi/mol\tdiff_lo/mol\tdiff_i2a/mol'
+    
+        save_cal_file = 'diff_geofile_'+time_dt[i0[cal_index]].strftime('%Y%m%dT%H%M')+'.geo'
+#        save_file_path = '/Users/mhayman/Documents/Python/Lidar/'
+        save_file_path = '/h/eol/mhayman/HSRL/hsrl_processing/hsrl_configuration/projDir/calfiles/'
+        
+        print('Saving to:\n  '+save_file_path+save_cal_file)        
+        
+        np.savetxt(save_file_path+save_cal_file,write_data,fmt='\t%d\t%.4e\t%.4e\t%.4e',header=header_str)
+#    plt.figure()
+#    plt.plot((profs['molecular'].profile/profs['combined_hi'].profile).flatten())
+#    plt.title('molecular/combined hi')
+#    
+#    plt.figure(); 
+#    plt.plot((profs['combined_lo'].profile/profs['combined_hi'].profile).flatten())
+#    plt.title('combined lo/hi')
+    
+#    plt.show(block=False)
+    
+    
+    
 # check for power stability
 # add 5 min buffers on either side
 # trim profiles to the selected interval
