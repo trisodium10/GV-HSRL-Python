@@ -72,7 +72,7 @@ pol_xtalk = 0.015
 #c = 3e8
 
 
-FilterI2 = True  # only include data where the I2 cell is removed
+FilterI2 = False  # only include data where the I2 cell is removed
 
 
 var_1d_list = ['total_energy','RemoveLongI2Cell'\
@@ -196,7 +196,12 @@ time_sec = np.array([(x-time_dt[0]).total_seconds() for x in time_dt])
 
 time_dt = np.array(time_dt)
 
-plt.figure(); plt.plot(time_sec/3600,var_1d_data['RemoveLongI2Cell'])
+plt.figure(); 
+plt.plot(time_sec/3600,var_1d_data['RemoveLongI2Cell'])
+plt.grid(b=True)
+plt.xlabel('time [h-UTC]')
+plt.ylabel('Value')
+plt.title('RemoveLongI2Cell')
 
 master_time = np.arange(time_sec[0]-tres/2,time_sec[-1]+tres/2,tres)
 
@@ -239,79 +244,37 @@ if FilterI2:
     time_dt = time_dt[i2_rem]
     time_sec = time_sec[i2_rem]
     
-fig_data = lp.pcolor_profiles([CombHi,Molecular],ylimits=[0,12])            
+fig_data = lp.pcolor_profiles([CombHi,Molecular],ylimits=[0,12])  
+fig_data[1][1].plot(time_sec/3600,var_1d_data['RemoveLongI2Cell']/15,'--')      
 
+if all(var_1d_data['RemoveLongI2Cell'] > 50):
+    print('No intervals found with I2 cell removed')
+    RunCal = False
 
-#        # load profile data
-#        if firstFile:
-#            TransEnergy = TransEnergy0.copy()
-#            timeDsec = timeDsec0.copy()
-#            shot_count = shot_count0.copy()
-#            telescope_direction = telescope_direction0.copy()
-#            telescope_locked = telescope_locked0.copy()            
-#            
-#            CrossPol = lp.LidarProfile(cross_data,timeDsec0,label='Cross Polarization Channel',descript = 'Cross Polarization\nCombined Aerosol and Molecular Returns',bin0=47,lidar='GV-HSRL')
-#            RemCross = CrossPol.time_resample(delta_t=tres,update=True,remainder=True)
-#            
-#            Molecular = lp.LidarProfile(mol_data,timeDsec0,label='Molecular Backscatter Channel',descript = 'Parallel Polarization\nMolecular Backscatter Returns',bin0=47,lidar='GV-HSRL')
-#            RemMol = Molecular.time_resample(delta_t=tres,update=True,remainder=True)
-#            
-#            CombHi = lp.LidarProfile(hi_data,timeDsec0,label='High Gain Total Backscatter Channel',descript = 'Parallel Polarization\nHigh Gain\nCombined Aerosol and Molecular Returns',bin0=47,lidar='GV-HSRL')
-#            RemCombHi = CombHi.time_resample(delta_t=tres,update=True,remainder=True)
-#            
-#            CombLo = lp.LidarProfile(lo_data,timeDsec0,label='Low Gain Total Backscatter Channel',descript = 'Parallel Polarization\nLow Gain\nCombined Aerosol and Molecular Returns',bin0=47,lidar='GV-HSRL')            
-#            RemCombLo = CombLo.time_resample(delta_t=tres,update=True,remainder=True)
-#            
-#            
-##            Molecular = lp.LidarProfile(mol_data.T,dt*np.arange(mol_data.shape[1])+Hour*3600,label='Molecular Backscatter Channel',descript = 'Unpolarization\nMolecular Backscatter Returns',bin0=0,lidar='DLB-HSRL')
-##            RemMol = Molecular.time_resample(i=tres,update=True,remainder=True)
-##            
-##            CombHi = lp.LidarProfile(hi_data.T,dt*np.arange(hi_data.shape[1])+Hour*3600,label='Total Backscatter Channel',descript = 'Unpolarization\nHigh Gain\nCombined Aerosol and Molecular Returns',bin0=0,lidar='DLB-HSRL')
-##            RemCom = CombHi.time_resample(i=tres,update=True,remainder=True)
-#            
-#            firstFile = False
-#            
-#            
-#        else:
-#            TransEnergy = np.concatenate((TransEnergy,TransEnergy0))
-#            timeDsec = np.concatenate((timeDsec,timeDsec0))
-#            shot_count = np.concatenate((shot_count,shot_count0))
-#            telescope_direction = np.concatenate((telescope_direction,telescope_direction0))
-#            telescope_locked = np.concatenate((telescope_locked,telescope_locked0))
-#            
-#            if np.size(RemMol.time) > 0:
-#                MolTmp = lp.LidarProfile(mol_data,timeDsec0,label='Molecular Backscatter Channel',descript = 'Parallel Polarization\nMolecular Backscatter Returns',bin0=47,lidar='GV-HSRL')
-#                MolTmp.cat_time(RemMol)
-#                RemMol = MolTmp.time_resample(delta_t=tres,update=True,remainder=True)
-#                Molecular.cat_time(MolTmp,front=False)
-#                
-#                CrossTmp = lp.LidarProfile(cross_data,timeDsec0,label='Cross Polarization Channel',descript = 'Cross Polarization\nCombined Aerosol and Molecular Returns',bin0=47,lidar='GV-HSRL')
-#                CrossTmp.cat_time(RemCross)
-#                RemCross = CrossTmp.time_resample(delta_t=tres,update=True,remainder=True)
-#                CrossPol.cat_time(CrossTmp,front=False)
-#                
-#                CombHiTmp = lp.LidarProfile(hi_data,timeDsec0,label='High Gain Total Backscatter Channel',descript = 'Parallel Polarization\nHigh Gain\nCombined Aerosol and Molecular Returns',bin0=47,lidar='GV-HSRL')
-#                CombHiTmp.cat_time(RemCombHi)
-#                RemCombHi = CombHiTmp.time_resample(delta_t=tres,update=True,remainder=True)
-#                CombHi.cat_time(CombHiTmp,front=False)
-#                
-#                CombLoTmp = lp.LidarProfile(lo_data,timeDsec0,label='Low Gain Total Backscatter Channel',descript = 'Parallel Polarization\nLow Gain\nCombined Aerosol and Molecular Returns',bin0=47,lidar='GV-HSRL')            
-#                CombLoTmp.cat_time(RemCombHi)
-#                RemCombLo = CombLoTmp.time_resample(delta_t=tres,update=True,remainder=True)
-#                CombLo.cat_time(CombLoTmp,front=False)
-#            else:
-#                MolTmp = lp.LidarProfile(mol_data,timeDsec0,label='Molecular Backscatter Channel',descript = 'Parallel Polarization\nMolecular Backscatter Returns',bin0=47,lidar='GV-HSRL')
-#                RemMol = MolTmp.time_resample(i=tres,update=True,remainder=True)
-#                Molecular.cat_time(MolTmp,front=False)
-#                
-#                CrossTmp = lp.LidarProfile(cross_data,timeDsec0,label='Cross Polarization Channel',descript = 'Cross Polarization\nCombined Aerosol and Molecular Returns',bin0=47,lidar='GV-HSRL')
-#                RemCross = CrossTmp.time_resample(delta_t=tres,update=True,remainder=True)
-#                CrossPol.cat_time(CrossTmp,front=False)
-#                
-#                CombHiTmp = lp.LidarProfile(hi_data,timeDsec0,label='High Gain Total Backscatter Channel',descript = 'Parallel Polarization\nHigh Gain\nCombined Aerosol and Molecular Returns',bin0=47,lidar='GV-HSRL')
-#                RemCombHi = CombHiTmp.time_resample(delta_t=tres,update=True,remainder=True)
-#                CombHi.cat_time(CombHiTmp,front=False)
-#                
-#                CombLoTmp = lp.LidarProfile(lo_data,timeDsec0,label='Low Gain Total Backscatter Channel',descript = 'Parallel Polarization\nLow Gain\nCombined Aerosol and Molecular Returns',bin0=47,lidar='GV-HSRL')            
-#                RemCombLo = CombLoTmp.time_resample(delta_t=tres,update=True,remainder=True)
-#                CombLo.cat_time(CombLoTmp,front=False)
+else:
+    RunCal = True
+    # find times where the i2 cell was inserted/removed
+    ical = np.nonzero(np.diff(var_1d_data['RemoveLongI2Cell'])!=0)[0]
+    if var_1d_data['RemoveLongI2Cell'][0] > 50:
+        i0 = ical[::2]  # start indices
+        i1 = ical[1::2] # stop indices
+    else:
+        i0 = np.concatenate((np.zeros(1),ical[1::2]))  # start indices
+        i1 = ical[::2] # stop indices
+        
+    # ask user to select the interval to use
+    print('Found calibration intervals:')
+    for ai in range(len(i0)):
+        if ai < i1.size:
+            print('%d.)  %.2f - %.2f UTC'%(ai,time_sec[i0[ai]]/3600,time_sec[i1[ai]]/3600))
+        else:
+            print('%d.)  %.2f - End of file UTC'%(ai,time_sec[i0[ai]]/3600))
+    cal_index = np.int(input('Select Interval (invalid number quits cal)'))
+    
+
+# check for power stability
+# add 5 min buffers on either side
+# trim profiles to the selected interval
+
+# perform diff_geo
+
