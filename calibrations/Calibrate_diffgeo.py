@@ -176,7 +176,8 @@ var_2d_data = dict(zip(var_2d_list,[np.array([])]*len(var_2d_list)))
 
 
 #basepath = '/scr/eldora1/HSRL_data/'  # old path - still works with link from HSRL_data to /hsrl/raw/
-basepath = '/scr/eldora1/rsfdata/hsrl/raw/'  # new absolute path
+#basepath = '/scr/eldora1/rsfdata/hsrl/raw/'  # new absolute path
+basepath = '/Users/mhayman/Documents/HSRL/GVHSRL_data/'
 
 
 #FilePath0 = basepath + YearStr + '/' + MonthStr + '/' + DayStr + '/raw/'
@@ -348,6 +349,7 @@ if FilterI2:
     time_dt = time_dt[i2_rem]
     time_sec = time_sec[i2_rem]
     
+lp.plotprofiles(prof_list)
 #fig_data = lp.pcolor_profiles([CombHi,Molecular],ylimits=[0,12],climits=[[1e-4,1e4],[1e-4,1e4]])  
 #fig_data[1][1].plot(time_sec/3600,var_1d_data['RemoveLongI2Cell']/25,'b--')      
 plt.show(block=False)
