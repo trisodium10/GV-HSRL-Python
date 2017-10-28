@@ -303,7 +303,7 @@ prof_list = []
 prof_names = []
 if 'cross' in var_2d_data.keys():
     CrossPol = lp.LidarProfile(var_2d_data['cross'],time_sec,label='Cross Polarization Channel',descript = 'Cross Polarization\nCombined Aerosol and Molecular Returns',bin0=47,lidar='GV-HSRL',StartDate=cal_start.date())
-    CrossPol.time_resample(tedges=master_time,update=True,remainder=False,average=False)
+    CrossPol.time_resample(tedges=master_time,update=True,remainder=False)
     CrossPol.bg_subtract(BGIndex)
     prof_list = prof_list+[CrossPol]
     prof_names = prof_names+['cross']
@@ -317,7 +317,7 @@ if 'molecular' in var_2d_data.keys():
 
 if 'combined_hi' in var_2d_data.keys():
     CombHi = lp.LidarProfile(var_2d_data['combined_hi'],time_sec,label='High Gain Total Backscatter Channel',descript = 'Parallel Polarization\nHigh Gain\nCombined Aerosol and Molecular Returns',bin0=47,lidar='GV-HSRL',StartDate=cal_start.date())
-    CombHi.time_resample(tedges=master_time,update=True,remainder=False,average=False)
+    CombHi.time_resample(tedges=master_time,update=True,remainder=False)
     CombHi.bg_subtract(BGIndex)
     prof_list = prof_list+[CombHi]
     prof_names = prof_names+['combined_hi']
