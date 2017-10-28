@@ -176,8 +176,8 @@ var_2d_data = dict(zip(var_2d_list,[np.array([])]*len(var_2d_list)))
 
 
 #basepath = '/scr/eldora1/HSRL_data/'  # old path - still works with link from HSRL_data to /hsrl/raw/
-#basepath = '/scr/eldora1/rsfdata/hsrl/raw/'  # new absolute path
-basepath = '/Users/mhayman/Documents/HSRL/GVHSRL_data/'
+basepath = '/scr/eldora1/rsfdata/hsrl/raw/'  # new absolute path
+#basepath = '/Users/mhayman/Documents/HSRL/GVHSRL_data/'
 
 
 #FilePath0 = basepath + YearStr + '/' + MonthStr + '/' + DayStr + '/raw/'
