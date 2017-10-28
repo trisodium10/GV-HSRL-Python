@@ -348,8 +348,8 @@ if FilterI2:
     time_dt = time_dt[i2_rem]
     time_sec = time_sec[i2_rem]
     
-fig_data = lp.pcolor_profiles([CombHi,Molecular],ylimits=[0,12],climits=[[1e-4,1e4],[1e-4,1e4]])  
-fig_data[1][1].plot(time_sec/3600,var_1d_data['RemoveLongI2Cell']/25,'b--')      
+#fig_data = lp.pcolor_profiles([CombHi,Molecular],ylimits=[0,12],climits=[[1e-4,1e4],[1e-4,1e4]])  
+#fig_data[1][1].plot(time_sec/3600,var_1d_data['RemoveLongI2Cell']/25,'b--')      
 plt.show(block=False)
 
 
