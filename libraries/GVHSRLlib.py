@@ -156,7 +156,10 @@ def load_raw_data(start_time,stop_time,var_2d_list,var_1d_list,basepath = '/scr/
             for var in var_1d_data.keys():
                 if any(var in s for s in f.variables):
                     var_data = lp.ncvar(f,var)
-                    var_1d_data[var] = np.concatenate((var_1d_data[var],var_data)) 
+                    if len(var_1d_data[var]) > 0:
+                        var_1d_data[var] = np.concatenate((var_1d_data[var],var_data)) 
+                    else:
+                        var_1d_data[var] = var_data.copy()
                 
             # System for time array still needs work
             timeD0 = np.array(f.variables['DATA_time'][:]).astype(np.int)

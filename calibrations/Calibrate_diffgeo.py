@@ -93,7 +93,7 @@ FilterI2 = False  # only include data where the I2 cell is removed
 
 # list of 1D variables to load
 var_1d_list = ['total_energy','RemoveLongI2Cell'\
-    ,'TelescopeDirection','TelescopeLocked','polarization']  # 'DATA_shot_count'
+    ,'TelescopeDirection','TelescopeLocked','polarization','DATA_shot_count']  # 'DATA_shot_count'
 
 # list of 2D variables (profiles) to load
 var_2d_list = ['molecular','combined_hi','combined_lo']  # 'cross',
@@ -106,15 +106,29 @@ basepath = '/scr/eldora1/rsfdata/hsrl/raw/'  # new absolute path
 
 
 # grab raw data from netcdf files
-[timeD,time_dt,time_sec],var_1d_data, profs = gv.load_raw_data(cal_start,cal_stop,var_2d_list,var_1d_list,basepath = basepath ,verbose=True,as_prof=True)
+[timeD,time_dt,time_sec],var_1d_data, profs = gv.load_raw_data(cal_start,cal_stop,var_2d_list,var_1d_list,basepath=basepath,verbose=True,as_prof=True)
 
 # plot I2 cell status
-plt.figure(); 
-plt.plot(time_sec/3600,var_1d_data['RemoveLongI2Cell'])
-plt.grid(b=True)
-plt.xlabel('time [h-UTC]')
-plt.ylabel('Value')
-plt.title('RemoveLongI2Cell')
+#plt.figure(); 
+#plt.plot(time_sec/3600,var_1d_data['RemoveLongI2Cell'])
+#plt.grid(b=True)
+#plt.xlabel('time [h-UTC]')
+#plt.ylabel('Value')
+#plt.title('RemoveLongI2Cell')
+
+# equation for estimating transmit power is assumed based on known approximate
+# DAQ output.  The conversion used here could be incorrect.
+fig, ax1 = plt.subplots(); 
+ax1.plot(time_sec/3600.0,0.5*var_1d_data['total_energy']/var_1d_data['DATA_shot_count'][:,0],'b'); 
+ax1.set_xlabel('time [h-UTC]'); 
+ax1.set_ylabel('Transmit Power [mW]', color='b')
+ax1.tick_params('y', colors='b')
+ax1.grid(b=True)
+ax2 = ax1.twinx(); 
+ax2.plot(time_sec/3600,var_1d_data['RemoveLongI2Cell'],'r');
+ax2.set_ylabel('RemoveLongI2Cell', color='r')
+ax2.tick_params('y', colors='r')
+
 
 # set the master time to match all 2D profiles to
 # (1d data will not be resampled)

@@ -58,7 +58,7 @@ cal_stop = cal_start + datetime.timedelta(hours=stop_hr)
 
 
 var_1d_list = ['total_energy','RemoveLongI2Cell'\
-    ,'TelescopeDirection','TelescopeLocked','polarization']  # 'DATA_shot_count'
+    ,'TelescopeDirection','TelescopeLocked','polarization','DATA_shot_count']  # 'DATA_shot_count'
 
 
 var_2d_list = ['cross','molecular','combined_hi','combined_lo']
@@ -67,16 +67,9 @@ var_2d_list = ['cross','molecular','combined_hi','combined_lo']
 
 save_file_name = 'baseline_correction_'+cal_start.strftime('%Y%m%dT%H%M')+'.blc'
 
-
+# write out zeros for baseline correction
 write_data = np.zeros((4000,7))
 write_data[:,0] = np.arange(write_data.shape[0])
-
-# write out zeros for baseline correction
-#file = open(save_file_path+save_file_name,'w') 
-#file.write('#profile data from ' + cal_start.strftime('%d-%b-%y %H:%M')+' -->'+cal_stop.strftime('%H:%M UTC'))
-#file.write('#ave energy per shot= 0.06000    mJ')
-#header_str = 'bin_num\tcombined_hi\tcombined_lo\tmolecular\tcrosspol\tmol_I2A\tcomb_1064'
-#file.close()
 
 header_str = 'profile data from ' + cal_start.strftime('%d-%b-%y %H:%M')+' -->'+cal_stop.strftime('%H:%M UTC') + '\n'
 header_str = header_str + 'ave energy per shot= 0.06000    mJ\n'
