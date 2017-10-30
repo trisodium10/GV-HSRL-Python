@@ -36,10 +36,15 @@ try:
 except NameError:
     pass
 
-#save_file_path = '/Users/mhayman/Documents/Python/Lidar/'
-save_file_path = '/h/eol/mhayman/HSRL/hsrl_processing/hsrl_configuration/projDir/calfiles/'
+
 
 save_path_ez = os.path.abspath(__file__+'/../cal_files/')+'/'
+
+save_file_path = save_path_ez
+#save_file_path = '/Users/mhayman/Documents/Python/Lidar/'
+#save_file_path = '/h/eol/mhayman/HSRL/hsrl_processing/hsrl_configuration/projDir/calfiles/'
+
+
 sg_win = 11
 sg_order = 5
         
@@ -86,14 +91,13 @@ pol_xtalk = 0.015
 
 FilterI2 = False  # only include data where the I2 cell is removed
 
-
+# list of 1D variables to load
 var_1d_list = ['total_energy','RemoveLongI2Cell'\
     ,'TelescopeDirection','TelescopeLocked','polarization']  # 'DATA_shot_count'
-var_1d_data = dict(zip(var_1d_list,[np.array([])]*len(var_1d_list)))
-timeD = np.array([])
 
+# list of 2D variables (profiles) to load
 var_2d_list = ['molecular','combined_hi','combined_lo']  # 'cross',
-var_2d_data = dict(zip(var_2d_list,[np.array([])]*len(var_2d_list)))
+
 
 
 #basepath = '/scr/eldora1/HSRL_data/'  # old path - still works with link from HSRL_data to /hsrl/raw/
@@ -101,9 +105,10 @@ basepath = '/scr/eldora1/rsfdata/hsrl/raw/'  # new absolute path
 #basepath = '/Users/mhayman/Documents/HSRL/GVHSRL_data/'  # local computer data path
 
 
-
+# grab raw data from netcdf files
 [timeD,time_dt,time_sec],var_1d_data, profs = gv.load_raw_data(cal_start,cal_stop,var_2d_list,var_1d_list,basepath = basepath ,verbose=True,as_prof=True)
 
+# plot I2 cell status
 plt.figure(); 
 plt.plot(time_sec/3600,var_1d_data['RemoveLongI2Cell'])
 plt.grid(b=True)
@@ -111,31 +116,37 @@ plt.xlabel('time [h-UTC]')
 plt.ylabel('Value')
 plt.title('RemoveLongI2Cell')
 
+# set the master time to match all 2D profiles to
+# (1d data will not be resampled)
 master_time = np.arange(time_sec[0]-tres/2,time_sec[-1]+tres/2,tres)
 
 for var in profs.keys():
     profs[var].time_resample(tedges=master_time,update=True,remainder=False)
     profs[var].bg_subtract(BGIndex)
 
-if FilterI2:
-    i2_size = var_1d_data['RemoveLongI2Cell'].size  # size of array.  Don't apply to any arrays that don't have matching time dimensions
-    i2_rem = np.nonzero(var_1d_data['RemoveLongI2Cell'] < 50)[0]  # data points where the I2 cell is removed
-    
-    for var in var_1d_data.keys():
-            if var_1d_data[var].size == i2_size:
-                var_1d_data[var] = var_1d_data[var][i2_rem]
-            else:
-                print(var+' does not have time dimension that matches RemoveLongI2Cell')
-    
-    time_dt = time_dt[i2_rem]
-    time_sec = time_sec[i2_rem]
+## option to remove all data where the I2 cell is not removed.
+## depricated
+#if FilterI2:
+#    i2_size = var_1d_data['RemoveLongI2Cell'].size  # size of array.  Don't apply to any arrays that don't have matching time dimensions
+#    i2_rem = np.nonzero(var_1d_data['RemoveLongI2Cell'] < 50)[0]  # data points where the I2 cell is removed
+#    
+#    for var in var_1d_data.keys():
+#            if var_1d_data[var].size == i2_size:
+#                var_1d_data[var] = var_1d_data[var][i2_rem]
+#            else:
+#                print(var+' does not have time dimension that matches RemoveLongI2Cell')
+#    
+#    time_dt = time_dt[i2_rem]
+#    time_sec = time_sec[i2_rem]
 
 lp.plotprofiles(profs)
+# overlay profiles and I2 cell status to help determine the calibration interval
 fig_data = lp.pcolor_profiles([profs['combined_hi'],profs['molecular']],ylimits=[0,12],climits=[[1e-4,1e4],[1e-4,1e4]])  
 fig_data[1][1].plot(time_sec/3600,var_1d_data['RemoveLongI2Cell']/25,'b--')      
 plt.show(block=False)
 
-
+# check if the I2 cell is ever removed in the data.  If not, kill the 
+# process.  No point in running the calibration
 if all(var_1d_data['RemoveLongI2Cell'] > 50):
     print('No intervals found with I2 cell removed')
     RunCal = False
@@ -165,28 +176,34 @@ else:
     
         
     
-    if cal_index > len(i0):
+    if cal_index > len(i0) or cal_index < 0:
+        # if the user gives an out of bounds number, quit the routine
         RunCal = False
     elif cal_index == len(i0):
+        # the user wants to enter a custom range
         t_input1 = np.float(input('Enter start time in h-UTC: '))
         t_input2 = np.float(input('Enter stop time in h-UTC:'))
         time_range = [t_input1, t_input2]
         i0 = np.array(list(i0) + np.argmin(np.abs(time_sec-t_input1)))
         i1 = np.array(list(i1) + np.argmin(np.abs(time_sec-t_input2)))
     else:
+        # the user selects a pre-defined calibration interval
         time_range = [5*60+time_sec[i0[cal_index]],time_sec[i1[cal_index]]-5*60]
 if RunCal:
+    # integrate the profiles over the selected time region
     for pname in profs.keys():
         profs[pname].slice_time(time_range)
         profs[pname].time_integrate()
     
+    # ratio the profiles to obtain the diff-geo corrections
     pHi = profs['combined_hi'].copy()   
     pLo = profs['combined_lo'].copy() 
-    pHiLo = profs['combined_hi'].copy()
+#    pHiLo = profs['combined_hi'].copy()
     
+    # using LidarProfile data types helps propagate the error
     pHi.divide_prof(profs['molecular'])   
     pLo.divide_prof(profs['molecular'])  
-    pHiLo.divide_prof(profs['combined_lo'])  
+#    pHiLo.divide_prof(profs['combined_lo'])  
   
     hi_smooth = gv.savitzky_golay(pHi.profile.flatten(), sg_win, sg_order, deriv=0)  
     #    dhi_smooth = savitzky_golay(pHi.profile.flatten(), 11, 4, deriv=1)
