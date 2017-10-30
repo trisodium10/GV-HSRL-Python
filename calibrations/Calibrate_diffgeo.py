@@ -171,7 +171,7 @@ var_1d_list = ['total_energy','RemoveLongI2Cell'\
 var_1d_data = dict(zip(var_1d_list,[np.array([])]*len(var_1d_list)))
 timeD = np.array([])
 
-var_2d_list = ['cross','molecular','combined_hi','combined_lo']
+var_2d_list = ['molecular','combined_hi','combined_lo']  # 'cross',
 var_2d_data = dict(zip(var_2d_list,[np.array([])]*len(var_2d_list)))
 
 
@@ -268,18 +268,7 @@ for idir in range(len(SubFiles)):
             else:
                 var_2d_data[var] = np.vstack((var_2d_data[var],f.variables[var][:]))
                 
-        
-#        print(f.variables['cross'][:].copy().shape)     
-        
-#        if len(cross_data) != 0:
-#            cross_data = np.hstack()
-#            
-#        cross_data = lp.profile_netcdf(f.variables['cross'])
-#        mol_data = lp.profile_netcdf(f.variables['molecular'])
-#        hi_data = lp.profile_netcdf(f.variables['combined_hi'])
-#        lo_data = lp.profile_netcdf(f.variables['combined_lo'])
-        
-##        print('%d,%d'(hi_data.data.shape[0],hi_data.data.shape[1]))
+    
         f.close()
 #timeD = timeD[:,:8]
 timeD[:,6] = timeD[:,6]*1e3+timeD[:,7]
@@ -350,8 +339,8 @@ if FilterI2:
     time_sec = time_sec[i2_rem]
     
 lp.plotprofiles(prof_list)
-#fig_data = lp.pcolor_profiles([CombHi,Molecular],ylimits=[0,12],climits=[[1e-4,1e4],[1e-4,1e4]])  
-#fig_data[1][1].plot(time_sec/3600,var_1d_data['RemoveLongI2Cell']/25,'b--')      
+fig_data = lp.pcolor_profiles([CombHi,Molecular],ylimits=[0,12],climits=[[1e-4,1e4],[1e-4,1e4]])  
+fig_data[1][1].plot(time_sec/3600,var_1d_data['RemoveLongI2Cell']/25,'b--')      
 plt.show(block=False)
 
 
