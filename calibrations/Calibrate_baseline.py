@@ -28,7 +28,12 @@ import GVHSRLlib as gv
 Write a baseline file with all zeros
 """
 
-
+# input and raw_input are the same for python 3 and 2 respectively
+# this makes it so input always accepts a string
+try:
+    input=raw_input
+except NameError:
+    pass
 
 save_path_ez = os.path.abspath(__file__+'/../cal_files/')+'/'
 
