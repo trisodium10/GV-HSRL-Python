@@ -211,7 +211,7 @@ if RunCal:
                 fit_sol_list = fit_sol_list+[fit_sol]
                 fit_prof0 = fit_prof0-np.exp(fit_sol.flatten())
             
-                ifit_last = ifit.copy()
+                ifit_last = [ifit[0],ifit[1]]
            
                 
                 next_index = np.nonzero(np.abs(fit_prof0[:ifit[0]-1]/fit_std0[:ifit[0]-1]) > 4.0)[0]
@@ -265,7 +265,7 @@ if RunCal:
         plt.semilogy(profs[var].profile.flatten())
         plt.semilogy(fit_sol_sum)
         plt.semilogy(sol_merge,'r--')
-        plt.legend(['raw signa','fit signal','merged'])
+        plt.legend(['raw signal','fit signal','merged'])
         plt.title('baseline '+var)
         plt.grid(b=True)
         

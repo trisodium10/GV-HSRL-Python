@@ -295,7 +295,8 @@ if RunCal:
             hi_diff_var=pHi.profile_variance.data.flatten(),lo_diff_var=pLo.profile_variance.data.flatten(),\
             hi_prof = pHi.profile.data.flatten(),lo_prof = pLo.profile.data.flatten(),\
             sg_win = sg_win, sg_order = sg_order, i_norm = i_norm, 
-            range_array=pHi.range_array,lo_norm=lo_norm,hi_norm=hi_norm)
+            range_array=pHi.range_array,lo_norm=lo_norm,hi_norm=hi_norm, \
+            TelescopeDirection = np.nanmean(var_1d_data['TelescopeDirection'][i0[cal_index]:i1[cal_index]]))
         
         
 
