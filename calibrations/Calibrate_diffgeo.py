@@ -241,7 +241,8 @@ if RunCal:
     hi_diff_geo = gv.fit_high_range(hi_diff_geo,pHi.profile_variance,i_const,i_const_max)
     plt.plot(hi_diff_geo,'--')
     
-    hi_diff_geo = hi_diff_geo/hi_diff_geo[i_norm]
+    hi_norm = hi_diff_geo[i_norm]
+    hi_diff_geo = hi_diff_geo/hi_norm
     
     lo_smooth = gv.savitzky_golay(pLo.profile.flatten(), sg_win, sg_order, deriv=0) 
     
@@ -251,7 +252,7 @@ if RunCal:
     plt.title('Lo/Mol Ratio')
     plt.show(block=False)
     
-    i_const = np.int(input('Make constant above index (e.g. 100): '))
+    i_const = np.int(input('Make constant above index (e.g. 590): '))
     i_const_max = np.nonzero(pLo.SNR().flatten() < 0.2*pLo.SNR().flatten()[i_const])[0]
     i_const_max = i_const_max[np.nonzero(i_const_max > i_const)[0][0]]
     
@@ -264,7 +265,8 @@ if RunCal:
     plt.plot(lo_diff_geo,'--')
     plt.show(block=False)
     
-    lo_diff_geo = lo_diff_geo/lo_diff_geo[i_norm]
+    lo_norm = lo_diff_geo[i_norm]
+    lo_diff_geo = lo_diff_geo/lo_norm
     
     save_cal = input("Save Calibrations[y/n]")
     
@@ -292,7 +294,8 @@ if RunCal:
             hi_diff_geo=hi_diff_geo,lo_diff_geo=lo_diff_geo, \
             hi_diff_var=pHi.profile_variance.data.flatten(),lo_diff_var=pLo.profile_variance.data.flatten(),\
             hi_prof = pHi.profile.data.flatten(),lo_prof = pLo.profile.data.flatten(),\
-            sg_win = sg_win, sg_order = sg_order, i_norm = i_norm)
+            sg_win = sg_win, sg_order = sg_order, i_norm = i_norm, 
+            range_array=pHi.range_array,lo_norm=lo_norm,hi_norm=hi_norm)
         
         
 
