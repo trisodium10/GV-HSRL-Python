@@ -190,22 +190,26 @@ if RunCal:
             fit_prof = np.delete(fit_prof,inan)
             fit_range = np.delete(fit_range,inan)
             
-            mat = np.ones((fit_range.size,2))
-            mat[:,1] = fit_range
+            if len(fit_prof) < 2:
+                loop_on = False
             
-            sol_list = sol_list+[np.dot(np.linalg.pinv(mat),fit_prof[:,np.newaxis])]
-            error_list = error_list+[np.mean((fit_prof-np.dot(mat,sol_list[ai]))**2)]
-            
-            matsol = np.ones((profs[var].range_array.size,2))
-            matsol[:,1] = profs[var].range_array
-            fit_sol = np.dot(matsol,sol_list[ai])   
-            
-            fit_sol_sum = fit_sol_sum + np.exp(fit_sol.flatten())  
-            mean_fit_error = mean_fit_error + [np.nanmean((profs[var].profile.flatten()[ifit[0]:]-fit_sol_sum[ifit[0]:])**2/fit_std0[ifit[0]:]**2)] 
-            
-            if ai > 0:
-                if np.abs(mean_fit_error[ai]-mean_fit_error[ai-1])/mean_fit_error[ai-1] > np.max([1.0/ai,0.1]):
-                    loop_on = False
+            if loop_on:
+                mat = np.ones((fit_range.size,2))
+                mat[:,1] = fit_range
+                
+                sol_list = sol_list+[np.dot(np.linalg.pinv(mat),fit_prof[:,np.newaxis])]
+                error_list = error_list+[np.mean((fit_prof-np.dot(mat,sol_list[ai]))**2)]
+                
+                matsol = np.ones((profs[var].range_array.size,2))
+                matsol[:,1] = profs[var].range_array
+                fit_sol = np.dot(matsol,sol_list[ai])   
+                
+                fit_sol_sum = fit_sol_sum + np.exp(fit_sol.flatten())  
+                mean_fit_error = mean_fit_error + [np.nanmean((profs[var].profile.flatten()[ifit[0]:]-fit_sol_sum[ifit[0]:])**2/fit_std0[ifit[0]:]**2)] 
+                
+                if ai > 0:
+                    if np.abs(mean_fit_error[ai]-mean_fit_error[ai-1])/mean_fit_error[ai-1] > np.max([1.0/ai,0.1]):
+                        loop_on = False
             
             if loop_on:
                 fit_sol_list = fit_sol_list+[fit_sol]
