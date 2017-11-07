@@ -41,7 +41,7 @@ cal_file_path = os.path.abspath(__file__+'/../../calibrations/cal_files/')+'/'
 tres = 1*60.0  # resolution in time in seconds (0.5 sec)
 zres = 10.0  # resolution in altitude points (7.5 m)
 
-mol_gain = 1.0728915  # gain adjustment to molecular channel
+mol_gain = 1.133915#1.0728915  # gain adjustment to molecular channel
 
 # index for where to treat the profile as background only
 BGIndex = -100; # negative number provides an index from the end of the array
@@ -135,5 +135,42 @@ BSR.label = 'Backscatter Ratio'
 BSR.profile_type = 'unitless'
 BSR.divide_prof(profs['molecular'])
 
-lp.plotprofiles(profs)
-lp.pcolor_profiles([BSR],scale=['log'],climits=[[1,5e2]])
+bbsr = np.linspace(0,4,400)
+bsnr = np.linspace(10,150,100)
+hbsr = np.histogram2d(BSR.profile.flatten(),BSR.SNR().flatten(),bins=[bbsr,bsnr])
+plt.figure()
+plt.pcolor(bbsr,bsnr,hbsr[0].T)
+
+i_hist_median = np.argmax(hbsr[0],axis=0)
+iset = np.arange(hbsr[0].shape[1])
+dh1 = hbsr[0][i_hist_median,iset]-hbsr[0][i_hist_median-1,iset]
+dh2 = hbsr[0][i_hist_median+1,iset]-hbsr[0][i_hist_median,iset]
+dbsr = np.mean(np.diff(bbsr))
+bsr1 = bbsr[i_hist_median]
+bsr2 = bbsr[i_hist_median+1]
+
+m_0 = (dh2-dh1)/dbsr
+b_0 = dh1-m_0*bsr1
+
+Nsm = 6  # number of bins to smooth over
+hist_median = (-b_0)/m_0
+hist_med_sm = np.convolve(hist_median,np.ones(Nsm)*1.0/Nsm,mode='same')
+
+#hist_median = bbsr[i_hist_median]
+
+plt.figure()
+plt.pcolor(bbsr,bsnr,hbsr[0].T)
+plt.plot(hist_median,bsnr[1:],'r--')
+plt.plot(hist_med_sm,bsnr[1:],'g--')
+plt.xlabel('BSR')
+plt.ylabel('BSR SNR')
+
+i_snr_lim = np.nonzero(np.logical_and(bsnr < 80,bsnr > 20))[0]
+
+mol_gain_adj = np.nanmin(hist_med_sm[i_snr_lim])
+
+print('Current Molecular Gain: %f'%mol_gain)
+print('Suggested Molecular Gain: %f'%(mol_gain*mol_gain_adj))
+
+#lp.plotprofiles(profs)
+#lp.pcolor_profiles([BSR],scale=['log'],climits=[[1,5e2]])
