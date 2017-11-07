@@ -1,5 +1,5 @@
 {
-	"lidar name": "GV-HSRL",
+	"lidar name": [{"value":"GV-HSRL"}],
 	"MCS bins": [
 		{"date": "7-Dec-2013, 0:0","value": 280}
 	],

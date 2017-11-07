@@ -126,7 +126,7 @@ with open(cal_file,"r") as f:
     cal_json = json.loads(f.read())
 
 mol_gain,diff_geo_file = lp.get_calval(time_start,cal_json,"Molecular Gain",returnlist=['value','diff_geo'])
-baseline_file = lp.get_calval(time_start,cal_json,"Baseline File")
+baseline_file = lp.get_calval(time_start,cal_json,"Baseline File")[0]
 
 # load differential overlap correction
 diff_data = np.load(cal_file_path+diff_geo_file)
