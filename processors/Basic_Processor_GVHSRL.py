@@ -21,6 +21,8 @@ import LidarProfileFunctions as lp
 import datetime
 #import glob
 
+import json
+
 import GVHSRLlib as gv
     
 
@@ -35,13 +37,14 @@ except NameError:
 
 
 cal_file_path = os.path.abspath(__file__+'/../../calibrations/cal_files/')+'/'
+cal_file = cal_file_path + 'gv_calvals.json'
 #save_file_path = '/Users/mhayman/Documents/Python/Lidar/'
 #save_file_path = '/h/eol/mhayman/HSRL/hsrl_processing/hsrl_configuration/projDir/calfiles/'
 
 tres = 1*60.0  # resolution in time in seconds (0.5 sec)
 zres = 10.0  # resolution in altitude points (7.5 m)
 
-mol_gain = 1.133915#1.0728915  # gain adjustment to molecular channel
+#mol_gain = 1.133915#1.0728915  # gain adjustment to molecular channel
 
 # index for where to treat the profile as background only
 BGIndex = -100; # negative number provides an index from the end of the array
@@ -119,8 +122,17 @@ for var in profs.keys():
     int_profs[var].bg_subtract(BGIndex)
     int_profs[var].slice_range(range_lim=[0,MaxAlt])
 
+with open(cal_file,"r") as f:
+    cal_json = json.loads(f.read())
+
+mol_gain,diff_geo_file = lp.get_calval(time_start,cal_json,"Molecular Gain",returnlist=['value','diff_geo'])
+baseline_file = lp.get_calval(time_start,cal_json,"Baseline File")
+
 # load differential overlap correction
-diff_data = np.load(cal_file_path+'diff_geo_GVHSRL20171025_tmp.npz')
+diff_data = np.load(cal_file_path+diff_geo_file)
+baseline_data = np.load(cal_file_path+baseline_file)
+#diff_data = np.load(cal_file_path+'diff_geo_GVHSRL20171025_tmp.npz')
+#baseline_data = np.load(cal_file_path+'diff_geo_GVHSRL20171025_tmp.npz')
 
 lp.plotprofiles(profs)
 
