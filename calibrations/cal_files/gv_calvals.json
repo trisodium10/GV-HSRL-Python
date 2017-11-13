@@ -9,7 +9,8 @@
 
 	"Molecular Gain": [
 		{"date": "12-Oct-2017, 0:0","value": 1.0728915, "diff_geo": "diff_geo_GVHSRL20171025.npz", "change type": "abrupt"},
-		{"date": "27-Oct-2017, 0:0","value": 1.133915, "diff_geo": "diff_geo_GVHSRL20171025.npz", "change type": "gradual"}
+		{"date": "27-Oct-2017, 0:0","value": 1.133915, "diff_geo": "diff_geo_GVHSRL20171025.npz", "change type": "gradual"},
+		{"date": "9-Nov-2017, 0:0","value": 1.099211, "diff_geo": "diff_geo_GVHSRL20171025.npz", "change type": "gradual"}
 	],
 	"Baseline File": [
 		{"date": "12-Oct-2017, 0:0","value": "baseline_20171019T2000.npz", "change type": "abrupt"}
