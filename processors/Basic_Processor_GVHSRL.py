@@ -55,6 +55,8 @@ RemoveCals = True   # don't include instances where the I2 cell is removed
                     # scan files are not included in the file search so they
                     # are removed anyway
 
+diff_geo_correct = True  # apply differential overlap correction
+
 sg_win = 11
 sg_order = 5
 
@@ -103,6 +105,18 @@ if 'RemoveLongI2Cell' in var_1d_data.keys():
 else:
     cal_indices = []
 
+with open(cal_file,"r") as f:
+    cal_json = json.loads(f.read())
+
+mol_gain,diff_geo_file = lp.get_calval(time_start,cal_json,"Molecular Gain",returnlist=['value','diff_geo'])
+baseline_file = lp.get_calval(time_start,cal_json,"Baseline File")[0]
+# load differential overlap correction
+diff_data = np.load(cal_file_path+diff_geo_file)
+baseline_data = np.load(cal_file_path+baseline_file)
+#diff_data = np.load(cal_file_path+'diff_geo_GVHSRL20171025_tmp.npz')
+#baseline_data = np.load(cal_file_path+'diff_geo_GVHSRL20171025_tmp.npz')
+
+
 # set the master time to match all 2D profiles to
 # (1d data will not be resampled)
 master_time = np.arange(time_sec[0]-tres/2,time_sec[-1]+tres/2,tres)
@@ -118,28 +132,27 @@ for var in profs.keys():
     int_profs[var].time_integrate()
     
     profs[var].bg_subtract(BGIndex)
+    if var == 'combined_hi' and diff_geo_correct:
+        profs[var].diff_geo_overlap_correct(diff_data['hi_diff_geo'])
+    elif var == 'combined_lo' and diff_geo_correct:
+        profs[var].diff_geo_overlap_correct(diff_data['hi_diff_geo'])
+        profs[var].gain_scale(1.0/diff_data['lo_norm'])
     profs[var].slice_range(range_lim=[0,MaxAlt])
     int_profs[var].bg_subtract(BGIndex)
     int_profs[var].slice_range(range_lim=[0,MaxAlt])
 
-with open(cal_file,"r") as f:
-    cal_json = json.loads(f.read())
 
-mol_gain,diff_geo_file = lp.get_calval(time_start,cal_json,"Molecular Gain",returnlist=['value','diff_geo'])
-baseline_file = lp.get_calval(time_start,cal_json,"Baseline File")[0]
 
-# load differential overlap correction
-diff_data = np.load(cal_file_path+diff_geo_file)
-baseline_data = np.load(cal_file_path+baseline_file)
-#diff_data = np.load(cal_file_path+'diff_geo_GVHSRL20171025_tmp.npz')
-#baseline_data = np.load(cal_file_path+'diff_geo_GVHSRL20171025_tmp.npz')
+
+
+
 
 lp.plotprofiles(profs)
 
 profs['molecular'].gain_scale(mol_gain)
-profs['combined_hi'].diff_geo_overlap_correct(diff_data['hi_diff_geo'][:profs['combined_hi'].range_array.size])
-profs['combined_lo'].diff_geo_overlap_correct(diff_data['lo_diff_geo'][:profs['combined_lo'].range_array.size])
-profs['combined_lo'].gain_scale(1.0/diff_data['lo_norm'])
+#profs['combined_hi'].diff_geo_overlap_correct(diff_data['hi_diff_geo'][:profs['combined_hi'].range_array.size])
+#profs['combined_lo'].diff_geo_overlap_correct(diff_data['lo_diff_geo'][:profs['combined_lo'].range_array.size])
+#profs['combined_lo'].gain_scale(1.0/diff_data['lo_norm'])
 
 BSR = profs['combined_hi'].copy()
 BSR.descript = 'Ratio of combined to molecular backscatter'
@@ -150,8 +163,8 @@ BSR.divide_prof(profs['molecular'])
 bbsr = np.linspace(0,4,400)
 bsnr = np.linspace(10,150,100)
 hbsr = np.histogram2d(BSR.profile.flatten(),BSR.SNR().flatten(),bins=[bbsr,bsnr])
-plt.figure()
-plt.pcolor(bbsr,bsnr,hbsr[0].T)
+#plt.figure()
+#plt.pcolor(bbsr,bsnr,hbsr[0].T)
 
 i_hist_median = np.argmax(hbsr[0],axis=0)
 iset = np.arange(hbsr[0].shape[1])
@@ -185,4 +198,4 @@ print('Current Molecular Gain: %f'%mol_gain)
 print('Suggested Molecular Gain: %f'%(mol_gain*mol_gain_adj))
 
 #lp.plotprofiles(profs)
-#lp.pcolor_profiles([BSR],scale=['log'],climits=[[1,5e2]])
+lp.pcolor_profiles([BSR],scale=['log'],climits=[[1,5e2]])
