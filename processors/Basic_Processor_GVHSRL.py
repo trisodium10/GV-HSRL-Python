@@ -24,6 +24,8 @@ import datetime
 import json
 
 import GVHSRLlib as gv
+
+import ExternalDataFunctions as ex
     
 
 
@@ -38,6 +40,9 @@ except NameError:
 
 cal_file_path = os.path.abspath(__file__+'/../../calibrations/cal_files/')+'/'
 cal_file = cal_file_path + 'gv_calvals.json'
+
+reanalysis_path = os.path.abspath(__file__+'/../../../external_data/')+'/'
+
 #save_file_path = '/Users/mhayman/Documents/Python/Lidar/'
 #save_file_path = '/h/eol/mhayman/HSRL/hsrl_processing/hsrl_configuration/projDir/calfiles/'
 
@@ -49,7 +54,7 @@ zres = 10.0  # resolution in altitude points (7.5 m)
 # index for where to treat the profile as background only
 BGIndex = -100; # negative number provides an index from the end of the array
 platform = 'ground' # 'ground' or 'airborne'.  If 'airborne' it needs an aircraft netcdf.
-MaxAlt = 14e3
+MaxAlt = 10e3
 
 RemoveCals = True   # don't include instances where the I2 cell is removed
                     # scan files are not included in the file search so they
@@ -67,8 +72,8 @@ basepath = '/scr/eldora1/rsfdata/hsrl/raw/'  # new absolute path
 year_in = 2017
 month_in = 10
 day_in = 27
-start_hr = 17.2
-stop_hr = 4
+start_hr = 10 #17.2
+stop_hr = 12# 4
 
 print('Default Test Date:')
 print('(M/D/Y) %d/%d/%d, starting %.1f UTC for %.1f h'%(month_in,day_in,year_in,start_hr,stop_hr))
@@ -89,7 +94,7 @@ var_1d_list = ['total_energy','RemoveLongI2Cell'\
     ,'TelescopeDirection','TelescopeLocked','polarization','DATA_shot_count']  # 'DATA_shot_count'
 
 # list of 2D variables (profiles) to load
-var_2d_list = ['molecular','combined_hi','combined_lo']  # 'cross',
+var_2d_list = ['molecular','combined_hi','combined_lo','cross']
 
 
 
@@ -107,6 +112,7 @@ else:
 
 with open(cal_file,"r") as f:
     cal_json = json.loads(f.read())
+f.close()
 
 mol_gain,diff_geo_file = lp.get_calval(time_start,cal_json,"Molecular Gain",returnlist=['value','diff_geo'])
 baseline_file = lp.get_calval(time_start,cal_json,"Baseline File")[0]
@@ -116,6 +122,7 @@ baseline_data = np.load(cal_file_path+baseline_file)
 #diff_data = np.load(cal_file_path+'diff_geo_GVHSRL20171025_tmp.npz')
 #baseline_data = np.load(cal_file_path+'diff_geo_GVHSRL20171025_tmp.npz')
 
+lidar_location = lp.get_calval(time_start,cal_json,"Location",returnlist=['latitude','longitude'])
 
 # set the master time to match all 2D profiles to
 # (1d data will not be resampled)
@@ -144,7 +151,7 @@ for var in profs.keys():
 
 
 
-
+pres,temp = ex.load_fixed_point_NCEP_TandP(profs['molecular'],lidar_location,reanalysis_path)
 
 
 lp.plotprofiles(profs)
@@ -154,11 +161,34 @@ profs['molecular'].gain_scale(mol_gain)
 #profs['combined_lo'].diff_geo_overlap_correct(diff_data['lo_diff_geo'][:profs['combined_lo'].range_array.size])
 #profs['combined_lo'].gain_scale(1.0/diff_data['lo_norm'])
 
-BSR = profs['combined_hi'].copy()
+BSR = profs['combined_hi']/profs['molecular']
 BSR.descript = 'Ratio of combined to molecular backscatter'
 BSR.label = 'Backscatter Ratio'
 BSR.profile_type = 'unitless'
-BSR.divide_prof(profs['molecular'])
+
+BSR_mask = (BSR.profile-1)/np.sqrt(BSR.profile_variance) < 5.0
+
+#BSR2 = profs['combined_hi'].copy()
+#BSR2.divide_prof(profs['molecular'])
+#BSR2.descript = 'Ratio of combined to molecular backscatter'
+#BSR2.label = 'Backscatter Ratio'
+#BSR2.profile_type = 'unitless'
+
+dVol = profs['cross']/(profs['combined_hi']+profs['cross'])
+#dVol = profs['combined_hi'].copy()
+dVol.descript = 'Propensity of Volume to depolarize (d)'
+dVol.label = 'Volume Depolarization'
+dVol.profile_type = 'unitless'
+
+d_mol = 2*0.000365/(1+0.000365) # molecular depolarization
+
+#Particle Depolarization = dVol/(1.0-1.0/BSR) - d_mol/(BSR-1)
+dPart = (BSR*dVol-d_mol)/(BSR-1)
+dPart.descript = 'Propensity of Particles to depolarize (d)'
+dPart.label = 'Particle Depolarization'
+dPart.profile_type = 'unitless'
+
+
 
 bbsr = np.linspace(0,4,400)
 bsnr = np.linspace(10,150,100)
@@ -197,5 +227,22 @@ mol_gain_adj = np.nanmin(hist_med_sm[i_snr_lim])
 print('Current Molecular Gain: %f'%mol_gain)
 print('Suggested Molecular Gain: %f'%(mol_gain*mol_gain_adj))
 
+
+dPartMask = dPart.SNR() < 3.0
+
+#pfilt = np.array([  8.60798056e-04,   2.15186492e-02,   9.97983986e-01])
+#dMask = pfilt[0]*(dPart.SNR())**2 + pfilt[1]*(dPart.SNR())**1 + pfilt[2]*dPart.SNR() < BSR.profile
+#dMask = np.logical_or()
+
+#plt.figure();
+#plt.scatter(dVol.profile.flatten(),dPart.profile.flatten(),c=np.log10(BSR.profile.flatten()))
+#plt.xlim([0,1])
+#plt.ylim([0,1])
+#plt.xlabel('Volume Depolarization')
+#plt.ylabel('Particle Depolarization')
+
 #lp.plotprofiles(profs)
-lp.pcolor_profiles([BSR],scale=['log'],climits=[[1,5e2]])
+#dPart.mask(dPartMask)
+#lp.pcolor_profiles([BSR,dPart],scale=['log','linear'],climits=[[1,5e2],[0,0.7]])
+#lp.pcolor_profiles([BSR,dVol],scale=['log','linear'],climits=[[1,5e2],[0,1.0]])
+#lp.pcolor_profiles([dVol],scale=['linear'],climits=[[0,1]])
