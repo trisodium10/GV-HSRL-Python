@@ -21,6 +21,8 @@ import LidarProfileFunctions as lp
 import datetime
 #import glob
 
+import MLELidarProfileFunctions as mle
+
 import json
 
 import GVHSRLlib as gv
@@ -62,11 +64,13 @@ RemoveCals = True   # don't include instances where the I2 cell is removed
 
 diff_geo_correct = True  # apply differential overlap correction
 
-load_reanalysis = False # load T and P reanalysis from NCEP/NCAR Model
+load_reanalysis = True # load T and P reanalysis from NCEP/NCAR Model
 
-plot_2D = False   # pcolor plot the BSR and depolarization profiles
+plot_2D = True   # pcolor plot the BSR and depolarization profiles
 
 Estimate_Mol_Gain = True # use statistics on BSR to estimate the molecular gain
+
+Denoise_Mol = True  # run PTV denoising on molecular channel
 
 
 #sg_win = 11
@@ -79,7 +83,7 @@ basepath = '/scr/eldora1/rsfdata/hsrl/raw/'  # new absolute path
 year_in = 2017
 month_in = 10
 day_in = 27
-start_hr = 10 #17.2
+start_hr = 16 #17.2
 stop_hr = 12# 4
 
 print('Default Test Date:')
@@ -102,7 +106,6 @@ var_1d_list = ['total_energy','RemoveLongI2Cell'\
 
 # list of 2D variables (profiles) to load
 var_2d_list = ['molecular','combined_hi','combined_lo','cross']
-
 
 
 
@@ -145,20 +148,30 @@ for var in profs.keys():
     int_profs[var] = profs[var].copy()
     int_profs[var].time_integrate()
     
+    if var == 'molecular':
+        MolRaw = profs['molecular'].copy()
+    
     profs[var].bg_subtract(BGIndex)
     if var == 'combined_hi' and diff_geo_correct:
         profs[var].diff_geo_overlap_correct(diff_data['hi_diff_geo'])
     elif var == 'combined_lo' and diff_geo_correct:
         profs[var].diff_geo_overlap_correct(diff_data['hi_diff_geo'])
         profs[var].gain_scale(1.0/diff_data['lo_norm'])
+    
     profs[var].slice_range(range_lim=[0,MaxAlt])
     int_profs[var].bg_subtract(BGIndex)
     int_profs[var].slice_range(range_lim=[0,MaxAlt])
 
 
+
+
 if load_reanalysis:
     pres,temp = ex.load_fixed_point_NCEP_TandP(profs['molecular'],lidar_location,reanalysis_path)
+    beta_m = lp.get_beta_m(temp,pres,profs['molecular'].wavelength)
 
+if Denoise_Mol:
+    MolDenoise,tune_list = mle.DenoiseMolecular(MolRaw,beta_m_sonde=beta_m, \
+                            MaxAlt=MaxAlt,accel = True)
 
 lp.plotprofiles(profs)
 
@@ -194,6 +207,8 @@ dPart = (BSR*dVol-d_mol)/(BSR-1)
 dPart.descript = 'Propensity of Particles to depolarize (d)'
 dPart.label = 'Particle Depolarization'
 dPart.profile_type = 'unitless'
+
+beta_aer = lp.AerosolBackscatter(profs['molecular'],profs['combined_hi'],beta_m)
 
 
 if Estimate_Mol_Gain:
@@ -243,12 +258,15 @@ if Estimate_Mol_Gain:
 # add a diagnostic for diff overlap between lo and hi channels as a function
 # of count rate or backscatter coeff
 
-dPartMask = dPart.SNR() < 3.0
+#dPartMask = dPart.SNR() < 3.0
 
 
 if plot_2D:
-    lp.pcolor_profiles([BSR,dPart],scale=['log','linear'],climits=[[1,5e2],[0,0.7]])
+    lp.pcolor_profiles([beta_aer,dPart],scale=['log','linear'],climits=[[1e-8,1e-4],[0,0.7]])
+#    lp.pcolor_profiles([BSR,dPart],scale=['log','linear'],climits=[[1,5e2],[0,0.7]])
     #lp.plotprofiles(profs)
     #dPart.mask(dPartMask)
     #lp.pcolor_profiles([BSR,dVol],scale=['log','linear'],climits=[[1,5e2],[0,1.0]])
     #lp.pcolor_profiles([dVol],scale=['linear'],climits=[[0,1]])
+
+plt.show()
