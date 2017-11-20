@@ -30,11 +30,13 @@ Created on Tue Oct 24 09:41:02 2017
 
 import numpy as np
 import matplotlib.pyplot as plt
-import scipy
-from scipy import optimize
+import scipy.optimize
+#from scipy import optimize
 import netCDF4 as nc4
 
 import glob
+
+import os
 
 import datetime
 
@@ -117,7 +119,7 @@ def get_i2_write_values(x,comb,mol,freq,i2,i2f,plotres=False):
         plt.plot(i2f,molecular)
         plt.plot(i2f,i2_measured)
         plt.plot(i2f,i2_theory)
-    return np.vstack((i2f,combined,molecular,i2_measured,i2_theory)).T
+    return np.vstack((i2f,combined,molecular,i2_measured,i2_theory)).T,Te
 
 # input and raw_input are the same for python 3 and 2 respectively
 # this makes it so input always accepts a string
@@ -221,9 +223,12 @@ if file_select != -1 and file_select < len(file_list):
     #plt.semilogy(molcal[i_narrow]*1e-3)
     
     #  Load I2 spectrum
-    i2file = '/h/eol/mhayman/PythonScripts/HSRL_Processing/NewHSRLPython/I2cell_272_31_extended_freq.txt'
+    i2file = os.path.abspath(__file__+'/../../reference_files/')+'/I2cell_272_31_extended_freq.txt'
+#    i2file = '/h/eol/mhayman/PythonScripts/HSRL_Processing/NewHSRLPython/I2cell_272_31_extended_freq.txt'
     i2spec = np.loadtxt(i2file)  #,skiprows=4
     
+    save_ez_file_path = os.path.abspath(__file__+'/../cal_files/')+'/'
+#    save_file_path = '/h/eol/mhayman/HSRL/hsrl_processing/hsrl_configuration/projDir/calfiles/'
     
     MZfft = np.fft.fft(interferometer,axis=1)
     imin = 15
@@ -265,7 +270,7 @@ if file_select != -1 and file_select < len(file_list):
     corMolWide[np.isinf(corMolWide)] = -5.0
     
     cormol = np.correlate(corMolNar,corMolWide)
-    imid = cormol.size/2
+    imid = np.int(cormol.size/2)
     ipkcor = -30+np.argmax(cormol[imid-30:imid+30])
     
     #plt.figure(); 
@@ -328,12 +333,19 @@ if file_select != -1 and file_select < len(file_list):
     print('Phase to frequency conversion: %f'%(phase_to_GHz*sol[0]))
     print('Phase to frequnecy offset: %f'%sol[1])
     
-    write_data = get_i2_write_values(sol,comb,mol_merge,freq,i2spec[:,2],i2spec[:,0],plotres=True)
+    write_data,Te = get_i2_write_values(sol,comb,mol_merge,freq,i2spec[:,2],i2spec[:,0],plotres=True)
     
-    plt.show()
+    plt.show(block=False)
     
     save_i2_str = input("Save i2 cal? [Y/N]  ")
-    if save_i2_str[0] == 'Y' or save_i2_str[0] == 'y':    
+    if save_i2_str[0] == 'Y' or save_i2_str[0] == 'y':  
+        save_ez_filename =  'i2-default-scan-'+scan_start_dt.strftime('%Y%m%dT%H%M')
+        np.savez(save_ez_file_path+save_ez_filename,freq_mult = sol[0], \
+            freq_offset = sol[1], etalon_refl = sol[2], etalon_freq_offset = sol[3], \
+            etalon_phase_mult = sol[4], molecular_mult = sol[5], combined_mult = sol[6], \
+            freq=write_data[:,0],combined_scan=write_data[:,1],mol_scan=write_data[:,2],\
+            i2_theory=write_data[:,4],Tetalon = Te,created_str = datetime.datetime.today().strftime('%d-%b-%y at %H:%m UT'))
+        
         
         header_str = ''
         header_str = header_str+'Calibration scan as function of frequency offset from I2 line\n'
@@ -347,11 +359,11 @@ if file_select != -1 and file_select < len(file_list):
         header_str = header_str+'Min iodine transmission =    %1.1e,  1/(min_trans) =  %1.1e\n\n'%(np.min(mol_merge),1/np.min(mol_merge))
         header_str = header_str+'freq(GHz)  combined  molecular i2_measured i2_theory'
         
-        # may need 'i2-default-scan' in name
-        save_cal_file = 'i2-default-scan-'+scan_start_dt.strftime('%Y%m%dT%H%M')+'.cal'
-#        save_file_path = '/h/eol/mhayman/HSRL/hsrl_processing/'
-        save_file_path = '/h/eol/mhayman/HSRL/hsrl_processing/hsrl_configuration/projDir/calfiles/'
-        np.savetxt(save_file_path+save_cal_file,write_data,fmt='%.5f    ',header=header_str)
+#        # may need 'i2-default-scan' in name
+#        save_cal_file = 'i2-default-scan-'+scan_start_dt.strftime('%Y%m%dT%H%M')+'.cal'
+##        save_file_path = '/h/eol/mhayman/HSRL/hsrl_processing/'
+#        save_file_path = '/h/eol/mhayman/HSRL/hsrl_processing/hsrl_configuration/projDir/calfiles/'
+#        np.savetxt(save_file_path+save_cal_file,write_data,fmt='%.5f    ',header=header_str)
 
 else:
     print('Unrecognized file index')
