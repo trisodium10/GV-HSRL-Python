@@ -113,13 +113,14 @@ def get_i2_write_values(x,comb,mol,freq,i2,i2f,plotres=False):
     combined = np.interp(i2f,freq2,comb)
     i2_measured = np.interp(i2f,freq2,mol/Te)
     i2_theory = i2
+    Te2 = Tetalon(x[2:5],i2f)
     if plotres:
         plt.figure()
         plt.plot(i2f,combined)
         plt.plot(i2f,molecular)
         plt.plot(i2f,i2_measured)
         plt.plot(i2f,i2_theory)
-    return np.vstack((i2f,combined,molecular,i2_measured,i2_theory)).T,Te
+    return np.vstack((i2f,combined,molecular,i2_measured,i2_theory)).T,Te2
 
 # input and raw_input are the same for python 3 and 2 respectively
 # this makes it so input always accepts a string

@@ -70,7 +70,9 @@ plot_2D = True   # pcolor plot the BSR and depolarization profiles
 
 Estimate_Mol_Gain = True # use statistics on BSR to estimate the molecular gain
 
-Denoise_Mol = True  # run PTV denoising on molecular channel
+Denoise_Mol = False  # run PTV denoising on molecular channel
+
+hsrl_rb_adjust = True # apply rayleigh brillouin correction to molecular profile
 
 
 #sg_win = 11
@@ -123,12 +125,16 @@ else:
 with open(cal_file,"r") as f:
     cal_json = json.loads(f.read())
 f.close()
-
-mol_gain,diff_geo_file = lp.get_calval(time_start,cal_json,"Molecular Gain",returnlist=['value','diff_geo'])
+if hsrl_rb_adjust:
+    mol_gain,diff_geo_file = lp.get_calval(time_start,cal_json,'Molecular Gain',cond=[['RB_Corrected','=','True']],returnlist=['value','diff_geo'])  
+else:
+    mol_gain,diff_geo_file = lp.get_calval(time_start,cal_json,"Molecular Gain",returnlist=['value','diff_geo'])
 baseline_file = lp.get_calval(time_start,cal_json,"Baseline File")[0]
+i2_file = lp.get_calval(time_start,cal_json,"I2 Scan")[0]
 # load differential overlap correction
 diff_data = np.load(cal_file_path+diff_geo_file)
 baseline_data = np.load(cal_file_path+baseline_file)
+i2_data = np.load(cal_file_path+i2_file)
 #diff_data = np.load(cal_file_path+'diff_geo_GVHSRL20171025_tmp.npz')
 #baseline_data = np.load(cal_file_path+'diff_geo_GVHSRL20171025_tmp.npz')
 
@@ -170,12 +176,49 @@ if load_reanalysis:
     beta_m = lp.get_beta_m(temp,pres,profs['molecular'].wavelength)
 
 if Denoise_Mol:
+#    tune_data = mle.DenoiseBG(MolRaw,-10,verbose=False,plot_sol=True,tv_lim =[0.4, 1.4],N_tv_pts=78)
     MolDenoise,tune_list = mle.DenoiseMolecular(MolRaw,beta_m_sonde=beta_m, \
-                            MaxAlt=MaxAlt,accel = True)
+                            MaxAlt=MaxAlt,accel = False,tv_lim =[1.5, 2.8],N_tv_pts=59, \
+                            geo_data=dict(geo_prof=np.array([2e14])),bg_index=-10)
+    
+
+
+if hsrl_rb_adjust:
+    print('Obtaining Rayleigh-Brillouin Correction')
+    dnu = 20e6  # resolution
+    nu_max = 10e9 # max frequency relative to line center
+    nu = np.arange(-nu_max,nu_max,dnu)
+    Ti2 = np.interp(nu,i2_data['freq']*1e9,i2_data['mol_scan'])  # molecular transmission
+    
+    Tc2 = np.interp(nu,i2_data['freq']*1e9,i2_data['combined_scan'])  # combined transmission
+#    Trb = spec.RubidiumCellTransmission(nu+lp.c/Molecular.wavelength,RbCellTemp,RbCellPressure,RbCellLength,iso87=RbCellPurity)
+#    Tm = SurfaceTemp_HSRL.profile-0.0065*Molecular.range_array[np.newaxis,:]
+#    Pm = SurfacePres_HSRL.profile*(SurfaceTemp_HSRL.profile/Tm)**(-5.5)# /9.86923e-6  # give pressure in Pa
+    
+    beta_mol_norm = lp.RB_Spectrum(temp.profile.flatten(),pres.profile.flatten()*9.86923e-6,profs['molecular'].wavelength,nu=nu,norm=True)
+    eta_i2 = np.sum(Ti2[:,np.newaxis]*beta_mol_norm,axis=0)
+    eta_i2 = eta_i2.reshape(temp.profile.shape)
+    profs['molecular'].multiply_piecewise(1.0/eta_i2)
+    profs['molecular'].gain_scale(mol_gain)
+    
+    eta_c = np.sum(Tc2[:,np.newaxis]*beta_mol_norm,axis=0)
+    eta_c = eta_c.reshape(temp.profile.shape)
+    profs['combined_hi'].multiply_piecewise(1.0/eta_c)
+    
+    if Denoise_Mol:
+        MolDenoise.multiply_piecewise(1.0/eta_i2)
+        MolDenoise.gain_scale(mol_gain)
+else:
+    # Rescale molecular channel to match combined channel gain
+    profs['molecular'].gain_scale(mol_gain)
+    if Denoise_Mol:
+        MolDenoise.gain_scale(mol_gain)
+
 
 lp.plotprofiles(profs)
 
-profs['molecular'].gain_scale(mol_gain)
+#profs['molecular'].gain_scale(mol_gain)
+#
 #profs['combined_hi'].diff_geo_overlap_correct(diff_data['hi_diff_geo'][:profs['combined_hi'].range_array.size])
 #profs['combined_lo'].diff_geo_overlap_correct(diff_data['lo_diff_geo'][:profs['combined_lo'].range_array.size])
 #profs['combined_lo'].gain_scale(1.0/diff_data['lo_norm'])
@@ -209,7 +252,8 @@ dPart.label = 'Particle Depolarization'
 dPart.profile_type = 'unitless'
 
 beta_aer = lp.AerosolBackscatter(profs['molecular'],profs['combined_hi'],beta_m)
-
+if Denoise_Mol:
+    beta_aer_denoise = lp.AerosolBackscatter(MolDenoise,profs['combined_hi'],beta_m)
 
 if Estimate_Mol_Gain:
     # This segment estimates what the molecular gain should be 
@@ -263,6 +307,8 @@ if Estimate_Mol_Gain:
 
 if plot_2D:
     lp.pcolor_profiles([beta_aer,dPart],scale=['log','linear'],climits=[[1e-8,1e-4],[0,0.7]])
+    if Denoise_Mol:
+        lp.pcolor_profiles([beta_aer_denoise],scale=['log'],climits=[[1e-8,1e-4]])
 #    lp.pcolor_profiles([BSR,dPart],scale=['log','linear'],climits=[[1,5e2],[0,0.7]])
     #lp.plotprofiles(profs)
     #dPart.mask(dPartMask)
