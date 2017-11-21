@@ -1,31 +1,35 @@
 {
-	"lidar name": [{"value":"GV-HSRL"}],
-	"MCS bins": [
-		{"date": "7-Dec-2013, 0:0","value": 280}
+	"lidar_name": "GV-HSRL",
+	"MCS_bins": [
+		{"date": "7-Dec-2013 0:0","value": 280}
 	],
-	"Bin Width": [
-		{"date": "7-Dec-2013, 0:0","value": 50e-9, "units":"seconds"}
-	],
-
-	"Molecular Gain": [
-		{"date": "12-Oct-2017, 0:0","value": 1.0728915, "diff_geo": "diff_geo_GVHSRL20171025.npz", "change type": "abrupt"},
-		{"date": "27-Oct-2017, 0:0","value": 1.133915, "diff_geo": "diff_geo_GVHSRL20171025.npz", "change type": "gradual"},
-		{"date": "9-Nov-2017, 0:0","value": 1.099211, "diff_geo": "diff_geo_GVHSRL20171025.npz", "change type": "gradual"}
-	],
-	"Baseline File": [
-		{"date": "12-Oct-2017, 0:0","value": "baseline_20171019T2000.npz", "change type": "abrupt"}
+	"Bin_Width": [
+		{"date": "7-Dec-2013 0:0","value": 50e-9, "units":"seconds"}
 	],
 
-	"Laser Pulse Width": [
-		{"date": "7-Dec-2013, 0:0","value": 50e-9, "units":"seconds"}
+	"Molecular_Gain": [
+		{"date": "12-Oct-2017 0:0","value": 1.0728915, "diff_geo": "diff_geo_GVHSRL20171025.npz", "change_type": "abrupt", "RB_Corrected":"False"},
+		{"date": "27-Oct-2017 0:0","value": 1.133915, "diff_geo": "diff_geo_GVHSRL20171025.npz", "change_type": "gradual", "RB_Corrected":"False"},
+		{"date": "27-Oct-2017 0:0","value": 0.784546, "diff_geo": "diff_geo_GVHSRL20171025.npz", "change_type": "gradual", "RB_Corrected":"True"}
+	],
+	"Baseline_File": [
+		{"date": "12-Oct-2017 0:0","value": "baseline_20171019T2000.npz", "change_type": "abrupt"}
+	],
+
+	"Laser_Pulse_Width": [
+		{"date": "7-Dec-2013 0:0","value": 50e-9, "units":"seconds"}
+	],
+
+	"I2_Scan": [
+		{"date": "18-Oct-2017 19:02","value": "i2-default-scan-20171018T1901.npz", "change_type": "gradual"}
 	],
 
 	"Location": [
-		{"date": "1-Sep-2015, 0:0","location": "Boulder, CO, USA","latitude": 40.038589, "longitude": -105.238968, "Project":"none", "description": "Lidar Lab", "change type": "abrupt"}
+		{"date": "1-Sep-2015 0:0","location": "Boulder, CO, USA","latitude": 40.038589, "longitude": -105.238968, "Project":"none", "description": "Lidar Lab", "change_type": "abrupt"}
 	],
 
 	"Comments": [
-		{"date": "7-Dec-2013, 0:0", "value": "Made up start date"}
+		{"date": "7-Dec-2013 0:0", "value": "Made up start date"}
 	]
 
 }
