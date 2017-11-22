@@ -21,7 +21,8 @@
 	],
 
 	"I2_Scan": [
-		{"date": "18-Oct-2017 19:02","value": "i2-default-scan-20171018T1901.npz", "change_type": "gradual"}
+		{"date": "18-Oct-2017 19:02","value": "i2-default-scan-20171018T1901.npz", "change_type": "gradual"},
+		{"date": "21-Nov-2017 20:00","value": "i2-default-scan-20171121T2000.npz", "change_type": "gradual"}
 	],
 
 	"Location": [
