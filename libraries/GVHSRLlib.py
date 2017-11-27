@@ -245,7 +245,43 @@ def load_raw_data(start_time,stop_time,var_2d_list,var_1d_list,basepath = '/scr/
         profs_2d = var_2d_data
     
     return time_list, var_1d_data, profs_2d
+
+def load_aircraft_data(filename,var_list):
+    """
+    Loads data from aircraft netcdf
+    filename - string with path and filename to load
+    var_list - strings of the netcdf variables to load
+    """    
+
+    var_data = dict(zip(var_list,[np.array([])]*len(var_list)))
+    f = nc4.Dataset(filename,'r')
+            
+    for var in var_data.keys():
+        if any(var in s for s in f.variables):
+            data = lp.ncvar(f,var)
+            if len(var_data[var]) > 0:
+                var_data[var] = np.concatenate((var_data[var],data)) 
+            else:
+                var_data[var] = data.copy()
+                
+    print('Aircraft Time Data: %s' %f.variables['Time'].units)
+    f.close()
     
+    return var_data
+
+def interp_aircraft_data(master_time,aircraft_data):
+    """
+    Interpolates aircraft data to the lidar time grid
+    master_time - the lidar time grid in seconds since the processing start date at 0:00 UTC
+    aircraft_data - dict of variables loaded from the aircraft data file including
+        'Time' variable
+    """
+    air_data_new = {}
+    for var in aircraft_data.keys():
+        if var != 'Time':
+            air_data_new[var] = np.interp(master_time,aircraft_data['Time'],aircraft_data[var])
+    return air_data_new
+
 def var_time_resample(tedges,var_time,varlist,average=True,remainder=False):
     """
     regrids 1D data onto a predefined time grid
