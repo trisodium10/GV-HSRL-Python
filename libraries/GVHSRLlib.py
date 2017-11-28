@@ -130,6 +130,8 @@ def load_raw_data(start_time,stop_time,var_2d_list,var_1d_list,basepath = '/scr/
     var_2d_data = dict(zip(var_2d_list,[np.array([])]*len(var_2d_list)))
     timeD = np.array([])
     
+    start_time_hr = datetime.datetime(year=start_time.year,month=start_time.month,day=start_time.day,hour=start_time.hour)    
+    
     # build list of files falling on the requested dates
     day_iter =  start_time.date()
     SubFiles = []
@@ -149,7 +151,7 @@ def load_raw_data(start_time,stop_time,var_2d_list,var_1d_list,basepath = '/scr/
         Hour = np.double(SubFiles[idir][iTime+1:iTime+3])
         File_Time = datetime.datetime(*FileDate[idir].timetuple()[:4])+datetime.timedelta(hours=Hour)
         # check if this file is in the search time period
-        if File_Time >= start_time and File_Time <= stop_time:
+        if File_Time >= start_time_hr and File_Time <= stop_time:
             
             f = nc4.Dataset(SubFiles[idir],'r')
             

@@ -46,16 +46,17 @@ reanalysis_path = os.path.abspath(__file__+'/../../../external_data/')+'/'
 #save_file_path = '/Users/mhayman/Documents/Python/Lidar/'
 #save_file_path = '/h/eol/mhayman/HSRL/hsrl_processing/hsrl_configuration/projDir/calfiles/'
 
-tres = 0.5  # resolution in time in seconds (0.5 sec)
-zres = 30.0  # altitude resolution in meters (7.5 m minimum)
+tres = 0.5  # resolution in time in seconds (0.5 sec) before altitude correction
+tres_post = 60 # resolution after altitude correction -  set to zero to not use
+zres = 7.5  # altitude resolution in meters (7.5 m minimum)
 
 #mol_gain = 1.133915#1.0728915  # gain adjustment to molecular channel
 
 # index for where to treat the profile as background only
 BGIndex = -100; # negative number provides an index from the end of the array
 platform = 'ground' # 'ground' or 'airborne'.  If 'airborne' it needs an aircraft netcdf.
-MaxAlt = 10e3
-MinAlt = 0
+MaxAlt = 5e3
+MinAlt = -1e3
 
 RemoveCals = True   # don't include instances where the I2 cell is removed
                     # scan files are not included in the file search so they
@@ -65,10 +66,12 @@ diff_geo_correct = False  # apply differential overlap correction
 
 load_reanalysis = False # load T and P reanalysis from NCEP/NCAR Model
 
-plot_2D = False   # pcolor plot the BSR and depolarization profiles
+plot_2D = True   # pcolor plot the BSR and depolarization profiles
 
 Estimate_Mol_Gain = False # use statistics on BSR to estimate the molecular gain
 
+
+Airspeed_Threshold = 15 # threshold for determining start and end of the flight (in m/s)
 
 #sg_win = 11
 #sg_order = 5
@@ -79,24 +82,7 @@ basepath = '/scr/eldora1/rsfdata/hsrl/raw/'  # new absolute path
         
 aircraft_basepath = '/scr/raf_data/CSET/24_Mar_17_BU/'
         
-year_in = 2015
-month_in = 7
-day_in = 17
-start_hr = 15 #17.2
-stop_hr = 2# 4
 
-print('Default Test Date:')
-print('(M/D/Y) %d/%d/%d, starting %.1f UTC for %.1f h'%(month_in,day_in,year_in,start_hr,stop_hr))
-if input('Run this default date? [y/n]') != 'y':
-    print("Enter search range for diff_geo calibration:")
-    year_in = np.int(input("Year: "))
-    month_in = np.int(input("Month (#): "))
-    day_in = np.int(input("Day: "))
-    start_hr = np.float(input("Start Hour (UTC): "))
-    stop_hr = np.float(input("Duration (hours): "))
-
-time_start = datetime.datetime(year_in,month_in,day_in)+datetime.timedelta(hours=start_hr)
-time_stop = time_start + datetime.timedelta(hours=stop_hr)
 
 
 # list of 1D variables to load
@@ -106,63 +92,158 @@ var_1d_list = ['total_energy','RemoveLongI2Cell'\
 # list of 2D variables (profiles) to load
 var_2d_list = ['molecular','combined_hi','combined_lo','cross']
 
-######
-
+# list of aircraft variables to load
 var_aircraft = ['Time','GGALT','ROLL','PITCH','THDG','GGLAT','GGLON','TASX']
 
-filePathName = '/scr/eldora1/HSRL_data/2015/07/17/raw/'+'gvhsrl_20150717T150000_data_fl1.nc'
-#filePathName = '/scr/eldora1/HSRL_data/2015/07/22/raw/'+'gvhsrl_20150722T192157_data_fl1.nc'
-#filePathName = '/scr/eldora1/HSRL_data/2015/03/18/raw/'+'gvhsrl_20150318T212527_data_fl1.nc'
-#filePathName = '/scr/eldora1/HSRL_data/2015/03/18/raw/'+'gvhsrl_20150318T200001_data_fl1.nc'
-#filePathName = '/scr/eldora1/HSRL_data/2013/10/17/raw/'+'gvhsrl_20131017T050000_data_fl1_pol.nc'
-#filePathName = '/scr/eldora1/HSRL_data/2016/04/04/raw/'+'gvhsrl_20160404T200754_data_fl1.nc'
-#filePathName = '/scr/eldora1/HSRL_data/2016/04/05/raw/'+'gvhsrl_20160405T150000_data_fl1.nc'
-#filePathName = '/scr/eldora1/HSRL_data/2016/04/14/raw/'+'gvhsrl_20160414T150000_data_fl1.nc'
+# grab calval data from json file
+with open(cal_file,"r") as f:
+    cal_json = json.loads(f.read())
+f.close()
 
-filePathAircraft = '/scr/raf_data/CSET/24_Mar_17_BU/CSETrf06.nc'
+# interactive prompt to determine desired flight
 
-# Processing Input Parameters
-#  Eventually these should be a file so we can re-run processing routines
-#  exactly as they were originally run.
+proj_list = []
+year_list = []
+for ai in range(len(cal_json['Flights'])):
+    if not cal_json['Flights'][ai]['Project'] in proj_list:
+        proj_list.extend([cal_json['Flights'][ai]['Project']])
+        year_list.extend([lp.json_str_to_datetime(cal_json['Flights'][ai]['date'])])
+        print('%d.) '%(len(proj_list)) + proj_list[-1] + ', ' + year_list[-1].strftime('%Y'))
 
-# index for where to treat the profile as background only
-#BGIndex = -100; # negative number provides an index from the end of the array
-platform = 'airborne' # 'ground' or 'airborne'.  If 'airborne' it needs an aircraft netcdf.
+usr_proj = np.int(input('Select Project: '))-1
+if usr_proj < 0 or usr_proj > len(proj_list)-1:
+    print('Selection is not recognized')
+else:
+    proj = proj_list[usr_proj]
 
+flight_list = []
+flight_date = []
+flight_label = []
+for ai in range(len(cal_json['Flights'])):
+    if cal_json['Flights'][ai]['Project'] == proj:
+        flight_list.extend([proj+cal_json['Flights'][ai]['Flight Designation'] + str(cal_json['Flights'][ai]['Flight Number']).zfill(2)])
+        flight_date.extend([lp.json_str_to_datetime(cal_json['Flights'][ai]['date'])])
+        flight_label.extend([cal_json['Flights'][ai]['Flight Designation'].upper()+str(cal_json['Flights'][ai]['Flight Number']).zfill(2)])
+        print('%d.) '%len(flight_list) + ' ' + flight_list[-1] + ', ' + flight_date[-1].strftime('%d-%b, %Y'))
+
+usr_flt = np.int(input('Select Flight: '))-1
+if usr_flt < 0 or usr_flt > len(flight_list)-1:
+    print('Selection is not recognized')
+else:
+    filePathAircraft = aircraft_basepath + flight_list[usr_flt] + '.nc'
+    
+#  load aircraft data
+    
 air_data = gv.load_aircraft_data(filePathAircraft,var_aircraft)
 
-#var_list = var_aircraft
-#filename = filePathAircraft
-#import netCDF4 as nc4
-#var_data = dict(zip(var_list,[np.array([])]*len(var_list)))
-#f = nc4.Dataset(filename,'r')
-#        
-#for var in var_data.keys():
-#    if any(var in s for s in f.variables):
-#        data = lp.ncvar(f,var)
-#        if len(var_data[var]) > 0:
-#            var_data[var] = np.concatenate((var_data[var],data)) 
-#        else:
-#            var_data[var] = data.copy()
-#            
-#print('Aircraft Time Data: %s' %f.variables['Time'].units)
-#f.close()
+# locate time range where aircraft is flying
+iflight = np.nonzero(air_data['TASX'] > Airspeed_Threshold)[0]
+it0 = iflight[0]  # index when aircraft starts moving
+it1 = iflight[-1]  # index when aircraft stops moving
+print('Flight time is: ')
+print('   '+(flight_date[usr_flt]+datetime.timedelta(seconds=np.int(air_data['Time'][it0]))).strftime('%H:%M %d-%b, %Y to'))
+print('   '+(flight_date[usr_flt]+datetime.timedelta(seconds=np.int(air_data['Time'][it1]))).strftime('%H:%M %d-%b, %Y'))
+print('')
+time_sel = input('Enter start hour (UTC) or press [Enter] select start of flight: ')
+if time_sel == '':
+    time_start = flight_date[usr_flt]+datetime.timedelta(seconds=np.int(air_data['Time'][it0]))
+    
+else:
+    start_hr = np.float(time_sel)
+    time_start = flight_date[usr_flt]+datetime.timedelta(seconds=np.int(start_hr*3600))
+    
+
+time_sel = np.float(input('Enter duration or press [Enter] for end of flight: '))
+if time_sel == '':
+    time_stop = flight_date[usr_flt]+datetime.timedelta(seconds=np.int(air_data['Time'][it1]))
+else:
+    stop_hr = np.float(time_sel)
+    time_stop = time_start+datetime.timedelta(seconds=np.int(stop_hr*3600))
+    
+    
+
+# end user input
+
+#year_in = 2015
+#month_in = 7
+#day_in = 17
+#start_hr = 15 #17.2
+#stop_hr = 2# 4
+#
+#print('Default Test Date:')
+#print('(M/D/Y) %d/%d/%d, starting %.1f UTC for %.1f h'%(month_in,day_in,year_in,start_hr,stop_hr))
+#if input('Run this default date? [y/n]') != 'y':
+#    print("Enter search range for diff_geo calibration:")
+#    year_in = np.int(input("Year: "))
+#    month_in = np.int(input("Month (#): "))
+#    day_in = np.int(input("Day: "))
+#    start_hr = np.float(input("Start Hour (UTC): "))
+#    stop_hr = np.float(input("Duration (hours): "))
+#
+#time_start = datetime.datetime(year_in,month_in,day_in)+datetime.timedelta(hours=start_hr)
+#time_stop = time_start + datetime.timedelta(hours=stop_hr)
 
 
-#a = netcdf.netcdf_file(filePathAircraft)
-#alt = a.variables['GGALT'].data.copy()
-#t_aircraft = a.variables['Time'].data.copy()
-#roll = a.variables['ROLL'].data.copy()
-#pitch = a.variables['PITCH'].data.copy()
-#heading = a.variables['THDG'].data.copy()
-#lat = a.variables['GGLAT'].data.copy()
-#lon = a.variables['GGLON'].data.copy()
-#print('Aircraft Time Data: %s' %a.variables['Time'].units)
-#a.close();
 
 
-
-
+#######
+#
+#
+#
+#filePathName = '/scr/eldora1/HSRL_data/2015/07/17/raw/'+'gvhsrl_20150717T150000_data_fl1.nc'
+#
+##filePathName = '/scr/eldora1/HSRL_data/2015/07/22/raw/'+'gvhsrl_20150722T192157_data_fl1.nc'
+##filePathName = '/scr/eldora1/HSRL_data/2015/03/18/raw/'+'gvhsrl_20150318T212527_data_fl1.nc'
+##filePathName = '/scr/eldora1/HSRL_data/2015/03/18/raw/'+'gvhsrl_20150318T200001_data_fl1.nc'
+##filePathName = '/scr/eldora1/HSRL_data/2013/10/17/raw/'+'gvhsrl_20131017T050000_data_fl1_pol.nc'
+##filePathName = '/scr/eldora1/HSRL_data/2016/04/04/raw/'+'gvhsrl_20160404T200754_data_fl1.nc'
+##filePathName = '/scr/eldora1/HSRL_data/2016/04/05/raw/'+'gvhsrl_20160405T150000_data_fl1.nc'
+##filePathName = '/scr/eldora1/HSRL_data/2016/04/14/raw/'+'gvhsrl_20160414T150000_data_fl1.nc'
+#
+#filePathAircraft = '/scr/raf_data/CSET/24_Mar_17_BU/CSETrf06.nc'
+#
+## Processing Input Parameters
+##  Eventually these should be a file so we can re-run processing routines
+##  exactly as they were originally run.
+#
+## index for where to treat the profile as background only
+##BGIndex = -100; # negative number provides an index from the end of the array
+#platform = 'airborne' # 'ground' or 'airborne'.  If 'airborne' it needs an aircraft netcdf.
+#
+#air_data = gv.load_aircraft_data(filePathAircraft,var_aircraft)
+#
+##var_list = var_aircraft
+##filename = filePathAircraft
+##import netCDF4 as nc4
+##var_data = dict(zip(var_list,[np.array([])]*len(var_list)))
+##f = nc4.Dataset(filename,'r')
+##        
+##for var in var_data.keys():
+##    if any(var in s for s in f.variables):
+##        data = lp.ncvar(f,var)
+##        if len(var_data[var]) > 0:
+##            var_data[var] = np.concatenate((var_data[var],data)) 
+##        else:
+##            var_data[var] = data.copy()
+##            
+##print('Aircraft Time Data: %s' %f.variables['Time'].units)
+##f.close()
+#
+#
+##a = netcdf.netcdf_file(filePathAircraft)
+##alt = a.variables['GGALT'].data.copy()
+##t_aircraft = a.variables['Time'].data.copy()
+##roll = a.variables['ROLL'].data.copy()
+##pitch = a.variables['PITCH'].data.copy()
+##heading = a.variables['THDG'].data.copy()
+##lat = a.variables['GGLAT'].data.copy()
+##lon = a.variables['GGLON'].data.copy()
+##print('Aircraft Time Data: %s' %a.variables['Time'].units)
+##a.close();
+#
+#
+#
+#
 ######
 
 
@@ -178,9 +259,7 @@ if 'RemoveLongI2Cell' in var_1d_data.keys():
 else:
     cal_indices = []
 
-with open(cal_file,"r") as f:
-    cal_json = json.loads(f.read())
-f.close()
+
 
 mol_gain,diff_geo_file = lp.get_calval(time_start,cal_json,"Molecular Gain",returnlist=['value','diff_geo'])
 baseline_file = lp.get_calval(time_start,cal_json,"Baseline File")[0]
@@ -194,11 +273,25 @@ lidar_location = lp.get_calval(time_start,cal_json,"Location",returnlist=['latit
 
 # set the master time to match all 2D profiles to
 # (1d data will not be resampled)
-master_time = np.arange(time_sec[0]-tres/2,time_sec[-1]+tres/2,tres)
+#master_time = np.arange(time_sec[0]-tres/2,time_sec[-1]+tres/2,tres) #
+sec_start = np.max([time_sec[0],(time_start-flight_date[usr_flt]).total_seconds()])
+sec_stop = np.min([time_sec[-1],(time_stop-flight_date[usr_flt]).total_seconds()])
+master_time = np.arange(sec_start-tres/2,sec_stop+tres/2,tres)
 master_alt = np.arange(MinAlt,MaxAlt+zres,zres)
 
 time_1d,var_1d = gv.var_time_resample(master_time,time_sec,var_1d_data,average=True)
 air_data_t = gv.interp_aircraft_data(time_1d,air_data)
+
+# time resolution after range to altitude conversion
+if tres_post > 0:
+    master_time_post = np.arange(sec_start-tres_post/2,sec_stop+tres_post/2,tres_post)
+    time_post,var_post = gv.var_time_resample(master_time,time_sec,var_1d_data,average=True)
+    air_data_post = gv.interp_aircraft_data(time_post,air_data)
+else:
+    master_time_post = master_time
+    time_post = time_1d
+    var_post = var_1d
+    air_data_post = air_data_t
 
 int_profs = {}  # obtain time integrated profiles
 for var in profs.keys():
@@ -209,16 +302,24 @@ for var in profs.keys():
     int_profs[var] = profs[var].copy()
     int_profs[var].time_integrate()
     
+    # maximum range required for this dataset
+    range_trim = np.max([np.max(MaxAlt-air_data_t['GGALT']),np.max(air_data_t['GGALT']-MinAlt)])+4*zres
+    
     profs[var].bg_subtract(BGIndex)
     if var == 'combined_hi' and diff_geo_correct:
         profs[var].diff_geo_overlap_correct(diff_data['hi_diff_geo'])
     elif var == 'combined_lo' and diff_geo_correct:
         profs[var].diff_geo_overlap_correct(diff_data['hi_diff_geo'])
         profs[var].gain_scale(1.0/diff_data['lo_norm'])
-    profs[var].slice_range(range_lim=[0,MaxAlt])
+    profs[var].slice_range(range_lim=[0,range_trim])
     profs[var].range2alt(master_alt,air_data_t,telescope_direction=var_1d['TelescopeDirection'])
-    int_profs[var].bg_subtract(BGIndex)
-    int_profs[var].slice_range(range_lim=[0,MaxAlt])
+    if tres_post > 0:
+        profs[var].time_resample(tedges=master_time_post,update=True,remainder=False)
+    
+    int_profs[var] = profs[var].copy()
+    int_profs[var].time_integrate()
+#    int_profs[var].bg_subtract(BGIndex)
+#    int_profs[var].slice_range(range_lim=[0,MaxAlt])
 
 
 if load_reanalysis:
@@ -310,9 +411,16 @@ if Estimate_Mol_Gain:
 
 dPartMask = dPart.SNR() < 3.0
 
+proj_label = proj + ' ' + flight_label[usr_flt] + ', '
 
 if plot_2D:
-    lp.pcolor_profiles([BSR,dPart],scale=['log','linear'],climits=[[1,5e2],[0,0.7]])
+    rfig = lp.pcolor_profiles([BSR,dPart],scale=['log','linear'],climits=[[1,5e2],[0,0.7]],ylimits=[MinAlt*1e-3,MaxAlt*1e-3],title_add=proj_label)
+    for ai in range(len(rfig[1])):
+        rfig[1][ai].plot(time_1d/3600.0,air_data_t['GGALT']*1e-3,'k-',linewidth=1)  # add aircraft altitude
+        
+    rfig = lp.pcolor_profiles([profs['combined_hi'],dVol],scale=['log','linear'],climits=[[1e-1,1e4],[0,1.0]],ylimits=[MinAlt*1e-3,MaxAlt*1e-3],title_add=proj_label)
+    for ai in range(len(rfig[1])):
+        rfig[1][ai].plot(time_1d/3600.0,air_data_t['GGALT']*1e-3,'k-',linewidth=1)  # add aircraft altitude
     #lp.plotprofiles(profs)
     #dPart.mask(dPartMask)
     #lp.pcolor_profiles([BSR,dVol],scale=['log','linear'],climits=[[1,5e2],[0,1.0]])
