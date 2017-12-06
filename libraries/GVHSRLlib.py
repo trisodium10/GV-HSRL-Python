@@ -138,7 +138,7 @@ def load_raw_data(start_time,stop_time,var_2d_list,var_1d_list,basepath = '/scr/
     FileDate = []
     while day_iter <= stop_time.date():
         FilePath0 = basepath+day_iter.strftime('%Y/%m/%d/raw/')
-        SubList0 = glob.glob(FilePath0+'*data*.nc')
+        SubList0 = sorted(glob.glob(FilePath0+'*data*.nc'))
         SubFiles = SubFiles+SubList0                  # make a list of files falling on the dates corresponding to the search period
         FileDate = FileDate+len(SubList0)*[day_iter]  # collect dates associated with each file (it's just easier)
         day_iter = day_iter + datetime.timedelta(days=1)
@@ -173,7 +173,7 @@ def load_raw_data(start_time,stop_time,var_2d_list,var_1d_list,basepath = '/scr/
                 timeD = np.vstack((timeD,np.array(f.variables['DATA_time'][:].astype(np.int))));          # time array [year,month,day,hour,minute,second,msec,usec]
             else:
                 timeD = np.array(f.variables['DATA_time'][:]).astype(np.int)
-            
+
             if verbose:
                 if any('polarization' in s for s in f.variables):
                     QWP = f.variables['polarization'][:].copy()               # QWP rotation angle
