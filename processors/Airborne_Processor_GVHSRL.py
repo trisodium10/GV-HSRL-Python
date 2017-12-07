@@ -522,3 +522,4 @@ if plot_2D:
     #dPart.mask(dPartMask)
     #lp.pcolor_profiles([BSR,dVol],scale=['log','linear'],climits=[[1,5e2],[0,1.0]])
     #lp.pcolor_profiles([dVol],scale=['linear'],climits=[[0,1]])
+plt.show()
