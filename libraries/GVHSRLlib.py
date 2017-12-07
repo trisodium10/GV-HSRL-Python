@@ -376,3 +376,55 @@ def var_time_resample(tedges,var_time,varlist,average=True,remainder=False):
             return timeNew,var_return,varRem
         else:
             return timeNew,var_return
+            
+def get_TP_from_aircraft(air_data,profile):
+    """
+    Returns a temperature and pressure profile corresponding to
+    dimensions of profile
+    The profile should already be converted to altitude coordinates from range
+    
+    The aircraft temperature and pressure measurements are contained
+    in air_data
+    """
+    
+    # make sure the time axes of the aircraft data aline with the 
+    # lidar profile data
+    air_data_int = interp_aircraft_data(profile.time,air_data)
+    aircraft_temp = air_data_int['ATX']+273.15  # convert aircraft temperature to K 
+    b_T = (aircraft_temp + air_data_int['GGALT']*0.0065)[:,np.newaxis]
+    TempAir = b_T-0.0065*profile.range_array[np.newaxis,:]
+    PresAir = air_data_int['PSXC'][:,np.newaxis]*100*(aircraft_temp[:,np.newaxis]/TempAir)**(-5.5)  # pressure in Pa from PSXC in hPa
+    
+
+    
+    
+    temp = profile.copy()
+    temp.profile = TempAir.copy()
+    temp.profile_variance = (temp.profile*0.1)**2  # force SNR of 10 in sonde profile.
+    temp.ProcessingStatus = []     # status of highest level of lidar profile - updates at each processing stage
+    temp.lidar = 'Aircraft measurement'
+    
+    temp.diff_geo_Refs = ['none']           # list containing the differential geo overlap reference sources (answers: differential to what?)
+    temp.profile_type =  '$K$'
+    
+    temp.bg = np.zeros(temp.bg.shape) # profile background levels
+    
+    temp.descript = 'Ideal Atmosphere Temperature in K'
+    temp.label = 'Temperature'
+    
+    pres = profile.copy()
+    pres.profile = PresAir
+    pres.profile_variance = (pres.profile*0.1)**2  # force SNR of 10 in sonde profile.
+    pres.ProcessingStatus = []     # status of highest level of lidar profile - updates at each processing stage
+    pres.lidar = 'Aircraft measurement'
+    
+    pres.diff_geo_Refs = ['none']           # list containing the differential geo overlap reference sources (answers: differential to what?)
+    pres.profile_type =  '$Pa$'
+    
+    pres.bg = np.zeros(temp.bg.shape) # profile background levels
+    
+    pres.descript = 'Ideal Atmosphere Pressure in Pa'
+    pres.label = 'Pressure'
+    
+    return temp, pres
+    

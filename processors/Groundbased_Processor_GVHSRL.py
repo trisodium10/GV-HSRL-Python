@@ -48,7 +48,7 @@ reanalysis_path = os.path.abspath(__file__+'/../../../external_data/')+'/'
 #save_file_path = '/Users/mhayman/Documents/Python/Lidar/'
 #save_file_path = '/h/eol/mhayman/HSRL/hsrl_processing/hsrl_configuration/projDir/calfiles/'
 
-tres = 10 #1*60.0  # resolution in time in seconds (0.5 sec)
+tres = 60 #1*60.0  # resolution in time in seconds (0.5 sec)
 zres = 10.0  # resolution in altitude points (7.5 m)
 
 #mol_gain = 1.133915#1.0728915  # gain adjustment to molecular channel
@@ -70,7 +70,7 @@ plot_2D = True   # pcolor plot the BSR and depolarization profiles
 
 Estimate_Mol_Gain = True # use statistics on BSR to estimate the molecular gain
 
-Denoise_Mol = True  # run PTV denoising on molecular channel
+Denoise_Mol = False  # run PTV denoising on molecular channel
 
 hsrl_rb_adjust = True # apply rayleigh brillouin correction to molecular profile
 

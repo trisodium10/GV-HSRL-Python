@@ -21,6 +21,8 @@ import LidarProfileFunctions as lp
 import datetime
 #import glob
 
+import matplotlib.dates as mdates
+
 import json
 
 import GVHSRLlib as gv
@@ -67,8 +69,9 @@ diff_geo_correct = False  # apply differential overlap correction
 load_reanalysis = False # load T and P reanalysis from NCEP/NCAR Model
 
 plot_2D = True   # pcolor plot the BSR and depolarization profiles
+plot_date = True  # plot results in date time format.  Otherwise plots as hour floats
 
-Estimate_Mol_Gain = False # use statistics on BSR to estimate the molecular gain
+Estimate_Mol_Gain = True # use statistics on BSR to estimate the molecular gain
 
 
 Airspeed_Threshold = 15 # threshold for determining start and end of the flight (in m/s)
@@ -93,7 +96,7 @@ var_1d_list = ['total_energy','RemoveLongI2Cell'\
 var_2d_list = ['molecular','combined_hi','combined_lo','cross']
 
 # list of aircraft variables to load
-var_aircraft = ['Time','GGALT','ROLL','PITCH','THDG','GGLAT','GGLON','TASX']
+var_aircraft = ['Time','GGALT','ROLL','PITCH','THDG','GGLAT','GGLON','TASX','ATX','PSXC']
 
 # grab calval data from json file
 with open(cal_file,"r") as f:
@@ -252,10 +255,17 @@ if load_reanalysis:
 
 lp.plotprofiles(profs)
 
-profs['molecular'].gain_scale(mol_gain)
+Temp,Pres = gv.get_TP_from_aircraft(air_data,profs['molecular'])
+beta_m = lp.get_beta_m(Temp,Pres,profs['molecular'].wavelength)
+
+
+profs['molecular'].gain_scale(mol_gain,gain_var = (mol_gain*0.1)**2)
 #profs['combined_hi'].diff_geo_overlap_correct(diff_data['hi_diff_geo'][:profs['combined_hi'].range_array.size])
 #profs['combined_lo'].diff_geo_overlap_correct(diff_data['lo_diff_geo'][:profs['combined_lo'].range_array.size])
 #profs['combined_lo'].gain_scale(1.0/diff_data['lo_norm'])
+
+
+beta_a = lp.AerosolBackscatter(profs['molecular'],profs['combined_hi'],beta_m)
 
 BSR = profs['combined_hi']/profs['molecular']
 BSR.descript = 'Ratio of combined to molecular backscatter'
@@ -291,7 +301,7 @@ if Estimate_Mol_Gain:
     # based on a histogram minimum in BSR over the loaded data
     
     bbsr = np.linspace(0,4,400)
-    bsnr = np.linspace(10,150,100)
+    bsnr = np.linspace(10,380,100)
     hbsr = np.histogram2d(BSR.profile.flatten(),BSR.SNR().flatten(),bins=[bbsr,bsnr])
     #plt.figure()
     #plt.pcolor(bbsr,bsnr,hbsr[0].T)
@@ -333,7 +343,8 @@ if Estimate_Mol_Gain:
 # add a diagnostic for diff overlap between lo and hi channels as a function
 # of count rate or backscatter coeff
 
-dPartMask = dPart.SNR() < 3.0
+dPartMask = dPart.profile_variance > 1.0
+dPart.mask(dPartMask)
 
 proj_label = proj + ' ' + flight_label[usr_flt] + ', '
 
@@ -342,13 +353,20 @@ dPart.mask(np.isnan(dPart.profile))
 dVol.mask(np.isnan(dVol.profile))
 
 if plot_2D:
-    rfig = lp.pcolor_profiles([BSR,dPart],scale=['log','linear'],climits=[[1,5e2],[0,0.7]],ylimits=[MinAlt*1e-3,MaxAlt*1e-3],title_add=proj_label)
+    if plot_date:
+        t1d_plt = x_time = mdates.date2num([datetime.datetime.fromordinal(BSR.StartDate.toordinal()) \
+                    + datetime.timedelta(seconds=sec) for sec in time_1d])   
+    else:
+        t1d_plt = time_1d/3600.0
+    
+#    rfig = lp.pcolor_profiles([BSR,dPart],scale=['log','linear'],climits=[[1,1e2],[0,0.7]],ylimits=[MinAlt*1e-3,MaxAlt*1e-3],title_add=proj_label,plot_date=plot_date)
+    rfig = lp.pcolor_profiles([beta_a,dPart],scale=['log','linear'],climits=[[1e-8,1e-3],[0,0.7]],ylimits=[MinAlt*1e-3,MaxAlt*1e-3],title_add=proj_label,plot_date=plot_date)
     for ai in range(len(rfig[1])):
-        rfig[1][ai].plot(time_1d/3600.0,air_data_t['GGALT']*1e-3,'k-',linewidth=1)  # add aircraft altitude
+        rfig[1][ai].plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude
         
-    rfig = lp.pcolor_profiles([profs['combined_hi'],dVol],scale=['log','linear'],climits=[[1e-1,1e4],[0,1.0]],ylimits=[MinAlt*1e-3,MaxAlt*1e-3],title_add=proj_label)
+    rfig = lp.pcolor_profiles([profs['combined_hi'],dVol],scale=['log','linear'],climits=[[1e-1,1e4],[0,1.0]],ylimits=[MinAlt*1e-3,MaxAlt*1e-3],title_add=proj_label,plot_date=plot_date)
     for ai in range(len(rfig[1])):
-        rfig[1][ai].plot(time_1d/3600.0,air_data_t['GGALT']*1e-3,'k-',linewidth=1)  # add aircraft altitude
+        rfig[1][ai].plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude
     #lp.plotprofiles(profs)
     #dPart.mask(dPartMask)
     #lp.pcolor_profiles([BSR,dVol],scale=['log','linear'],climits=[[1,5e2],[0,1.0]])
