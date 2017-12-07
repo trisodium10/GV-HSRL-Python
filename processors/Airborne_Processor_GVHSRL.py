@@ -28,6 +28,8 @@ import json
 import GVHSRLlib as gv
 
 import ExternalDataFunctions as ex
+
+import MLELidarProfileFunctions as mle
     
 
 
@@ -72,6 +74,10 @@ plot_2D = True   # pcolor plot the BSR and depolarization profiles
 plot_date = True  # plot results in date time format.  Otherwise plots as hour floats
 
 Estimate_Mol_Gain = True # use statistics on BSR to estimate the molecular gain
+
+hsrl_rb_adjust = True # adjust for Rayleigh Brillouin Spectrum
+
+Denoise_Mol = False # run PTV denoising on molecular channel
 
 
 Airspeed_Threshold = 15 # threshold for determining start and end of the flight (in m/s)
@@ -178,10 +184,15 @@ else:
 
 
 # grab calibration data files
-mol_gain,diff_geo_file = lp.get_calval(time_start,cal_json,"Molecular Gain",returnlist=['value','diff_geo'])
+# down_gain is the molecular gain when the telescope points down
+if hsrl_rb_adjust:
+    mol_gain_up,diff_geo_file,mol_gain_down = lp.get_calval(time_start,cal_json,'Molecular Gain',cond=[['RB_Corrected','=','True']],returnlist=['value','diff_geo','down_gain'])  
+else:
+    mol_gain_up,diff_geo_file,mol_gain_down = lp.get_calval(time_start,cal_json,"Molecular Gain",returnlist=['value','diff_geo','down_gain'])
+    
 baseline_file = lp.get_calval(time_start,cal_json,"Baseline File")[0]
 diff_pol_file = lp.get_calval(time_start,cal_json,"Polarization",returnlist=['diff_geo'])
-
+i2_file = lp.get_calval(time_start,cal_json,"I2 Scan")
 
 # load differential overlap correction
 diff_data = np.load(cal_file_path+diff_geo_file)
@@ -189,8 +200,17 @@ baseline_data = np.load(cal_file_path+baseline_file)
 if len(diff_pol_file):
     diff_pol_data = np.load(cal_file_path+diff_pol_file[0])
 
+# load i2 scan from file
+if len(i2_file):
+    i2_data = np.load(cal_file_path+i2_file[0])
+else:
+    # if no i2 scan available, don't correct for Rayleigh Brillouin spectrum
+    hsrl_rb_adjust = False
 
 lidar_location = lp.get_calval(time_start,cal_json,"Location",returnlist=['latitude','longitude'])
+
+
+
 
 # set the master time to match all 2D profiles to
 # (1d data will not be resampled)
@@ -221,6 +241,20 @@ elif tres > 0.5:
     air_data_post = air_data_t
 else:
     master_time_post = np.arange(sec_start-tres/2,sec_stop+tres/2,tres)
+
+# setup molecular gain vector based on telescope pointing direction
+mol_gain = np.zeros(var_post['TelescopeDirection'].shape)
+mol_gain[np.nonzero(var_post['TelescopeDirection']==1.0)] = mol_gain_up
+mol_gain[np.nonzero(var_post['TelescopeDirection']==0.0)] = mol_gain_down
+mol_gain = mol_gain[:,np.newaxis]
+
+
+
+"""
+Main Profile Processing Loop
+loop through each lidar profile in profs and perform basic processing 
+operations
+"""
     
 
 int_profs = {}  # obtain time integrated profiles
@@ -235,6 +269,9 @@ for var in profs.keys():
     
     # maximum range required for this dataset
     range_trim = np.max([np.max(MaxAlt-air_data_t['GGALT']),np.max(air_data_t['GGALT']-MinAlt)])+4*zres
+    
+    if var == 'molecular' and Denoise_Mol:
+        MolRaw = profs['molecular'].copy()    
     
     profs[var].bg_subtract(BGIndex)
     
@@ -264,24 +301,51 @@ for var in profs.keys():
     
     int_profs[var] = profs[var].copy()
     int_profs[var].time_integrate()
-#    int_profs[var].bg_subtract(BGIndex)
-#    int_profs[var].slice_range(range_lim=[0,MaxAlt])
 
 
-if load_reanalysis:
-    pres,temp = ex.load_fixed_point_NCEP_TandP(profs['molecular'],lidar_location,reanalysis_path)
+
+#if load_reanalysis:
+#    pres,temp = ex.load_fixed_point_NCEP_TandP(profs['molecular'],lidar_location,reanalysis_path)
 
 
 lp.plotprofiles(profs)
 
-Temp,Pres = gv.get_TP_from_aircraft(air_data,profs['molecular'])
-beta_m = lp.get_beta_m(Temp,Pres,profs['molecular'].wavelength)
+temp,pres = gv.get_TP_from_aircraft(air_data,profs['molecular'])
+beta_m = lp.get_beta_m(temp,pres,profs['molecular'].wavelength)
 
+if Denoise_Mol:
+    MolDenoise,tune_list = mle.DenoiseMolecular(MolRaw,beta_m_sonde=beta_m, \
+                            MaxAlt=MaxAlt,accel = False,tv_lim =[1.5, 2.8],N_tv_pts=59, \
+                            geo_data=dict(geo_prof=np.array([2e14])),bg_index=-10,n=20)
 
-profs['molecular'].gain_scale(mol_gain,gain_var = (mol_gain*0.01)**2)
-#profs['combined_hi'].diff_geo_overlap_correct(diff_data['hi_diff_geo'][:profs['combined_hi'].range_array.size])
-#profs['combined_lo'].diff_geo_overlap_correct(diff_data['lo_diff_geo'][:profs['combined_lo'].range_array.size])
-#profs['combined_lo'].gain_scale(1.0/diff_data['lo_norm'])
+if hsrl_rb_adjust:
+    print('Obtaining Rayleigh-Brillouin Correction')
+    dnu = 20e6  # resolution
+    nu_max = 10e9 # max frequency relative to line center
+    nu = np.arange(-nu_max,nu_max,dnu)
+    Ti2 = np.interp(nu,i2_data['freq']*1e9,i2_data['mol_scan'])  # molecular transmission
+    
+    Tc2 = np.interp(nu,i2_data['freq']*1e9,i2_data['combined_scan'])  # combined transmission
+    
+    beta_mol_norm = lp.RB_Spectrum(temp.profile.flatten(),pres.profile.flatten()*9.86923e-6,profs['molecular'].wavelength,nu=nu,norm=True)
+    eta_i2 = np.sum(Ti2[:,np.newaxis]*beta_mol_norm,axis=0)
+    eta_i2 = eta_i2.reshape(temp.profile.shape)
+    profs['molecular'].multiply_piecewise(1.0/eta_i2)
+    profs['molecular'].gain_scale(mol_gain,gain_var = (mol_gain*0.05)**2)
+    
+    eta_c = np.sum(Tc2[:,np.newaxis]*beta_mol_norm,axis=0)
+    eta_c = eta_c.reshape(temp.profile.shape)
+    profs['combined_hi'].multiply_piecewise(1.0/eta_c)
+    profs['cross'].multiply_piecewise(1.0/eta_c)
+    
+    if Denoise_Mol:
+        MolDenoise.multiply_piecewise(1.0/eta_i2)
+        MolDenoise.gain_scale(mol_gain)
+else:
+    # Rescale molecular channel to match combined channel gain
+    profs['molecular'].gain_scale(mol_gain,gain_var = (mol_gain*0.05)**2)
+    if Denoise_Mol:
+        MolDenoise.gain_scale(mol_gain)
 
 
 beta_a = lp.AerosolBackscatter(profs['molecular'],profs['combined_hi'],beta_m)
@@ -321,31 +385,24 @@ if Estimate_Mol_Gain:
     # This segment estimates what the molecular gain should be 
     # based on a histogram minimum in BSR over the loaded data
     
+    iUp = np.nonzero(var_post['TelescopeDirection']==1.0)
     
-    BSRprof = BSR.profile.flatten()
-#    BSRsnr = ((BSR.profile-1)/np.sqrt(BSR.profile_variance)).flatten()
-    BSRsnr = BSR.SNR().flatten()
-    BSRalt = (np.ones(BSR.profile.shape)*BSR.range_array[np.newaxis,:]).flatten()
+    BSRprof = BSR.profile[iUp,:].flatten()
+    BSRalt = (np.ones(BSR.profile[iUp,:].shape)*BSR.range_array[np.newaxis,:]).flatten()
     
-    BSRsnr = np.delete(BSRsnr,np.nonzero(np.isnan(BSRprof)))
     BSRalt = np.delete(BSRalt,np.nonzero(np.isnan(BSRprof)))
     BSRprof = np.delete(BSRprof,np.nonzero(np.isnan(BSRprof)))
-    
-    BSRprof = np.delete(BSRprof,np.nonzero(np.isnan(BSRsnr)))
-    BSRalt = np.delete(BSRalt,np.nonzero(np.isnan(BSRsnr)))
-    BSRsnr = np.delete(BSRsnr,np.nonzero(np.isnan(BSRsnr)))
 
     bbsr = np.linspace(0,4,400)
-    bsnr = np.linspace(70,100,250)
-#    bsnr = np.linspace(10,380,100)
-#    bsnr = 10**np.linspace(np.log10(0.01),np.log10(18),100)
-#    bsnr = np.linspace(1.0,np.nanmax(BSRsnr),100)    
+    bsnr = np.linspace(1,100,250) # snr (70,100,250)
+
     balt = np.concatenate((BSR.range_array-BSR.mean_dR/2,BSR.range_array[-1:]+BSR.mean_dR/2))
+
+    """
+    perform analysis by altitude
+    """
     
-    hbsr = np.histogram2d(BSRprof,BSRsnr,bins=[bbsr,bsnr])
-#    hbsr = np.histogram2d(BSRprof,BSRalt,bins=[bbsr,balt])
-    #plt.figure()
-    #plt.pcolor(bbsr,bsnr,hbsr[0].T)
+    hbsr = np.histogram2d(BSRprof,BSRalt,bins=[bbsr,balt])
     
     i_hist_median = np.argmax(hbsr[0],axis=0)
     iset = np.arange(hbsr[0].shape[1])
@@ -362,22 +419,69 @@ if Estimate_Mol_Gain:
     hist_median = (-b_0)/m_0
     hist_med_sm = np.convolve(hist_median,np.ones(Nsm)*1.0/Nsm,mode='same')
     
-    #hist_median = bbsr[i_hist_median]
+    plt.figure()
+    plt.pcolor(bbsr,balt,hbsr[0].T)
+    plt.plot(hist_median,balt[1:],'r--')
+    plt.plot(hist_med_sm,balt[1:],'g--')
+    plt.xlabel('BSR')
+    plt.ylabel('Altitude [m]')
+    plt.title('Telescope Up')
+    
+    i_alt_lim = np.nonzero(np.logical_and(balt > 2000,balt < 6500))[0]
+    
+    mol_gain_adj = np.nanmin(hist_med_sm[i_alt_lim])
+    
+    print('Current Molecular (Telescope Up) Gain: %f'%mol_gain_up)
+    print('Suggested Molecular (Telescope Up) Gain: %f'%(mol_gain_up*mol_gain_adj))
+    
+    iDown = np.nonzero(var_post['TelescopeDirection']==0.0)
+    
+    BSRprof = BSR.profile[iDown,:].flatten()
+    BSRalt = (np.ones(BSR.profile[iDown,:].shape)*BSR.range_array[np.newaxis,:]).flatten()
+    
+    BSRalt = np.delete(BSRalt,np.nonzero(np.isnan(BSRprof)))
+    BSRprof = np.delete(BSRprof,np.nonzero(np.isnan(BSRprof)))
+
+    bbsr = np.linspace(0,4,400)
+    bsnr = np.linspace(1,100,250) # snr (70,100,250)
+
+    balt = np.concatenate((BSR.range_array-BSR.mean_dR/2,BSR.range_array[-1:]+BSR.mean_dR/2))
+
+    """
+    perform analysis by altitude
+    """
+    
+    hbsr = np.histogram2d(BSRprof,BSRalt,bins=[bbsr,balt])
+    
+    i_hist_median = np.argmax(hbsr[0],axis=0)
+    iset = np.arange(hbsr[0].shape[1])
+    dh1 = hbsr[0][i_hist_median,iset]-hbsr[0][i_hist_median-1,iset]
+    dh2 = hbsr[0][i_hist_median+1,iset]-hbsr[0][i_hist_median,iset]
+    dbsr = np.mean(np.diff(bbsr))
+    bsr1 = bbsr[i_hist_median]
+    bsr2 = bbsr[i_hist_median+1]
+    
+    m_0 = (dh2-dh1)/dbsr
+    b_0 = dh1-m_0*bsr1
+    
+    Nsm = 6  # number of bins to smooth over
+    hist_median = (-b_0)/m_0
+    hist_med_sm = np.convolve(hist_median,np.ones(Nsm)*1.0/Nsm,mode='same')
     
     plt.figure()
-    plt.pcolor(bbsr,bsnr,hbsr[0].T)
-#    plt.pcolor(bbsr,balt,hbsr[0].T)
-    plt.plot(hist_median,bsnr[1:],'r--')
-    plt.plot(hist_med_sm,bsnr[1:],'g--')
+    plt.pcolor(bbsr,balt,hbsr[0].T)
+    plt.plot(hist_median,balt[1:],'r--')
+    plt.plot(hist_med_sm,balt[1:],'g--')
     plt.xlabel('BSR')
-    plt.ylabel('BSR SNR')
+    plt.ylabel('Altitude [m]')
+    plt.title('Telescope Down')
     
-    i_snr_lim = np.nonzero(np.logical_and(bsnr > 80,bsnr < 100))[0]
+    i_alt_lim = np.nonzero(np.logical_and(balt > 2000,balt < 6500))[0]
     
-    mol_gain_adj = np.nanmin(hist_med_sm[i_snr_lim])
+    mol_gain_adj = np.nanmin(hist_med_sm[i_alt_lim])
     
-    print('Current Molecular Gain: %f'%mol_gain)
-    print('Suggested Molecular Gain: %f'%(mol_gain*mol_gain_adj))
+    print('Current Molecular (Telescope Down) Gain: %f'%mol_gain_down)
+    print('Suggested Molecular (Telescope Down) Gain: %f'%(mol_gain_down*mol_gain_adj))
 
 
 # add a diagnostic for counts/backscatter coeff
@@ -385,8 +489,12 @@ if Estimate_Mol_Gain:
 # add a diagnostic for diff overlap between lo and hi channels as a function
 # of count rate or backscatter coeff
 
-dPartMask = dPart.profile_variance > 1.0
-dPart.mask(dPartMask)
+#dPartMask = dPart.profile_variance > 1.0
+#dPart.mask(dPartMask)
+dPart.mask(dPart.profile_variance > 1.0)
+dPart.mask(dPart.profile > 1.0)
+dPart.mask(dPart.profile < -0.1)
+
 
 proj_label = proj + ' ' + flight_label[usr_flt] + ', '
 
@@ -403,7 +511,7 @@ if plot_2D:
         t1d_plt = time_1d/3600.0
     
 #    rfig = lp.pcolor_profiles([BSR,dPart],scale=['log','linear'],climits=[[1,1e2],[0,0.7]],ylimits=[MinAlt*1e-3,MaxAlt*1e-3],title_add=proj_label,plot_date=plot_date)
-    rfig = lp.pcolor_profiles([beta_a,dPart],scale=['log','linear'],climits=[[1e-8,1e-3],[0,0.7]],ylimits=[MinAlt*1e-3,MaxAlt*1e-3],title_add=proj_label,plot_date=plot_date)
+    rfig = lp.pcolor_profiles([beta_a,dPart],scale=['log','linear'],climits=[[1e-8,1e-3],[0,1.0]],ylimits=[MinAlt*1e-3,MaxAlt*1e-3],title_add=proj_label,plot_date=plot_date)
     for ai in range(len(rfig[1])):
         rfig[1][ai].plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude
         

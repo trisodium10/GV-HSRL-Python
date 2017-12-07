@@ -162,7 +162,7 @@ for var in profs.keys():
         CombRaw = profs['molecular'].copy()
         profs[var].diff_geo_overlap_correct(diff_data['hi_diff_geo'])
     elif var == 'combined_lo' and diff_geo_correct:
-        profs[var].diff_geo_overlap_correct(diff_data['hi_diff_geo'])
+        profs[var].diff_geo_overlap_correct(diff_data['lo_diff_geo'])
         profs[var].gain_scale(1.0/diff_data['lo_norm'])
     
     profs[var].slice_range(range_lim=[0,MaxAlt])
@@ -181,9 +181,9 @@ if Denoise_Mol:
     MolDenoise,tune_list = mle.DenoiseMolecular(MolRaw,beta_m_sonde=beta_m, \
                             MaxAlt=MaxAlt,accel = False,tv_lim =[1.5, 2.8],N_tv_pts=59, \
                             geo_data=dict(geo_prof=np.array([2e14])),bg_index=-10,n=20)
-    CombDenoise,tune_list = mle.DenoiseMolecular(CombRaw,beta_m_sonde=beta_m, \
-                            MaxAlt=MaxAlt,accel = False,tv_lim =[0.5, 2.0],N_tv_pts=59, \
-                            geo_data=dict(geo_prof=np.array([2e14])),bg_index=-10,n=20)
+#    CombDenoise,tune_list = mle.DenoiseMolecular(CombRaw,beta_m_sonde=beta_m, \
+#                            MaxAlt=MaxAlt,accel = False,tv_lim =[0.5, 2.0],N_tv_pts=59, \
+#                            geo_data=dict(geo_prof=np.array([2e14])),bg_index=-10,n=20)
 
 
 if hsrl_rb_adjust:
