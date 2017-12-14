@@ -36,7 +36,8 @@
 	],
 
 	"Location": [
-		{"date": "1-Sep-2015 0:0","location": "Boulder, CO, USA","latitude": 40.038589, "longitude": -105.238968, "Project":"none", "description": "Lidar Lab", "change_type": "abrupt"}
+		{"date": "1-Sep-2015 0:0","location": "Boulder, CO, USA","latitude": 40.038589, "longitude": -105.238968, "Project":"none", "description": "Lidar Lab", "change_type": "abrupt"},
+           {"date": "7-Dec-2017 0:0","location": "Broomfield, CO, USA","latitude": 39.912763, "longitude": -105.118251, "Project":"SOCRATES", "description": "GV", "change_type": "abrupt"}
 	],
 
 	"Flights": [
