@@ -241,9 +241,11 @@ plt.xlabel('Time [h-UTC]')
 plt.ylabel('Column Aerosol Backscatter [$m^{-1}sr^{-1}$]')
 plt.grid(b=True)
 
+plt.show()
+
 """    
     
-"""
+
 # plot I2 cell status
 #plt.figure(); 
 #plt.plot(time_sec/3600,var_1d_data['RemoveLongI2Cell'])
@@ -434,5 +436,5 @@ if RunCal:
             range_array=pHi.range_array,lo_norm=lo_norm,hi_norm=hi_norm, \
             TelescopeDirection = np.nanmean(var_1d_data['TelescopeDirection'][i0[cal_index]:i1[cal_index]]))
         
-        
+"""
 
