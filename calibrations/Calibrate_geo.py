@@ -57,6 +57,7 @@ save_file_path = save_path_ez
 #save_file_path = '/Users/mhayman/Documents/Python/Lidar/'
 #save_file_path = '/h/eol/mhayman/HSRL/hsrl_processing/hsrl_configuration/projDir/calfiles/'
 
+int_bs_th = 1e-3
 
 sg_win = 11
 sg_order = 5
@@ -64,8 +65,8 @@ sg_order = 5
 year_in = 2017
 month_in = 10
 day_in = 25
-start_hr = 17
-stop_hr = 4
+start_hr = 22
+stop_hr = 2
 
 print('Default Test Date:')
 print('(M/D/Y) %d/%d/%d, starting %.1f UTC for %.1f h'%(month_in,day_in,year_in,start_hr,stop_hr))
@@ -234,7 +235,7 @@ beta_aer = lp.AerosolBackscatter(profs['molecular'],profs['combined_hi'],beta_m)
     
 fig_data = lp.pcolor_profiles([beta_aer],scale=['log'],climits=[[1e-8,1e-3]]) #,ylimits=[MinAlt*1e-3,MaxAlt*1e-3])
 
-accum_beta_a = np.nansum(beta_aer.profile,axis=1)
+accum_beta_a = np.nanmax(beta_aer.profile,axis=1)
 plt.figure()
 plt.semilogy(beta_aer.time/3600.,accum_beta_a)
 plt.xlabel('Time [h-UTC]')

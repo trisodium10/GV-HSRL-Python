@@ -51,7 +51,7 @@ sg_order = 5
 year_in = 2017
 month_in = 10
 day_in = 25
-start_hr = 17
+start_hr = 18
 stop_hr = 4
 
 print('Default Test Date:')
