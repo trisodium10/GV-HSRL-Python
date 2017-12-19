@@ -44,7 +44,7 @@ diff_geo_correct = True
 hsrl_rb_adjust = True
 RemoveCals = True # removes instances where the I2 cell is removed
 load_reanalysis = True
-
+use_bs_thr = True
 
 cal_file_path = os.path.abspath(__file__+'/../../calibrations/cal_files/')+'/'
 cal_file = cal_file_path + 'gv_calvals.json'
@@ -57,7 +57,7 @@ save_file_path = save_path_ez
 #save_file_path = '/Users/mhayman/Documents/Python/Lidar/'
 #save_file_path = '/h/eol/mhayman/HSRL/hsrl_processing/hsrl_configuration/projDir/calfiles/'
 
-int_bs_th = 1e-3
+bs_th = 3e-6  # BS coeff threshold where profile isn't included in the geo overlap analysis
 
 sg_win = 11
 sg_order = 5
@@ -235,14 +235,26 @@ beta_aer = lp.AerosolBackscatter(profs['molecular'],profs['combined_hi'],beta_m)
     
 fig_data = lp.pcolor_profiles([beta_aer],scale=['log'],climits=[[1e-8,1e-3]]) #,ylimits=[MinAlt*1e-3,MaxAlt*1e-3])
 
+SNR_filter = beta_aer.SNR() < 2.0
+beta_aer.mask(SNR_filter)
+beta_aer.mask_range('<',100)
 accum_beta_a = np.nanmax(beta_aer.profile,axis=1)
 plt.figure()
-plt.semilogy(beta_aer.time/3600.,accum_beta_a)
+plt.semilogy(beta_aer.time/3600.,accum_beta_a,label=r'Max $\beta_a$')
+plt.semilogy(beta_aer.time[[0,-1]]/3600.,np.array([bs_th,bs_th]),'k--',linewidth=1.5,label='Threshold')
 plt.xlabel('Time [h-UTC]')
 plt.ylabel('Column Aerosol Backscatter [$m^{-1}sr^{-1}$]')
 plt.grid(b=True)
+plt.legend()
 
 plt.show()
+
+i_rm = np.nonzero(accum_beta_a > bs_th)[0]
+if use_bs_thr:
+    for var in profs.keys():
+        profs[var].remove_time_indices(i_rm)
+        
+
 
 """    
     
