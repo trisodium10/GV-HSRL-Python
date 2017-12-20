@@ -255,7 +255,7 @@ plt.ylabel('Column Aerosol Backscatter [$m^{-1}sr^{-1}$]')
 plt.grid(b=True)
 plt.legend()
 
-plt.show()
+
 
 i_rm = np.nonzero(accum_beta_a > bs_th)[0]
 
@@ -268,16 +268,24 @@ alpha_aer.label = 'Extinction Coefficient'
 alpha_aer.descript = 'Approximated extinction coefficient based on assumed lidar ratio'
 alpha_aer.profile_type = '$m^{-1}$'
 
-totalExt = alpha_aer.profile+8*np.pi/3.0*beta_m.profile
-totalExt[:,:150] = 0   # force extinction to zero below bin 110
+ODest = alpha_aer+8*np.pi/3.0*beta_m
+ODest.cumsum(axis=1)
 
-OD_est = sp.integrate.cumtrapz(totalExt,dx=alpha_aer.mean_dR,axis=1)
-OD_est2 = np.nancumsum(totalExt,axis=1)*alpha_aer.mean_dR
-Tatm = np.nanmean(np.exp(-2*OD_est),axis=0)
-Tatm2 = np.nanmean(np.exp(-2*OD_est2),axis=0)
+Tatm = np.nanmean(np.exp(-2*ODest.profile))
+Tatm_var = np.nansum(4*np.exp(-4*ODest.profile)*ODest.profile_variance,axis=0)/(ODest.time.size**2)
+#totalExt = alpha_aer.profile+8*np.pi/3.0*beta_m.profile
+#totalExt[:,:150] = 0   # force extinction to zero below bin 110
+
+#OD_est = sp.integrate.cumtrapz(totalExt,dx=alpha_aer.mean_dR,axis=1)
+#OD_est2 = np.nancumsum(totalExt,axis=1)*alpha_aer.mean_dR
+#Tatm = np.nanmean(np.exp(-2*OD_est),axis=0)
+#Tatm2 = np.nanmean(np.exp(-2*OD_est2),axis=0)
 plt.figure(); 
-plt.plot(Tatm)
-plt.plot(Tatm2,'--')
+plt.plot(Tatm,label='Transmission')
+plt.plot(np.sqrt(Tatm_var),label='std')
+plt.grid(b=True)
+plt.legend()
+#plt.plot(Tatm2,'--')
 
 
 profs['beta_m'] = beta_m
@@ -301,7 +309,7 @@ geo_raw = profs['beta_m']/profs['molecular']
 lp.plotprofiles([geo_raw],varplot=True,scale='log')
 
 
-
+plt.show()
 
 """    
     
