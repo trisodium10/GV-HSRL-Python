@@ -30,6 +30,8 @@ import ExternalDataFunctions as ex
 import LidarProfileFunctions as lp
 
 import json
+
+import scipy as sp
     
 
 
@@ -88,22 +90,25 @@ cal_stop = cal_start + datetime.timedelta(hours=stop_hr)
 #Year = 2017
 #HourLim = np.array([0,24])  # Limits on the processing time
 
-tres = 1*60.0  # resolution in time in seconds (0.5 sec)
-zres = 10.0  # resolution in altitude points (7.5 m)
-
-# index for where to treat the profile as background only
-BGIndex = -100; # negative number provides an index from the end of the array
-platform = 'ground' # 'ground' or 'airborne'.  If 'airborne' it needs an aircraft netcdf.
-MaxAlt = 10e3
-
-
-pol_xtalk = 0.015
-
-#kB = 1.3806504e-23;
-#c = 3e8
-
-
-FilterI2 = False  # only include data where the I2 cell is removed
+settings = {
+    'tres':1*60.0,  # resolution in time in seconds (0.5 sec)
+    'zres':10.0,  # resolution in altitude points (7.5 m)
+    
+    # index for where to treat the profile as background only
+    'BGIndex':-100, # negative number provides an index from the end of the array
+    'platform':'ground', # 'ground' or 'airborne'.  If 'airborne' it needs an aircraft netcdf.
+    'MaxAlt':40e3,
+    
+    'LRassumed':30,  # assumed lidar ratio for OD estimate
+    
+    
+    'pol_xtalk':0.015,
+    
+    
+    'FilterI2':False  # only include data where the I2 cell is removed
+    
+    
+    }
 
 ## list of 1D variables to load
 #var_1d_list = ['total_energy','RemoveLongI2Cell'\
@@ -163,6 +168,9 @@ i2_data = np.load(cal_file_path+i2_file)
 
 lidar_location = lp.get_calval(time_start,cal_json,"Location",returnlist=['latitude','longitude'])
 
+tres = settings['tres']
+BGIndex = settings['BGIndex']
+MaxAlt = settings['MaxAlt']
 # set the master time to match all 2D profiles to
 # (1d data will not be resampled)
 master_time = np.arange(time_sec[0]-tres/2,time_sec[-1]+tres/2,tres)
@@ -174,8 +182,8 @@ for var in profs.keys():
         # remove instances where the I2 cell is removed
         profs[var].remove_time_indices(cal_indices)
     profs[var].time_resample(tedges=master_time,update=True,remainder=False)
-    int_profs[var] = profs[var].copy()
-    int_profs[var].time_integrate()
+#    int_profs[var] = profs[var].copy()
+#    int_profs[var].time_integrate()
     
     if var == 'molecular':
         MolRaw = profs['molecular'].copy()
@@ -188,9 +196,9 @@ for var in profs.keys():
         profs[var].diff_geo_overlap_correct(diff_data['lo_diff_geo'])
         profs[var].gain_scale(1.0/diff_data['lo_norm'])
     
-    profs[var].slice_range(range_lim=[0,MaxAlt])
-    int_profs[var].bg_subtract(BGIndex)
-    int_profs[var].slice_range(range_lim=[0,MaxAlt])
+#    profs[var].slice_range(range_lim=[0,MaxAlt])
+#    int_profs[var].bg_subtract(BGIndex)
+#    int_profs[var].slice_range(range_lim=[0,MaxAlt])
 
 
 
@@ -233,7 +241,7 @@ else:
     
 beta_aer = lp.AerosolBackscatter(profs['molecular'],profs['combined_hi'],beta_m)
     
-fig_data = lp.pcolor_profiles([beta_aer],scale=['log'],climits=[[1e-8,1e-3]]) #,ylimits=[MinAlt*1e-3,MaxAlt*1e-3])
+#fig_data = lp.pcolor_profiles([beta_aer],scale=['log'],climits=[[1e-8,1e-3]]) #,ylimits=[MinAlt*1e-3,MaxAlt*1e-3])
 
 SNR_filter = beta_aer.SNR() < 2.0
 beta_aer.mask(SNR_filter)
@@ -250,10 +258,49 @@ plt.legend()
 plt.show()
 
 i_rm = np.nonzero(accum_beta_a > bs_th)[0]
+
+beta_aer.remove_time_indices(i_rm,label='Cloud Filter')
+beta_m.remove_time_indices(i_rm,label='Cloud Filter')
+
+alpha_aer = beta_aer.copy()
+alpha_aer.gain_scale(settings['LRassumed'],gain_var=settings['LRassumed']*0.5)
+alpha_aer.label = 'Extinction Coefficient'
+alpha_aer.descript = 'Approximated extinction coefficient based on assumed lidar ratio'
+alpha_aer.profile_type = '$m^{-1}$'
+
+totalExt = alpha_aer.profile+8*np.pi/3.0*beta_m.profile
+totalExt[:,:150] = 0   # force extinction to zero below bin 110
+
+OD_est = sp.integrate.cumtrapz(totalExt,dx=alpha_aer.mean_dR,axis=1)
+OD_est2 = np.nancumsum(totalExt,axis=1)*alpha_aer.mean_dR
+Tatm = np.nanmean(np.exp(-2*OD_est),axis=0)
+Tatm2 = np.nanmean(np.exp(-2*OD_est2),axis=0)
+plt.figure(); 
+plt.plot(Tatm)
+plt.plot(Tatm2,'--')
+
+
+profs['beta_m'] = beta_m
+
+
 if use_bs_thr:
     for var in profs.keys():
-        profs[var].remove_time_indices(i_rm)
+        if not 'Removed specified times: Cloud Filter' in profs[var].ProcessingStatus:
+            profs[var].remove_time_indices(i_rm,label='Cloud Filter')
+            
+        profs[var].time_integrate(avg=True)
+        if var != 'beta_m':
+            profs[var].range_correct()
         
+lp.plotprofiles(profs)
+
+geo_raw = profs['beta_m']/profs['molecular']
+
+
+
+lp.plotprofiles([geo_raw],varplot=True,scale='log')
+
+
 
 
 """    
