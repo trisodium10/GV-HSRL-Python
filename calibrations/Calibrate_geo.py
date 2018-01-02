@@ -31,7 +31,7 @@ import LidarProfileFunctions as lp
 
 import json
 
-import scipy as sp
+#import scipy as sp
     
 
 
@@ -42,11 +42,11 @@ try:
 except NameError:
     pass
 
-diff_geo_correct = True
-hsrl_rb_adjust = True
-RemoveCals = True # removes instances where the I2 cell is removed
-load_reanalysis = True
-use_bs_thr = True
+#diff_geo_correct = True
+#hsrl_rb_adjust = True
+#RemoveCals = True # removes instances where the I2 cell is removed
+#load_reanalysis = True
+#use_bs_thr = True
 
 cal_file_path = os.path.abspath(__file__+'/../../calibrations/cal_files/')+'/'
 cal_file = cal_file_path + 'gv_calvals.json'
@@ -105,8 +105,17 @@ settings = {
     'pol_xtalk':0.015,
     
     
-    'FilterI2':False  # only include data where the I2 cell is removed
+    'FilterI2':False,  # only include data where the I2 cell is removed
     
+    'diff_geo_correct':True,
+    'hsrl_rb_adjust':True,
+    'RemoveCals':True, # removes instances where the I2 cell is removed
+    'load_reanalysis':True,
+    'use_bs_thr':True,
+    
+    'EstimateExtinction':True,  # attempt to apply an extinction correction
+    'ExtinctionAlt':5e3     # max altitude to apply extinction correction
+
     
     }
 
@@ -125,20 +134,14 @@ var_1d_list = ['total_energy','RemoveLongI2Cell'\
 var_2d_list = ['molecular','combined_hi','combined_lo','cross']
 
 #basepath = '/scr/eldora1/HSRL_data/'  # old path - still works with link from HSRL_data to /hsrl/raw/
-basepath = '/scr/eldora1/rsfdata/hsrl/raw/'  # new absolute path
-#basepath = '/Users/mhayman/Documents/HSRL/GVHSRL_data/'  # local computer data path
+#basepath = '/scr/eldora1/rsfdata/hsrl/raw/'  # new absolute path
+basepath = '/Users/mhayman/Documents/HSRL/GVHSRL_data/'  # local computer data path
 
 
 # grab raw data from netcdf files
 [timeD,time_dt,time_sec],var_1d_data, profs = gv.load_raw_data(cal_start,cal_stop,var_2d_list,var_1d_list,basepath=basepath,verbose=True,as_prof=True)
 time_start = datetime.datetime(year_in,month_in,day_in)+datetime.timedelta(hours=start_hr)
 time_stop = time_start + datetime.timedelta(hours=stop_hr)
-
-
-
-
-
-
 
 
 ## grab raw data from netcdf files
@@ -153,7 +156,7 @@ else:
 with open(cal_file,"r") as f:
     cal_json = json.loads(f.read())
 f.close()
-if hsrl_rb_adjust:
+if settings['hsrl_rb_adjust']:
     mol_gain,diff_geo_file = lp.get_calval(time_start,cal_json,'Molecular Gain',cond=[['RB_Corrected','=','True']],returnlist=['value','diff_geo'])  
 else:
     mol_gain,diff_geo_file = lp.get_calval(time_start,cal_json,"Molecular Gain",returnlist=['value','diff_geo'])
@@ -178,7 +181,7 @@ master_time = np.arange(time_sec[0]-tres/2,time_sec[-1]+tres/2,tres)
 time_1d,var_1d = gv.var_time_resample(master_time,time_sec,var_1d_data,average=True)
 int_profs = {}  # obtain time integrated profiles
 for var in profs.keys():
-    if RemoveCals:
+    if settings['RemoveCals']:
         # remove instances where the I2 cell is removed
         profs[var].remove_time_indices(cal_indices)
     profs[var].time_resample(tedges=master_time,update=True,remainder=False)
@@ -189,10 +192,10 @@ for var in profs.keys():
         MolRaw = profs['molecular'].copy()
     
     profs[var].bg_subtract(BGIndex)
-    if var == 'combined_hi' and diff_geo_correct:
+    if var == 'combined_hi' and settings['diff_geo_correct']:
         CombRaw = profs['molecular'].copy()
         profs[var].diff_geo_overlap_correct(diff_data['hi_diff_geo'])
-    elif var == 'combined_lo' and diff_geo_correct:
+    elif var == 'combined_lo' and settings['diff_geo_correct']:
         profs[var].diff_geo_overlap_correct(diff_data['lo_diff_geo'])
         profs[var].gain_scale(1.0/diff_data['lo_norm'])
     
@@ -203,12 +206,12 @@ for var in profs.keys():
 
 
 
-if load_reanalysis:
+if settings['load_reanalysis']:
     pres,temp = ex.load_fixed_point_NCEP_TandP(profs['molecular'],lidar_location,reanalysis_path)
     beta_m = lp.get_beta_m(temp,pres,profs['molecular'].wavelength)
     
     
-if hsrl_rb_adjust:
+if settings['hsrl_rb_adjust']:
     print('Obtaining Rayleigh-Brillouin Correction')
     dnu = 20e6  # resolution
     nu_max = 10e9 # max frequency relative to line center
@@ -261,37 +264,59 @@ i_rm = np.nonzero(accum_beta_a > bs_th)[0]
 
 beta_aer.remove_time_indices(i_rm,label='Cloud Filter')
 beta_m.remove_time_indices(i_rm,label='Cloud Filter')
-
-alpha_aer = beta_aer.copy()
-alpha_aer.gain_scale(settings['LRassumed'],gain_var=settings['LRassumed']*0.5)
-alpha_aer.label = 'Extinction Coefficient'
-alpha_aer.descript = 'Approximated extinction coefficient based on assumed lidar ratio'
-alpha_aer.profile_type = '$m^{-1}$'
-
-ODest = alpha_aer+8*np.pi/3.0*beta_m
-ODest.cumsum(axis=1)
-
-Tatm = np.nanmean(np.exp(-2*ODest.profile))
-Tatm_var = np.nansum(4*np.exp(-4*ODest.profile)*ODest.profile_variance,axis=0)/(ODest.time.size**2)
-#totalExt = alpha_aer.profile+8*np.pi/3.0*beta_m.profile
-#totalExt[:,:150] = 0   # force extinction to zero below bin 110
-
-#OD_est = sp.integrate.cumtrapz(totalExt,dx=alpha_aer.mean_dR,axis=1)
-#OD_est2 = np.nancumsum(totalExt,axis=1)*alpha_aer.mean_dR
-#Tatm = np.nanmean(np.exp(-2*OD_est),axis=0)
-#Tatm2 = np.nanmean(np.exp(-2*OD_est2),axis=0)
-plt.figure(); 
-plt.plot(Tatm,label='Transmission')
-plt.plot(np.sqrt(Tatm_var),label='std')
-plt.grid(b=True)
-plt.legend()
-#plt.plot(Tatm2,'--')
+if settings['EstimateExtinction']:
+        
+    alpha_aer = beta_aer.copy()
+    #alpha_aer.remove_mask()
+    alpha_aer.gain_scale(settings['LRassumed'],gain_var=settings['LRassumed']*0.5)
+    alpha_aer.label = 'Extinction Coefficient'
+    alpha_aer.descript = 'Approximated extinction coefficient based on assumed lidar ratio'
+    alpha_aer.profile_type = '$m^{-1}$'
+    #alpha_aer.profile[:,:150] = 0
+    #alpha_aer.profile_variance[:,:150] = 0
+    
+    ODest = alpha_aer+8*np.pi/3.0*beta_m
+    ODest.profile[:,:150] = 0
+    ODest.profile_variance[:,:150] = 0
+    izMax = np.argmin(np.abs(ODest.range_array-settings['ExtinctionAlt']))
+    ODest.profile[:,izMax:] = 0
+    ODest.profile_variance[:,izMax:]
+    ODest.cumsum(axis=1)
+    
+    
+    Tatm = np.nanmean(np.exp(-2*ODest.profile),axis=0)
+    Tatm.mask= np.zeros(Tatm.shape,dtype=bool)
+    Tatm_var = np.nansum(4*np.exp(-4*ODest.profile)*ODest.profile_variance,axis=0)/(ODest.time.size**2)
+    Tatm_var.mask = np.zeros(Tatm_var.shape,dtype=bool)
+    
+    #totalExt = alpha_aer.profile+8*np.pi/3.0*beta_m.profile
+    #totalExt[:,:150] = 0   # force extinction to zero below bin 110
+    #
+    #OD_est = sp.integrate.cumtrapz(totalExt,dx=alpha_aer.mean_dR,axis=1)
+    #OD_est2 = np.nancumsum(totalExt,axis=1)*alpha_aer.mean_dR
+    #Tatm0 = np.nanmean(np.exp(-2*OD_est),axis=0)
+    #Tatm2 = np.nanmean(np.exp(-2*OD_est2),axis=0)
+    
+        
+    
+    plt.figure()
+    plt.plot(Tatm,label='Transmission')
+    plt.plot(np.sqrt(Tatm_var),label='std')
+    #plt.plot(Tatm0,':',label='trapazoid')
+    #plt.plot(Tatm2,'--',label='cumulative')
+    plt.grid(b=True)
+    plt.legend()
+    #plt.plot(Tatm2,'--')
+    
+    Tatm = Tatm[np.newaxis,:]
+else:
+    Tatm = np.zeros((1,profs['molecular'].profile.shape[1]))
 
 
 profs['beta_m'] = beta_m
 
 
-if use_bs_thr:
+if settings['use_bs_thr']:
     for var in profs.keys():
         if not 'Removed specified times: Cloud Filter' in profs[var].ProcessingStatus:
             profs[var].remove_time_indices(i_rm,label='Cloud Filter')
@@ -303,8 +328,7 @@ if use_bs_thr:
 lp.plotprofiles(profs)
 
 geo_raw = profs['beta_m']/profs['molecular']
-
-
+geo_raw.multiply_piecewise(Tatm)
 
 lp.plotprofiles([geo_raw],varplot=True,scale='log')
 

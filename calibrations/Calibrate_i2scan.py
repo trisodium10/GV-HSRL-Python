@@ -278,7 +278,7 @@ if file_select != -1 and file_select < len(file_list):
     #plt.semilogy(phase_nar_interp+ipkcor*dphase,molnar*1e-3/norm_factor)
     #plt.semilogy(phase_wide_interp,molwide/norm_factor)
     
-    iswap = np.nonzero(molnar*1e-3>molwide[ip0:ip1+1])[0]
+    iswap = np.nonzero(molnar*1e-3>molwide[ip0:ip1])[0]
     
     mol_merge = molwide
     mol_merge[iswap[0]+ip0:iswap[-1]+ip0] = 1e-3*molnar[iswap[0]:iswap[-1]]
@@ -360,11 +360,17 @@ if file_select != -1 and file_select < len(file_list):
         header_str = header_str+'Min iodine transmission =    %1.1e,  1/(min_trans) =  %1.1e\n\n'%(np.min(mol_merge),1/np.min(mol_merge))
         header_str = header_str+'freq(GHz)  combined  molecular i2_measured i2_theory'
         
-#        # may need 'i2-default-scan' in name
-#        save_cal_file = 'i2-default-scan-'+scan_start_dt.strftime('%Y%m%dT%H%M')+'.cal'
-##        save_file_path = '/h/eol/mhayman/HSRL/hsrl_processing/'
-#        save_file_path = '/h/eol/mhayman/HSRL/hsrl_processing/hsrl_configuration/projDir/calfiles/'
-#        np.savetxt(save_file_path+save_cal_file,write_data,fmt='%.5f    ',header=header_str)
+        
+        # may need 'i2-default-scan' in name
+        save_cal_file = 'i2-default-scan-'+scan_start_dt.strftime('%Y%m%dT%H%M')+'.cal'
+#        save_file_path = '/h/eol/mhayman/HSRL/hsrl_processing/'
+        save_file_path = '/h/eol/mhayman/HSRL/hsrl_processing/hsrl_configuration/projDir/calfiles/'
+        np.savetxt(save_file_path+save_cal_file,write_data,fmt='%.5f    ',header=header_str)
+        
+        print('Saved calibration files:')
+        print('   ' + save_ez_file_path+save_ez_filename)
+        print('    and')
+        print('   ' +save_file_path+save_cal_file )
 
 else:
     print('Unrecognized file index')
