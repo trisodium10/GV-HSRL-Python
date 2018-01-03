@@ -8,12 +8,12 @@
 	],
 
 	"Molecular_Gain": [
-           {"date": "29-Jul-2015 16:31","value": 1.0347, "down_gain":1.0347, "diff_geo": "diff_geo_GVHSRL20120201.npz", "change_type": "gradual", "RB_Corrected":"False"},
-           {"date": "29-Jul-2015 16:31","value": 0.688944, "down_gain":0.661462, "diff_geo": "diff_geo_GVHSRL20120201.npz", "change_type": "gradual", "RB_Corrected":"True"},
-		{"date": "12-Oct-2017 0:0","value": 1.0728915, "down_gain":1.0728915, "diff_geo": "diff_geo_GVHSRL20171025.npz", "change_type": "abrupt", "RB_Corrected":"False"},
-		{"date": "27-Oct-2017 0:0","value": 1.133915, "down_gain":1.133915, "diff_geo": "diff_geo_GVHSRL20171025.npz", "change_type": "gradual", "RB_Corrected":"False"},
-		{"date": "27-Oct-2017 0:0","value": 0.784546, "down_gain":0.784546, "diff_geo": "diff_geo_GVHSRL20171025.npz", "change_type": "gradual", "RB_Corrected":"True"},
-           {"date": "20-Dec-2017 18:00","value": 0.579247, "down_gain":0.579247, "diff_geo": "diff_geo_GVHSRL20171220.npz", "change_type": "gradual", "RB_Corrected":"True"}
+           {"date": "29-Jul-2015 16:31","value": 1.0347, "down_gain":1.0347, "diff_geo": "diff_geo_GVHSRL20120201.npz", "change_type": "gradual", "RB_Corrected":"False","down_diff":""},
+           {"date": "29-Jul-2015 16:31","value": 0.688944, "down_gain":0.661462, "diff_geo": "diff_geo_GVHSRL20120201.npz", "change_type": "gradual", "RB_Corrected":"True","down_diff":""},
+		{"date": "12-Oct-2017 0:0","value": 1.0728915, "down_gain":1.0728915, "diff_geo": "diff_geo_GVHSRL20171025.npz", "change_type": "abrupt", "RB_Corrected":"False","down_diff":""},
+		{"date": "27-Oct-2017 0:0","value": 1.133915, "down_gain":1.133915, "diff_geo": "diff_geo_GVHSRL20171025.npz", "change_type": "gradual", "RB_Corrected":"False","down_diff":""},
+		{"date": "27-Oct-2017 0:0","value": 0.784546, "down_gain":0.784546, "diff_geo": "diff_geo_GVHSRL20171025.npz", "change_type": "gradual", "RB_Corrected":"True","down_diff":""},
+           {"date": "20-Dec-2017 18:00","value": 0.629033, "down_gain":0.59758, "diff_geo": "diff_geo_GVHSRL20171220.npz", "change_type": "gradual", "RB_Corrected":"True","down_diff":"diff_geo_GVHSRL20180102.npz"}
 	],
 	"Baseline_File": [
 		{"date": "12-Oct-2017 0:0","value": "baseline_20171019T2000.npz", "change_type": "abrupt"}
@@ -58,7 +58,9 @@
 		{"date": "3-Aug-2015 0:0","Project":"CSET","Flight Number": 13,"Flight Designation": "rf"},
 		{"date": "7-Aug-2015 0:0","Project":"CSET","Flight Number": 14,"Flight Designation": "rf"},
 		{"date": "9-Aug-2015 0:0","Project":"CSET","Flight Number": 15,"Flight Designation": "rf"},
-		{"date": "12-Aug-2015 0:0","Project":"CSET","Flight Number": 16,"Flight Designation": "rf"}
+		{"date": "12-Aug-2015 0:0","Project":"CSET","Flight Number": 16,"Flight Designation": "rf"},
+
+           {"date": "2-Jan-2018 0:0","Project":"SOCRATES","Flight Number": 1,"Flight Designation": "tf"}
 	],
 
 	"Comments": [

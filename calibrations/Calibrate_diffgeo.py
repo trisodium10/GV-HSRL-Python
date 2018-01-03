@@ -44,6 +44,7 @@ save_file_path = save_path_ez
 #save_file_path = '/Users/mhayman/Documents/Python/Lidar/'
 #save_file_path = '/h/eol/mhayman/HSRL/hsrl_processing/hsrl_configuration/projDir/calfiles/'
 
+airborne = False
 
 sg_win = 11
 sg_order = 5
@@ -63,6 +64,10 @@ if input('Run this default date? [y/n]') != 'y':
     day_in = np.int(input("Day: "))
     start_hr = np.float(input("Start Hour (UTC): "))
     stop_hr = np.float(input("Duration (hours): "))
+    airborne_str = input("Is the lidar airborne? [y/n]")
+    
+    if airborne_str == 'y' or airborne_str == 'Y':
+        airborne = True
 
 cal_start = datetime.datetime(year_in,month_in,day_in)+datetime.timedelta(hours=start_hr)
 cal_stop = cal_start + datetime.timedelta(hours=stop_hr)
@@ -101,7 +106,8 @@ var_2d_list = ['molecular','combined_hi','combined_lo']  # 'cross',
 
 
 #basepath = '/scr/eldora1/HSRL_data/'  # old path - still works with link from HSRL_data to /hsrl/raw/
-basepath = '/scr/eldora1/rsfdata/hsrl/raw/'  # new absolute path
+#basepath = '/scr/eldora1/rsfdata/hsrl/raw/'  # new absolute path
+basepath = '/scr/rain1/rsfdata/projects/socrates/hsrl/raw/'  # SOCRATES Path
 #basepath = '/Users/mhayman/Documents/HSRL/GVHSRL_data/'  # local computer data path
 
 
@@ -228,7 +234,9 @@ if RunCal:
     plt.title('Hi/Mol Ratio')
     plt.show(block=False)
     
+
     i_norm = 1000
+
     i_const = np.int(input('Make constant above index (e.g. 500): '))
     i_const_max = np.nonzero(pHi.SNR().flatten() < 0.2*pHi.SNR().flatten()[i_const])[0]
     i_const_max = i_const_max[np.nonzero(i_const_max > i_const)[0][0]]
@@ -238,7 +246,11 @@ if RunCal:
 #    hi_diff_geo[i_const:] = hi_diff_geo[i_const]
 #    plt.plot(hi_diff_geo)
     
-    hi_diff_geo = gv.fit_high_range(hi_diff_geo,pHi.profile_variance,i_const,i_const_max)
+    if airborne:
+        hi_diff_const = np.nanmean(hi_diff_geo[i_const-4:i_const])
+        hi_diff_geo[i_const:] = hi_diff_const
+    else:
+        hi_diff_geo = gv.fit_high_range(hi_diff_geo,pHi.profile_variance,i_const,i_const_max)
     plt.plot(hi_diff_geo,'--')
     
     hi_norm = hi_diff_geo[i_norm]
@@ -261,7 +273,11 @@ if RunCal:
 #    lo_diff_geo[i_const:] = lo_diff_geo[i_const]
 #    plt.plot(lo_diff_geo)
     
-    lo_diff_geo = gv.fit_high_range(lo_diff_geo,pLo.profile_variance,i_const,i_const_max)
+    if airborne:
+        lo_diff_const = np.nanmean(lo_diff_geo[i_const-4:i_const])
+        lo_diff_geo[i_const:] = lo_diff_const
+    else:
+        lo_diff_geo = gv.fit_high_range(lo_diff_geo,pLo.profile_variance,i_const,i_const_max)
     plt.plot(lo_diff_geo,'--')
     plt.show(block=False)
     
@@ -296,7 +312,8 @@ if RunCal:
             hi_prof = pHi.profile.data.flatten(),lo_prof = pLo.profile.data.flatten(),\
             sg_win = sg_win, sg_order = sg_order, i_norm = i_norm, 
             range_array=pHi.range_array,lo_norm=lo_norm,hi_norm=hi_norm, \
-            TelescopeDirection = np.nanmean(var_1d_data['TelescopeDirection'][i0[cal_index]:i1[cal_index]]))
-        
+            TelescopeDirection = np.nanmean(var_1d_data['TelescopeDirection'][i0[cal_index]:i1[cal_index]]), \
+            airborne=airborne)
+        # note that if the lidar is airborne, it is probably a downward pointing calibration
         
 
