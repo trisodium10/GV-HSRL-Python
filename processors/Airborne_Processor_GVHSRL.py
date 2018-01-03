@@ -74,6 +74,9 @@ default_settings = {
     
     'plot_2D':True,   # pcolor plot the BSR and depolarization profiles
     'plot_date':True,  # plot results in date time format.  Otherwise plots as hour floats
+    'save_plots':False, # save the plot data
+    
+    'save_data':False, # save data as netcdf
     
     'Estimate_Mol_Gain':True, # use statistics on BSR to estimate the molecular gain
     
@@ -128,7 +131,7 @@ except NameError:
 
 # list of 1D variables to load
 var_1d_list = ['total_energy','RemoveLongI2Cell'\
-    ,'TelescopeDirection','TelescopeLocked','polarization','DATA_shot_count']  # 'DATA_shot_count'
+    ,'TelescopeDirection','TelescopeLocked','polarization','DATA_shot_count','builduptime']  # 'DATA_shot_count'
 
 # list of 2D variables (profiles) to load
 var_2d_list = ['molecular','combined_hi','combined_lo','cross']
@@ -192,9 +195,10 @@ except NameError:
         flt = flight_list[usr_flt]
         
 filePathAircraft = aircraft_basepath[proj] + flt + '.nc'
-    
-#  load aircraft data
-    
+
+
+        
+#  load aircraft data    
 air_data = gv.load_aircraft_data(filePathAircraft,var_aircraft)
 
 # locate time range where aircraft is flying
@@ -231,6 +235,23 @@ print('Processing: ')
 print('   '+time_start.strftime('%H:%M %d-%b, %Y to'))
 print('   '+time_stop.strftime('%H:%M %d-%b, %Y'))
 print('')
+
+if settings['save_data']:
+    try:
+        save_data_file = save_data_path+flt+'_GVHSRL_'+time_start.strftime('%Y%m%dT%H%M')+'_'+time_stop.strftime('%Y%m%dT%H%M')+'.nc'
+    except NameError:
+        print('Save data is disabled')
+        print('  No save path (save_data_path) is provided')
+        settings['save_data'] = False
+
+if settings['save_plots']:
+    try:
+        save_plots_path
+        save_plots_base = flt+'_GVHSRL_'+time_start.strftime('%Y%m%dT%H%M')+'_'+time_stop.strftime('%Y%m%dT%H%M')
+    except NameError:
+        print('Save plots is disabled')
+        print('  No save path (save_plots_path) is provided')
+        settings['save_plots'] = False
 
 # grab raw data from netcdf files
 [timeD,time_dt,time_sec],var_1d_data, profs = gv.load_raw_data(time_start,time_stop,var_2d_list,var_1d_list,basepath=basepath,verbose=True,as_prof=True,loadQWP=settings['loadQWP'])
@@ -584,6 +605,27 @@ BSR.mask(np.isnan(BSR.profile))
 dPart.mask(np.isnan(dPart.profile))
 dVol.mask(np.isnan(dVol.profile))
 
+save_prof_list = [beta_a,dPart,dVol,BSR,beta_m]
+save_var1d_post = {'TelescopeDirection':'1-Lidar Pointing Up, 0-Lidar Pointing Down',
+                   'polarization':'System Quarter Waveplate orientation'}
+save_air_post = {'THDG': 'aircraft heading',
+                 'TASX': 'airspeed [m/s]',
+                 'GGLAT': 'latitude',
+                 'PITCH': 'pitch angle',
+                 'GGALT': 'altitude [m]',
+                 'PSXC': 'ambiant pressure in hPa',
+                 'ROLL': 'aircraft roll angle',
+                 'GGLON': 'longitude',
+                 'ATX': 'ambiant temperature in C'}
+
+if settings['save_data']:
+    for ai in range(len(save_prof_list)):
+        save_prof_list[ai].write2nc(save_data_file) #,name_override=True,tag=var_name)
+    for var in save_var1d_post.keys():
+        lp.write_var2nc(var_post[var],str(var),save_data_file,description=save_var1d_post[var])
+    for var in save_air_post.keys():
+        lp.write_var2nc(air_data_post[var],str(var),save_data_file,description=save_air_post[var])
+
 if settings['plot_2D']:
     if settings['plot_date']:
         t1d_plt = x_time = mdates.date2num([datetime.datetime.fromordinal(BSR.StartDate.toordinal()) \
@@ -596,9 +638,14 @@ if settings['plot_2D']:
     for ai in range(len(rfig[1])):
         rfig[1][ai].plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude
         
+    if settings['save_plots']:
+        plt.savefig(save_plots_path+'Aerosol_Backscatter_'+save_plots_base,dpi=300)
+        
     rfig = lp.pcolor_profiles([profs['combined_hi'],dVol],scale=['log','linear'],climits=[[1e-1,1e4],[0,1.0]],ylimits=[MinAlt*1e-3,MaxAlt*1e-3],title_add=proj_label,plot_date=settings['plot_date'])
     for ai in range(len(rfig[1])):
         rfig[1][ai].plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude
+    if settings['save_plots']:
+        plt.savefig(save_plots_path+'AttenuatedBackscatter_'+save_plots_base,dpi=300)
     #lp.plotprofiles(profs)
     #dPart.mask(dPartMask)
     #lp.pcolor_profiles([BSR,dVol],scale=['log','linear'],climits=[[1,5e2],[0,1.0]])
