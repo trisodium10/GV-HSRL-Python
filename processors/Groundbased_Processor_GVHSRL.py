@@ -40,40 +40,65 @@ except NameError:
 
 
 
-cal_file_path = os.path.abspath(__file__+'/../../calibrations/cal_files/')+'/'
+default_cal_file_path = os.path.abspath(__file__+'/../../calibrations/cal_files/')+'/'
+try:
+    cal_file_path
+except NameError:
+    cal_file_path = default_cal_file_path
 cal_file = cal_file_path + 'gv_calvals.json'
 
-reanalysis_path = os.path.abspath(__file__+'/../../../external_data/')+'/'
+default_reanalysis_path = os.path.abspath(__file__+'/../../../external_data/')+'/'
+try:
+    reanalysis_path
+except NameError:
+    reanalysis_path = default_reanalysis_path
 
 #save_file_path = '/Users/mhayman/Documents/Python/Lidar/'
 #save_file_path = '/h/eol/mhayman/HSRL/hsrl_processing/hsrl_configuration/projDir/calfiles/'
 
-tres = 60 #1*60.0  # resolution in time in seconds (0.5 sec)
-zres = 10.0  # resolution in altitude points (7.5 m)
+default_settings = {
 
-#mol_gain = 1.133915#1.0728915  # gain adjustment to molecular channel
+    'tres':60, #1*60.0  # resolution in time in seconds (0.5 sec)
+    'zres':10.0,  # resolution in altitude points (7.5 m)
+    
+    #mol_gain = 1.133915#1.0728915  # gain adjustment to molecular channel
+    
+    # index for where to treat the profile as background only
+    'BGIndex':-100, # negative number provides an index from the end of the array
+    'platform':'ground', # 'ground' or 'airborne'.  If 'airborne' it needs an aircraft netcdf.
+    'MaxAlt':10e3,
+    
+    'RemoveCals':True,   # don't include instances where the I2 cell is removed
+                        # scan files are not included in the file search so they
+                        # are removed anyway
+    
+    'diff_geo_correct':True,  # apply differential overlap correction
+    
+    'load_reanalysis':True, # load T and P reanalysis from NCEP/NCAR Model
+    
+    'plot_2D':True,   # pcolor plot the BSR and depolarization profiles
+    
+    'Estimate_Mol_Gain':True, # use statistics on BSR to estimate the molecular gain
+    
+    'Denoise_Mol':False,  # run PTV denoising on molecular channel
+    
+    'hsrl_rb_adjust':True  # apply rayleigh brillouin correction to molecular profile
+    }
 
-# index for where to treat the profile as background only
-BGIndex = -100; # negative number provides an index from the end of the array
-platform = 'ground' # 'ground' or 'airborne'.  If 'airborne' it needs an aircraft netcdf.
-MaxAlt = 10e3
 
-RemoveCals = True   # don't include instances where the I2 cell is removed
-                    # scan files are not included in the file search so they
-                    # are removed anyway
+# check if any settings have been defined.  If not, define it as an empty dict.
+try: settings
+except NameError: settings = {}
+    
+# If a paremeter isn't supplied, use the default setting
+for param in default_settings.keys():
+    if not param in settings.keys():
+        settings[param] = default_settings[param]  
 
-diff_geo_correct = True  # apply differential overlap correction
-
-load_reanalysis = True # load T and P reanalysis from NCEP/NCAR Model
-
-plot_2D = True   # pcolor plot the BSR and depolarization profiles
-
-Estimate_Mol_Gain = True # use statistics on BSR to estimate the molecular gain
-
-Denoise_Mol = False  # run PTV denoising on molecular channel
-
-hsrl_rb_adjust = True # apply rayleigh brillouin correction to molecular profile
-
+tres = settings['tres']
+zres = settings['zres']
+BGIndex = settings['BGIndex']
+MaxAlt = settings['MaxAlt']
 
 #sg_win = 11
 #sg_order = 5
@@ -81,25 +106,30 @@ hsrl_rb_adjust = True # apply rayleigh brillouin correction to molecular profile
 #basepath = '/scr/eldora1/HSRL_data/'  # old path - still works with link from HSRL_data to /hsrl/raw/
 basepath = '/scr/eldora1/rsfdata/hsrl/raw/'  # new absolute path
 #basepath = '/Users/mhayman/Documents/HSRL/GVHSRL_data/'  # local computer data path
-        
-year_in = 2017
-month_in = 10
-day_in = 27
-start_hr = 16 #17.2
-stop_hr = 12# 4
-
-print('Default Test Date:')
-print('(M/D/Y) %d/%d/%d, starting %.1f UTC for %.1f h'%(month_in,day_in,year_in,start_hr,stop_hr))
-if input('Run this default date? [y/n]') != 'y':
-    print("Enter search range for diff_geo calibration:")
-    year_in = np.int(input("Year: "))
-    month_in = np.int(input("Month (#): "))
-    day_in = np.int(input("Day: "))
-    start_hr = np.float(input("Start Hour (UTC): "))
-    stop_hr = np.float(input("Duration (hours): "))
-
-time_start = datetime.datetime(year_in,month_in,day_in)+datetime.timedelta(hours=start_hr)
-time_stop = time_start + datetime.timedelta(hours=stop_hr)
+  
+# check if the data time has been passed in 
+# if not, ask the user for it    
+try: 
+    time_start
+except NameError:
+    year_in = 2017
+    month_in = 10
+    day_in = 27
+    start_hr = 16 #17.2
+    stop_hr = 12# 4
+    
+    print('Default Test Date:')
+    print('(M/D/Y) %d/%d/%d, starting %.1f UTC for %.1f h'%(month_in,day_in,year_in,start_hr,stop_hr))
+    if input('Run this default date? [y/n]') != 'y':
+        print("Enter search range for diff_geo calibration:")
+        year_in = np.int(input("Year: "))
+        month_in = np.int(input("Month (#): "))
+        day_in = np.int(input("Day: "))
+        start_hr = np.float(input("Start Hour (UTC): "))
+        stop_hr = np.float(input("Duration (hours): "))
+    
+    time_start = datetime.datetime(year_in,month_in,day_in)+datetime.timedelta(hours=start_hr)
+    time_stop = time_start + datetime.timedelta(hours=stop_hr)
 
 
 # list of 1D variables to load
@@ -125,7 +155,7 @@ else:
 with open(cal_file,"r") as f:
     cal_json = json.loads(f.read())
 f.close()
-if hsrl_rb_adjust:
+if settings['hsrl_rb_adjust']:
     mol_gain,diff_geo_file = lp.get_calval(time_start,cal_json,'Molecular Gain',cond=[['RB_Corrected','=','True']],returnlist=['value','diff_geo'])  
 else:
     mol_gain,diff_geo_file = lp.get_calval(time_start,cal_json,"Molecular Gain",returnlist=['value','diff_geo'])
@@ -147,7 +177,7 @@ master_time = np.arange(time_sec[0]-tres/2,time_sec[-1]+tres/2,tres)
 time_1d,var_1d = gv.var_time_resample(master_time,time_sec,var_1d_data,average=True)
 int_profs = {}  # obtain time integrated profiles
 for var in profs.keys():
-    if RemoveCals:
+    if settings['RemoveCals']:
         # remove instances where the I2 cell is removed
         profs[var].remove_time_indices(cal_indices)
     profs[var].time_resample(tedges=master_time,update=True,remainder=False)
@@ -158,10 +188,10 @@ for var in profs.keys():
         MolRaw = profs['molecular'].copy()
     
     profs[var].bg_subtract(BGIndex)
-    if var == 'combined_hi' and diff_geo_correct:
+    if var == 'combined_hi' and settings['diff_geo_correct']:
         CombRaw = profs['molecular'].copy()
         profs[var].diff_geo_overlap_correct(diff_data['hi_diff_geo'])
-    elif var == 'combined_lo' and diff_geo_correct:
+    elif var == 'combined_lo' and settings['diff_geo_correct']:
         profs[var].diff_geo_overlap_correct(diff_data['lo_diff_geo'])
         profs[var].gain_scale(1.0/diff_data['lo_norm'])
     
@@ -172,11 +202,11 @@ for var in profs.keys():
 
 
 
-if load_reanalysis:
+if settings['load_reanalysis']:
     pres,temp = ex.load_fixed_point_NCEP_TandP(profs['molecular'],lidar_location,reanalysis_path)
     beta_m = lp.get_beta_m(temp,pres,profs['molecular'].wavelength)
 
-if Denoise_Mol:
+if settings['Denoise_Mol']:
 #    tune_data = mle.DenoiseBG(MolRaw,-10,verbose=False,plot_sol=True,tv_lim =[0.4, 1.4],N_tv_pts=78)
     MolDenoise,tune_list = mle.DenoiseMolecular(MolRaw,beta_m_sonde=beta_m, \
                             MaxAlt=MaxAlt,accel = False,tv_lim =[1.5, 2.8],N_tv_pts=59, \
@@ -186,7 +216,7 @@ if Denoise_Mol:
 #                            geo_data=dict(geo_prof=np.array([2e14])),bg_index=-10,n=20)
 
 
-if hsrl_rb_adjust:
+if settings['hsrl_rb_adjust']:
     print('Obtaining Rayleigh-Brillouin Correction')
     dnu = 20e6  # resolution
     nu_max = 10e9 # max frequency relative to line center
@@ -208,13 +238,13 @@ if hsrl_rb_adjust:
     eta_c = eta_c.reshape(temp.profile.shape)
     profs['combined_hi'].multiply_piecewise(1.0/eta_c)
     
-    if Denoise_Mol:
+    if settings['Denoise_Mol']:
         MolDenoise.multiply_piecewise(1.0/eta_i2)
         MolDenoise.gain_scale(mol_gain)
 else:
     # Rescale molecular channel to match combined channel gain
     profs['molecular'].gain_scale(mol_gain)
-    if Denoise_Mol:
+    if settings['Denoise_Mol']:
         MolDenoise.gain_scale(mol_gain)
 
 
@@ -255,10 +285,10 @@ dPart.label = 'Particle Depolarization'
 dPart.profile_type = 'unitless'
 
 beta_aer = lp.AerosolBackscatter(profs['molecular'],profs['combined_hi'],beta_m)
-if Denoise_Mol:
+if settings['Denoise_Mol']:
     beta_aer_denoise = lp.AerosolBackscatter(MolDenoise,profs['combined_hi'],beta_m)
 
-if Estimate_Mol_Gain:
+if settings['Estimate_Mol_Gain']:
     # This segment estimates what the molecular gain should be 
     # based on a histogram minimum in BSR over the loaded data
     
@@ -308,9 +338,9 @@ if Estimate_Mol_Gain:
 #dPartMask = dPart.SNR() < 3.0
 
 
-if plot_2D:
+if settings['plot_2D']:
     lp.pcolor_profiles([beta_aer,dPart],scale=['log','linear'],climits=[[1e-8,1e-4],[0,0.7]])
-    if Denoise_Mol:
+    if settings['Denoise_Mol']:
         lp.pcolor_profiles([beta_aer_denoise],scale=['log'],climits=[[1e-8,1e-4]])
 #    lp.pcolor_profiles([BSR,dPart],scale=['log','linear'],climits=[[1,5e2],[0,0.7]])
     #lp.plotprofiles(profs)

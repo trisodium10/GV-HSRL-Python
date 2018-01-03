@@ -108,7 +108,7 @@ def fit_high_range(profile,profile_var,i_min,i_max,order=1):
     return profile_out
     
     
-def load_raw_data(start_time,stop_time,var_2d_list,var_1d_list,basepath = '/scr/eldora1/rsfdata/hsrl/raw/',verbose=True,as_prof=True):
+def load_raw_data(start_time,stop_time,var_2d_list,var_1d_list,basepath = '/scr/eldora1/rsfdata/hsrl/raw/',verbose=True,as_prof=True,loadQWP='fixed'):
     """
     loads GVHSRL raw data from netcdf files stored in basepath
     accepts a list of the variables to be loaded (their netcdf names)
@@ -122,6 +122,10 @@ def load_raw_data(start_time,stop_time,var_2d_list,var_1d_list,basepath = '/scr/
     file.
     
     If as_prof = True, 2D data is returned as lidar profiles
+    
+    loadQWP - 'all':  load all data regardless of QWP status
+              'fixed': load only fixed QWP data
+              'rotating': load only rotating QWP data
     
     
     """
@@ -155,50 +159,71 @@ def load_raw_data(start_time,stop_time,var_2d_list,var_1d_list,basepath = '/scr/
             
             f = nc4.Dataset(SubFiles[idir],'r')
             
-            for var in var_1d_data.keys():
-                if any(var in s for s in f.variables):
-                    var_data = lp.ncvar(f,var)
-                    if len(var_1d_data[var]) > 0:
-                        var_1d_data[var] = np.concatenate((var_1d_data[var],var_data)) 
-                    else:
-                        var_1d_data[var] = var_data.copy()
-                
             # System for time array still needs work
             timeD0 = np.array(f.variables['DATA_time'][:]).astype(np.int)
             timeD0[:,6] = timeD0[:,6]*1e3+timeD0[:,7]
             time_dt0 = [datetime.datetime(*x) for x in timeD0[:,:7]]
             time_sec0 = np.array([(x-time_dt0[0]).total_seconds() for x in time_dt0])
             
-            if len(timeD)>0:
-                timeD = np.vstack((timeD,np.array(f.variables['DATA_time'][:].astype(np.int))));          # time array [year,month,day,hour,minute,second,msec,usec]
-            else:
-                timeD = np.array(f.variables['DATA_time'][:]).astype(np.int)
-
-            if verbose:
-                if any('polarization' in s for s in f.variables):
-                    QWP = f.variables['polarization'][:].copy()               # QWP rotation angle
-                    # Calculate the QWP rotation rate to determine its status
-                    meanQWPrate = np.median(np.diff(QWP)/np.diff(time_sec0)*180/np.pi)
-                    meanQWPvalue = np.median(QWP*180/np.pi)
-                    if meanQWPrate >= 10:
-                        QWP_Status = 'rotating'
-                    else:
-                        QWP_Status = 'fixed'
-                    print( 'QWP Rotation Rate: %f deg/sec' %meanQWPrate)
-                    print( 'Average QWP Position: %f deg' %meanQWPvalue)
+            if any('polarization' in s for s in f.variables):
+                QWP = f.variables['polarization'][:].copy()               # QWP rotation angle
+                # Calculate the QWP rotation rate to determine its status
+                meanQWPrate = np.median(np.diff(QWP)/np.diff(time_sec0)*180/np.pi)
+                meanQWPvalue = np.median(QWP*180/np.pi)
+                if meanQWPrate >= 10:
+                    QWP_Status = 'rotating'
                 else:
                     QWP_Status = 'fixed'
+                if verbose:
+                    print( 'QWP Rotation Rate: %f deg/sec' %meanQWPrate)
+                    print( 'Average QWP Position: %f deg' %meanQWPvalue)
+            else:
+                QWP_Status = 'fixed'
                 
-                
-                print( 'Processing %d UT' %Hour)
-                print( 'Profile Integration Time: %f seconds' %np.median(np.diff(time_sec0)))
-                print( 'Processing QWP as %s' %QWP_Status)
+            if loadQWP == 'fixed' and QWP_Status == 'rotating':
+                load_set = False
+            elif loadQWP == 'rotating' and QWP_Status == 'fixed':
+                load_set = False
+            else:
+                load_set = True
             
-            for var in var_2d_data.keys():
-                if len(var_2d_data[var]) == 0:
-                    var_2d_data[var] = f.variables[var][:].copy()
+            
+            if load_set:
+            
+                for var in var_1d_data.keys():
+                    if any(var in s for s in f.variables):
+                        var_data = lp.ncvar(f,var)
+                        if len(var_1d_data[var]) > 0:
+                            var_1d_data[var] = np.concatenate((var_1d_data[var],var_data)) 
+                        else:
+                            var_1d_data[var] = var_data.copy()
+                    
+                
+                
+                if len(timeD)>0:
+                    timeD = np.vstack((timeD,np.array(f.variables['DATA_time'][:].astype(np.int))));          # time array [year,month,day,hour,minute,second,msec,usec]
                 else:
-                    var_2d_data[var] = np.vstack((var_2d_data[var],f.variables[var][:]))
+                    timeD = np.array(f.variables['DATA_time'][:]).astype(np.int)
+    
+                
+                
+                if verbose:
+                    print( 'Processing %d UT' %Hour)
+                    print( '['+SubFiles[idir]+']')
+                    print( 'Profile Integration Time: %f seconds' %np.median(np.diff(time_sec0)))
+                    print( 'Processing QWP as %s\n' %QWP_Status)
+                    
+                
+                for var in var_2d_data.keys():
+                    if len(var_2d_data[var]) == 0:
+                        var_2d_data[var] = f.variables[var][:].copy()
+                    else:
+                        var_2d_data[var] = np.vstack((var_2d_data[var],f.variables[var][:]))
+            elif verbose:
+                print( 'Skipping %d UT' %Hour)
+                print( '['+SubFiles[idir]+']')
+                print( 'Profile Integration Time: %f seconds' %np.median(np.diff(time_sec0)))
+                print( 'Processing QWP as %s\n' %QWP_Status)
                     
         
             f.close()
@@ -428,3 +453,11 @@ def get_TP_from_aircraft(air_data,profile):
     
     return temp, pres
     
+def delete_indices(in_dict,indices):
+    """
+    deletes the indices of all elements of the dictionary
+    """
+    out_dict = {}
+    for var in in_dict.keys():
+        out_dict[var] = np.delete(in_dict[var],indices)
+    return out_dict
