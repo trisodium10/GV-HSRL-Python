@@ -60,7 +60,8 @@
 		{"date": "9-Aug-2015 0:0","Project":"CSET","Flight Number": 15,"Flight Designation": "rf"},
 		{"date": "12-Aug-2015 0:0","Project":"CSET","Flight Number": 16,"Flight Designation": "rf"},
 
-           {"date": "2-Jan-2018 0:0","Project":"SOCRATES","Flight Number": 1,"Flight Designation": "tf"}
+           {"date": "2-Jan-2018 0:0","Project":"SOCRATES","Flight Number": 1,"Flight Designation": "tf"},
+           {"date": "4-Jan-2018 0:0","Project":"SOCRATES","Flight Number": 2,"Flight Designation": "tf"}
 	],
 
 	"Comments": [
