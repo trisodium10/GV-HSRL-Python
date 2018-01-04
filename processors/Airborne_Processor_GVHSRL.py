@@ -92,7 +92,11 @@ default_settings = {
     
     'loadQWP':'fixed',  # load 'fixed','rotating', or 'all' QWP data
     
-    'as_altitude':True # process in altitude centered format or range centered format
+    'as_altitude':False, # process in altitude centered format or range centered format
+    
+    'SNRlimit':40.0  # minimum integrated SNR to treat the lidar as transmitting
+                     # used to filter instances where the shutter is closed
+                     # toggle this with 'Remove_Off_Data'
     }
 #sg_win = 11
 #sg_order = 5
@@ -114,7 +118,8 @@ MaxAlt = settings['MaxAlt']
 MinAlt = settings['MinAlt']
 
 #default_basepath = '/scr/eldora1/rsfdata/hsrl/raw/'  # new absolute path
-default_basepath = '/scr/rain1/rsfdata/projects/socrates/hsrl/raw/'
+#default_basepath = '/scr/rain1/rsfdata/projects/socrates/hsrl/raw/'
+default_basepath = '/Users/mhayman/Documents/HSRL/GVHSRL_data/'  # local path
 
 try:
     basepath
@@ -122,10 +127,17 @@ except NameError:
     basepath = default_basepath
 #basepath = '/scr/eldora1/HSRL_data/'  # old path - still works with link from HSRL_data to /hsrl/raw/
 #basepath = '/Users/mhayman/Documents/HSRL/GVHSRL_data/'  # local computer data path
-        
+ 
+       
+#default_aircraft_basepath = {
+#    'CSET':'/scr/raf_data/CSET/24_Mar_17_BU/',
+#    'SOCRATES':'/scr/raf_data/SOCRATES/' #SOCRATEStf01.nc       
+#    } 
+       
+# Local Paths
 default_aircraft_basepath = {
-    'CSET':'/scr/raf_data/CSET/24_Mar_17_BU/',
-    'SOCRATES':'/scr/raf_data/SOCRATES/' #SOCRATEStf01.nc       
+    'CSET':'/Users/mhayman/Documents/HSRL/aircraft_data/',
+    'SOCRATES':'/Users/mhayman/Documents/HSRL/aircraft_data/' #SOCRATEStf01.nc       
     } 
 
 try:
@@ -268,9 +280,11 @@ if 'RemoveLongI2Cell' in var_1d_data.keys():
 else:
     cal_indices = []
 
+# find instances where the lidar is not transmitting
 if settings['Remove_Off_Data']:
-    _,off_indices = profs['combined_hi'].trim_to_on(ret_index=True,delete=False)
+    _,off_indices = profs['combined_hi'].trim_to_on(ret_index=True,delete=False,SNRlim=settings['SNRlimit'])
     cal_indices = np.unique(np.concatenate((off_indices,cal_indices)))
+
 
 # grab calibration data files
 # down_gain is the molecular gain when the telescope points down
@@ -331,8 +345,8 @@ air_data_t = gv.interp_aircraft_data(time_1d,air_data)
 # time resolution after range to altitude conversion
 if tres_post > 0:
     master_time_post = np.arange(sec_start-tres_post/2,sec_stop+tres_post/2,tres_post)
-    time_post,var_post = gv.var_time_resample(master_time_post,time_sec,var_1d_data,average=True)
-    air_data_post = gv.interp_aircraft_data(time_post,air_data)
+#    time_post,var_post = gv.var_time_resample(master_time_post,time_sec,var_1d_data,average=True)
+#    air_data_post = gv.interp_aircraft_data(time_post,air_data)
 elif tres > 0.5:
     master_time_post = master_time
     time_post = time_1d
@@ -341,11 +355,11 @@ elif tres > 0.5:
 else:
     master_time_post = np.arange(sec_start-tres/2,sec_stop+tres/2,tres)
 
-# setup molecular gain vector based on telescope pointing direction
-mol_gain = np.zeros(var_post['TelescopeDirection'].shape)
-mol_gain[np.nonzero(var_post['TelescopeDirection']==1.0)] = mol_gain_up
-mol_gain[np.nonzero(var_post['TelescopeDirection']==0.0)] = mol_gain_down
-mol_gain = mol_gain[:,np.newaxis]
+## setup molecular gain vector based on telescope pointing direction
+#mol_gain = np.zeros(var_post['TelescopeDirection'].shape)
+#mol_gain[np.nonzero(var_post['TelescopeDirection']==1.0)] = mol_gain_up
+#mol_gain[np.nonzero(var_post['TelescopeDirection']==0.0)] = mol_gain_down
+#mol_gain = mol_gain[:,np.newaxis]
 
 # setup variable diffierential overlap (up vs down pointing) if supplied
 if len(diff_geo_file_down) > 0:
@@ -416,7 +430,21 @@ for var in profs.keys():
     int_profs[var] = profs[var].copy()
     int_profs[var].time_integrate()
 
+# reformulate the master time based on the time that appears in the profiles
+# after processing
+if tres_post > 0:
+    master_time_post = np.concatenate((np.array([profs['molecular'].time[0]-tres_post*0.5]), \
+        0.5*np.diff(profs['molecular'].time)+profs['molecular'].time[:-1], \
+        np.array([profs['molecular'].time[-1]+tres_post*0.5])))
+    time_post,var_post = gv.var_time_resample(master_time_post,time_sec,var_1d_data,average=True)
+    air_data_post = gv.interp_aircraft_data(time_post,air_data)
 
+
+# setup molecular gain vector based on telescope pointing direction
+mol_gain = np.zeros(var_post['TelescopeDirection'].shape)
+mol_gain[np.nonzero(var_post['TelescopeDirection']==1.0)] = mol_gain_up
+mol_gain[np.nonzero(var_post['TelescopeDirection']==0.0)] = mol_gain_down
+mol_gain = mol_gain[:,np.newaxis]
 
 #if load_reanalysis:
 #    pres,temp = ex.load_fixed_point_NCEP_TandP(profs['molecular'],lidar_location,reanalysis_path)
@@ -653,15 +681,16 @@ if settings['plot_2D']:
     
 #    rfig = lp.pcolor_profiles([BSR,dPart],scale=['log','linear'],climits=[[1,1e2],[0,0.7]],ylimits=[MinAlt*1e-3,MaxAlt*1e-3],title_add=proj_label,plot_date=plot_date)
     rfig = lp.pcolor_profiles([beta_a,dPart],scale=['log','linear'],climits=[[1e-8,1e-3],[0,1.0]],ylimits=[MinAlt*1e-3,MaxAlt*1e-3],title_add=proj_label,plot_date=settings['plot_date'])
-    for ai in range(len(rfig[1])):
-        rfig[1][ai].plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude
-        
+    if settings['as_altitude']:
+        for ai in range(len(rfig[1])):
+            rfig[1][ai].plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude      
     if settings['save_plots']:
         plt.savefig(save_plots_path+'Aerosol_Backscatter_'+save_plots_base,dpi=300)
         
     rfig = lp.pcolor_profiles([profs['combined_hi'],dVol],scale=['log','linear'],climits=[[1e-1,1e4],[0,1.0]],ylimits=[MinAlt*1e-3,MaxAlt*1e-3],title_add=proj_label,plot_date=settings['plot_date'])
-    for ai in range(len(rfig[1])):
-        rfig[1][ai].plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude
+    if settings['as_altitude']:
+        for ai in range(len(rfig[1])):
+            rfig[1][ai].plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude
     if settings['save_plots']:
         plt.savefig(save_plots_path+'AttenuatedBackscatter_'+save_plots_base,dpi=300)
     #lp.plotprofiles(profs)

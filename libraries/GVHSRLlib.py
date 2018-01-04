@@ -415,7 +415,8 @@ def get_TP_from_aircraft(air_data,profile,telescope_direction=[],lidar_tilt=[0,4
     processing
     
     lidar_tilt defines the lidar tilt angles relative to the aircraft.  It
-    is only used in range centered processing
+    is only used in range centered processing.  It is defined 
+    [forward/aft,port/starboard] in degrees
     """
     
     # make sure the time axes of the aircraft data aline with the 
@@ -438,8 +439,8 @@ def get_TP_from_aircraft(air_data,profile,telescope_direction=[],lidar_tilt=[0,4
         # create a 2D array of all the raw altitude data caputured by the lidar
         alt_raw = \
             (profile.range_array[:,np.newaxis]*telescope_direction[np.newaxis,:]\
-            *np.cos((air_data['ROLL']+lidar_tilt[1])*np.pi/180)*np.cos((air_data['PITCH']+lidar_tilt[0])*np.pi/180)\
-            +air_data['GGALT'][np.newaxis,:]).T
+            *np.cos((air_data_int['ROLL'][np.newaxis,:]+lidar_tilt[1])*np.pi/180)*np.cos((air_data_int['PITCH'][np.newaxis,:]+lidar_tilt[0])*np.pi/180)\
+            +air_data_int['GGALT'][np.newaxis,:]).T
 
         TempAir = b_T-0.0065*alt_raw
         PresAir = air_data_int['PSXC'][:,np.newaxis]*100*(aircraft_temp[:,np.newaxis]/TempAir)**(-5.5)  # pressure in Pa from PSXC in hPa
