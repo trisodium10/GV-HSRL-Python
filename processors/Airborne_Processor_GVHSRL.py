@@ -68,6 +68,9 @@ default_settings = {
                         # scan files are not included in the file search so they
                         # are removed anyway
     
+    'Remove_Off_Data':True, # remove data where the lidar appears to be off
+                            # currently only works if RemoveCals is True
+    
     'diff_geo_correct':True,  # apply differential overlap correction
     
     'load_reanalysis':False, # load T and P reanalysis from NCEP/NCAR Model
@@ -88,6 +91,8 @@ default_settings = {
     'Airspeed_Threshold':15, # threshold for determining start and end of the flight (in m/s)
     
     'loadQWP':'fixed',  # load 'fixed','rotating', or 'all' QWP data
+    
+    'as_altitude':True # process in altitude centered format or range centered format
     }
 #sg_win = 11
 #sg_order = 5
@@ -263,6 +268,9 @@ if 'RemoveLongI2Cell' in var_1d_data.keys():
 else:
     cal_indices = []
 
+if settings['Remove_Off_Data']:
+    _,off_indices = profs['combined_hi'].trim_to_on(ret_index=True,delete=False)
+    cal_indices = np.unique(np.concatenate((off_indices,cal_indices)))
 
 # grab calibration data files
 # down_gain is the molecular gain when the telescope points down
@@ -314,7 +322,8 @@ if settings['RemoveCals']:
     time_1d = np.delete(time_1d,cal_indices)
     var_1d = gv.delete_indices(var_1d,cal_indices)
 
-master_alt = np.arange(MinAlt,MaxAlt+zres,zres)
+if settings['as_altitude']:
+    master_alt = np.arange(MinAlt,MaxAlt+zres,zres)
 
 
 air_data_t = gv.interp_aircraft_data(time_1d,air_data)
@@ -359,19 +368,26 @@ for var in profs.keys():
     if settings['RemoveCals']:
         # remove instances where the I2 cell is removed
         profs[var].remove_time_indices(cal_indices)
+#        profs[var].trim_to_on()  # remove points where lidar isn't transmitting
     if tres > 0.5:
         profs[var].time_resample(tedges=master_time,update=True,remainder=False)
     int_profs[var] = profs[var].copy()
     int_profs[var].time_integrate()
     
-    # maximum range required for this dataset
-    range_trim = np.max([np.max(MaxAlt-air_data_t['GGALT']),np.max(air_data_t['GGALT']-MinAlt)])+4*zres
+    if settings['as_altitude']:
+        # maximum range required for this dataset
+        range_trim = np.max([np.max(MaxAlt-air_data_t['GGALT']),np.max(air_data_t['GGALT']-MinAlt)])+4*zres
+    else:
+        # set maximum range to MaxAlt if range centered processing
+        range_trim = MaxAlt
     
     if var == 'molecular' and settings['Denoise_Mol']:
         MolRaw = profs['molecular'].copy()    
     
+    # background subtract the profile
     profs[var].bg_subtract(BGIndex)
     
+    # profile specific processing routines
     if var == 'combined_hi' and settings['diff_geo_correct']:
         profs[var].diff_geo_overlap_correct(diff_data['hi_diff_geo'],geo_reference='molecular')
     elif var == 'combined_lo' and settings['diff_geo_correct']:
@@ -389,8 +405,8 @@ for var in profs.keys():
             profs[var].diff_geo_overlap_correct(diff_data['hi_diff_geo'],geo_reference='molecular')
     profs[var].slice_range(range_lim=[0,range_trim])
   
-    
-    profs[var].range2alt(master_alt,air_data_t,telescope_direction=var_1d['TelescopeDirection'])
+    if settings['as_altitude']:
+        profs[var].range2alt(master_alt,air_data_t,telescope_direction=var_1d['TelescopeDirection'])
        
     
     if tres_post > 0 or tres <= 0.5:
@@ -407,8 +423,10 @@ for var in profs.keys():
 
 
 lp.plotprofiles(profs)
-
-temp,pres = gv.get_TP_from_aircraft(air_data,profs['molecular'])
+if settings['as_altitude']:
+    temp,pres = gv.get_TP_from_aircraft(air_data,profs['molecular'])
+else:
+    temp,pres = gv.get_TP_from_aircraft(air_data,profs['molecular'],telescope_direction=var_post['TelescopeDirection'])
 beta_m = lp.get_beta_m(temp,pres,profs['molecular'].wavelength)
 
 if settings['Denoise_Mol']:

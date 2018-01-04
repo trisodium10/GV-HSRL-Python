@@ -402,7 +402,7 @@ def var_time_resample(tedges,var_time,varlist,average=True,remainder=False):
         else:
             return timeNew,var_return
             
-def get_TP_from_aircraft(air_data,profile):
+def get_TP_from_aircraft(air_data,profile,telescope_direction=[],lidar_tilt=[0,4.0]):
     """
     Returns a temperature and pressure profile corresponding to
     dimensions of profile
@@ -410,17 +410,39 @@ def get_TP_from_aircraft(air_data,profile):
     
     The aircraft temperature and pressure measurements are contained
     in air_data
+    
+    If telescope_direction is passed in, assume this is range centered 
+    processing
+    
+    lidar_tilt defines the lidar tilt angles relative to the aircraft.  It
+    is only used in range centered processing
     """
     
     # make sure the time axes of the aircraft data aline with the 
     # lidar profile data
-    air_data_int = interp_aircraft_data(profile.time,air_data)
-    aircraft_temp = air_data_int['ATX']+273.15  # convert aircraft temperature to K 
-    b_T = (aircraft_temp + air_data_int['GGALT']*0.0065)[:,np.newaxis]
-    TempAir = b_T-0.0065*profile.range_array[np.newaxis,:]
-    PresAir = air_data_int['PSXC'][:,np.newaxis]*100*(aircraft_temp[:,np.newaxis]/TempAir)**(-5.5)  # pressure in Pa from PSXC in hPa
     
+    if len(telescope_direction) == 0:
+        # process in altitude centered configuration
+        air_data_int = interp_aircraft_data(profile.time,air_data)
+        aircraft_temp = air_data_int['ATX']+273.15  # convert aircraft temperature to K 
+        b_T = (aircraft_temp + air_data_int['GGALT']*0.0065)[:,np.newaxis]
+        TempAir = b_T-0.0065*profile.range_array[np.newaxis,:]
+        PresAir = air_data_int['PSXC'][:,np.newaxis]*100*(aircraft_temp[:,np.newaxis]/TempAir)**(-5.5)  # pressure in Pa from PSXC in hPa
+    else:
+        # process in range centered configuration
+        air_data_int = interp_aircraft_data(profile.time,air_data)
+        aircraft_temp = air_data_int['ATX']+273.15  # convert aircraft temperature to K 
+        b_T = (aircraft_temp + air_data_int['GGALT']*0.0065)[:,np.newaxis]        
+        telescope_direction = np.sign(telescope_direction-0.5)
 
+        # create a 2D array of all the raw altitude data caputured by the lidar
+        alt_raw = \
+            (profile.range_array[:,np.newaxis]*telescope_direction[np.newaxis,:]\
+            *np.cos((air_data['ROLL']+lidar_tilt[1])*np.pi/180)*np.cos((air_data['PITCH']+lidar_tilt[0])*np.pi/180)\
+            +air_data['GGALT'][np.newaxis,:]).T
+
+        TempAir = b_T-0.0065*alt_raw
+        PresAir = air_data_int['PSXC'][:,np.newaxis]*100*(aircraft_temp[:,np.newaxis]/TempAir)**(-5.5)  # pressure in Pa from PSXC in hPa
     
     
     temp = profile.copy()
