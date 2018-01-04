@@ -73,15 +73,21 @@ stop_hr = 2
 print('Default Test Date:')
 print('(M/D/Y) %d/%d/%d, starting %.1f UTC for %.1f h'%(month_in,day_in,year_in,start_hr,stop_hr))
 if input('Run this default date? [y/n]') != 'y':
-    print("Enter search range for geo calibration:")
-    year_in = np.int(input("Year: "))
-    month_in = np.int(input("Month (#): "))
-    day_in = np.int(input("Day: "))
-    start_hr = np.float(input("Start Hour (UTC): "))
-    stop_hr = np.float(input("Duration (hours): "))
+    airborne_in = input('Is this an airborne calibration? [y/n]')
+    if airborne_in == 'y' or airborne_in == 'Y':
+        start_hr = np.float(input("Start Hour (UTC): "))
+        stop_hr = np.float(input("Duration (hours): "))
+        airborne = True
+    else:
+        print("Enter search range for geo calibration:")
+        year_in = np.int(input("Year: "))
+        month_in = np.int(input("Month (#): "))
+        day_in = np.int(input("Day: "))
+        start_hr = np.float(input("Start Hour (UTC): "))
+        stop_hr = np.float(input("Duration (hours): "))
 
-cal_start = datetime.datetime(year_in,month_in,day_in)+datetime.timedelta(hours=start_hr)
-cal_stop = cal_start + datetime.timedelta(hours=stop_hr)
+        cal_start = datetime.datetime(year_in,month_in,day_in)+datetime.timedelta(hours=start_hr)
+        cal_stop = cal_start + datetime.timedelta(hours=stop_hr)
 
 
 
@@ -101,6 +107,7 @@ settings = {
     
     'LRassumed':30,  # assumed lidar ratio for OD estimate
     
+    'airborne':False, # is the lidar airborne (downward poinging)    
     
     'pol_xtalk':0.015,
     
@@ -114,11 +121,17 @@ settings = {
     'use_bs_thr':True,
     
     'EstimateExtinction':True,  # attempt to apply an extinction correction
-    'ExtinctionAlt':5e3     # max altitude to apply extinction correction
+    'ExtinctionAlt':5e3,     # max altitude to apply extinction correction
+    
+    'sg_win':11,   # window size in SG filter
+    'sg_order':5  # order of SG filter
 
     
     }
 
+if airborne:
+    settings['airborne'] = True
+    
 ## list of 1D variables to load
 #var_1d_list = ['total_energy','RemoveLongI2Cell'\
 #    ,'TelescopeDirection','TelescopeLocked','polarization','DATA_shot_count']  # 'DATA_shot_count'
@@ -138,6 +151,105 @@ var_2d_list = ['molecular','combined_hi','combined_lo','cross']
 basepath = '/Users/mhayman/Documents/HSRL/GVHSRL_data/'  # local computer data path
 
 
+# grab calval data from json file
+with open(cal_file,"r") as f:
+    cal_json = json.loads(f.read())
+f.close()
+
+#default_aircraft_basepath = {
+#    'CSET':'/scr/raf_data/CSET/24_Mar_17_BU/',
+#    'SOCRATES':'/scr/raf_data/SOCRATES/' #SOCRATEStf01.nc       
+#    } 
+       
+# Local Paths
+aircraft_basepath = {
+    'CSET':'/Users/mhayman/Documents/HSRL/aircraft_data/',
+    'SOCRATES':'/Users/mhayman/Documents/HSRL/aircraft_data/' #SOCRATEStf01.nc       
+    } 
+
+if settings['airborne']:
+    # list of aircraft variables to load
+    var_aircraft = ['Time','GGALT','ROLL','PITCH','THDG','GGLAT','GGLON','TASX','ATX','PSXC']
+
+    proj_list = []
+    year_list = []
+    for ai in range(len(cal_json['Flights'])):
+        if not cal_json['Flights'][ai]['Project'] in proj_list:
+            proj_list.extend([cal_json['Flights'][ai]['Project']])
+            year_list.extend([lp.json_str_to_datetime(cal_json['Flights'][ai]['date'])])
+            print('%d.) '%(len(proj_list)) + proj_list[-1] + ', ' + year_list[-1].strftime('%Y'))
+    print('')
+   
+    # interactive prompt to determine desired flight
+  
+    usr_proj = np.int(input('Select Project: '))-1
+    if usr_proj < 0 or usr_proj > len(proj_list)-1:
+        print('Selection is not recognized')
+    else:
+        proj = proj_list[usr_proj]
+    
+    flight_list = []
+    flight_date = []
+    flight_label = []
+
+                    
+    for ai in range(len(cal_json['Flights'])):
+        if cal_json['Flights'][ai]['Project'] == proj:
+            flight_list.extend([proj+cal_json['Flights'][ai]['Flight Designation'] + str(cal_json['Flights'][ai]['Flight Number']).zfill(2)])
+            flight_date.extend([lp.json_str_to_datetime(cal_json['Flights'][ai]['date'])])
+            flight_label.extend([cal_json['Flights'][ai]['Flight Designation'].upper()+str(cal_json['Flights'][ai]['Flight Number']).zfill(2)])
+            print('%d.) '%len(flight_list) + ' ' + flight_list[-1] + ', ' + flight_date[-1].strftime('%d-%b, %Y'))
+    
+    usr_flt = np.int(input('Select Flight: '))-1
+    if usr_flt < 0 or usr_flt > len(flight_list)-1:
+        print('Selection is not recognized')
+    else:
+        flt = flight_list[usr_flt]
+            
+    filePathAircraft = aircraft_basepath[proj] + flt + '.nc'
+    
+    
+            
+    #  load aircraft data    
+    air_data = gv.load_aircraft_data(filePathAircraft,var_aircraft)
+    
+    # locate time range where aircraft is flying
+    iflight = np.nonzero(air_data['TASX'] > settings['Airspeed_Threshold'])[0]
+    it0 = iflight[0]  # index when aircraft starts moving
+    it1 = iflight[-1]  # index when aircraft stops moving
+    time_takeoff = flight_date[usr_flt]+datetime.timedelta(seconds=np.int(air_data['Time'][it0]))
+    time_landing = flight_date[usr_flt]+datetime.timedelta(seconds=np.int(air_data['Time'][it1]))
+    print('Flight time is: ')
+    print('   '+time_takeoff.strftime('%H:%M %d-%b, %Y to'))
+    print('   '+time_landing.strftime('%H:%M %d-%b, %Y'))
+    print('')
+    
+    
+    time_sel = input('Enter start hour (UTC) or press [Enter] select start of flight: ')
+    if time_sel == '':
+        time_start = flight_date[usr_flt]+datetime.timedelta(seconds=np.int(air_data['Time'][it0]))
+        
+    else:
+        start_hr = np.float(time_sel)
+        time_start = flight_date[usr_flt]+datetime.timedelta(seconds=np.int(start_hr*3600))
+        
+    
+    time_sel = input('Enter duration or press [Enter] for end of flight: ')
+    if time_sel == '':
+        time_stop = flight_date[usr_flt]+datetime.timedelta(seconds=np.int(air_data['Time'][it1]))
+    else:
+        stop_hr = np.float(time_sel)
+        time_stop = time_start+datetime.timedelta(seconds=np.int(stop_hr*3600))
+    
+    # check for out of bounds time limits
+    if time_start > time_landing:
+        time_start = time_landing - datetime.timedelta(minutes=1)
+    if time_stop < time_takeoff:
+        time_stop = time_takeoff + datetime.timedelta(minutes=1)
+        
+    cal_start = time_start
+    cal_stop = time_stop
+
 # grab raw data from netcdf files
 [timeD,time_dt,time_sec],var_1d_data, profs = gv.load_raw_data(cal_start,cal_stop,var_2d_list,var_1d_list,basepath=basepath,verbose=True,as_prof=True)
 time_start = datetime.datetime(year_in,month_in,day_in)+datetime.timedelta(hours=start_hr)
@@ -153,9 +265,6 @@ if 'RemoveLongI2Cell' in var_1d_data.keys():
 else:
     cal_indices = []
 
-with open(cal_file,"r") as f:
-    cal_json = json.loads(f.read())
-f.close()
 if settings['hsrl_rb_adjust']:
     mol_gain,diff_geo_file = lp.get_calval(time_start,cal_json,'Molecular Gain',cond=[['RB_Corrected','=','True']],returnlist=['value','diff_geo'])  
 else:
@@ -205,8 +314,9 @@ for var in profs.keys():
 
 
 
-
-if settings['load_reanalysis']:
+if settings['airborne']:
+    temp,pres = gv.get_TP_from_aircraft(air_data,profs['molecular'],telescope_direction=var_1d['TelescopeDirection'])
+elif settings['load_reanalysis']:
     pres,temp = ex.load_fixed_point_NCEP_TandP(profs['molecular'],lidar_location,reanalysis_path)
     beta_m = lp.get_beta_m(temp,pres,profs['molecular'].wavelength)
     
@@ -310,7 +420,7 @@ if settings['EstimateExtinction']:
     
     Tatm = Tatm[np.newaxis,:]
 else:
-    Tatm = np.zeros((1,profs['molecular'].profile.shape[1]))
+    Tatm = np.ones((1,profs['molecular'].profile.shape[1]))
 
 
 profs['beta_m'] = beta_m
@@ -330,10 +440,58 @@ lp.plotprofiles(profs)
 geo_raw = profs['beta_m']/profs['molecular']
 geo_raw.multiply_piecewise(Tatm)
 
-lp.plotprofiles([geo_raw],varplot=True,scale='log')
+geo_smooth = gv.savitzky_golay(geo_raw.profile.flatten(), settings['sg_win'], settings['sg_order'], deriv=0) 
+#lp.plotprofiles([geo_raw],varplot=True,scale='log')
+
+plt.figure()
+plt.plot(geo_raw.profile.flatten())
+plt.plot(geo_smooth)
+plt.ylim([-2e-12,2e-12])
 
 
-plt.show()
+plt.show(block=False)
+
+i_const = np.int(input('Make constant above index (e.g. 1000): '))
+i_const_max = np.nonzero(geo_raw.SNR().flatten() < 0.2*geo_raw.SNR().flatten()[i_const])[0]
+i_const_max = i_const_max[np.nonzero(i_const_max > i_const)[0][0]]
+
+if settings['airborne']:
+    geo_const = np.nanmean(geo_raw.profile[0,i_const-4:i_const])
+    geo_fit = geo_smooth.copy()
+    geo_fit[i_const:] = geo_const
+else:
+    geo_fit = gv.fit_high_range(geo_smooth,geo_raw.profile_variance,i_const,i_const_max)
+
+plt.plot(geo_fit,'g--')
+plt.show(block=False)
+
+save_cal = input("Save Geo Calibrations[y/n]")
+    
+if save_cal == 'y' or save_cal == 'Y':
+    write_data = np.zeros((geo_fit.size,2))
+    write_data[:,0] = geo_raw.range_array
+    write_data[:,1] = geo_fit
+    
+    header_str = 'profile data from ' + time_dt[0].strftime('%d-%b-%y %H:%M')+' -->'+time_dt[-1].strftime('%H:%M UTC\n') 
+    header_str = header_str+ ' file created ' + datetime.datetime.now().strftime('%d-%b-%y %H:%M\n')
+    header_str = header_str+ 'lidar ratio assumed %.1f below %.1f m'%(settings['LRassumed'],geo_raw.range_array[i_const])
+    header_str = header_str+ 'Range  geo_correction'
+    
+    save_cal_file = 'geofile_default_'+time_dt[0].strftime('%Y%m%dT%H%M.geo')
+    print('Saving to:\n  '+save_file_path+save_cal_file) 
+    np.savetxt(save_file_path+save_cal_file,write_data,fmt='%.4e\t%.4e',header=header_str)
+    
+    save_cal_file_ez = 'geofile_GVHSRL'+time_dt[0].strftime('%Y%m%d')   
+    print('Saving python vars to:\n  '+save_path_ez+save_cal_file_ez+'.npz') 
+    
+    np.savez(save_path_ez+save_cal_file_ez,start_time=time_dt[0],stop_time=time_dt[-1], \
+            geo_mol=geo_fit,geo_mol_var=geo_raw.profile_variance.data.flatten(),\
+            geo_raw = geo_raw.profile.data.flatten(),\
+            sg_win = settings['sg_win'], sg_order = settings['sg_order'], \
+            range_array=geo_raw.range_array, \
+            TelescopeDirection = np.nanmean(var_1d_data['TelescopeDirection']), \
+            airborne=settings['airborne'])
+    
 
 """    
     

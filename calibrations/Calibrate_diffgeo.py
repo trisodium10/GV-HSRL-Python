@@ -298,7 +298,7 @@ if RunCal:
     
         save_cal_file = 'diff_default_geofile_'+time_dt[i0[cal_index]].strftime('%Y%m%dT%H%M')+'.geo'
 
-        save_cal_file_ez = 'diff_geo_GVHSRL'+time_dt[i0[cal_index]].strftime('%Y%m%d')+'_tmp'
+        save_cal_file_ez = 'diff_geo_GVHSRL'+time_dt[i0[cal_index]].strftime('%Y%m%d')
         
         print('Saving to:\n  '+save_file_path+save_cal_file)        
         
