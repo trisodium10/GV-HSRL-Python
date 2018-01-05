@@ -618,8 +618,8 @@ if settings['Estimate_Mol_Gain']:
     
     mol_gain_adj = np.nanmin(hist_med_sm[i_alt_lim])
     
-    print('Current Molecular (Telescope Up) Gain: %f'%mol_gain_up)
-    print('Suggested Molecular (Telescope Up) Gain: %f'%(mol_gain_up*mol_gain_adj))
+    print('\nCurrent Molecular (Telescope Up) Gain: %f'%mol_gain_up)
+    print('Suggested Molecular (Telescope Up) Gain: %f\n'%(mol_gain_up*mol_gain_adj))
     
     iDown = np.nonzero(var_post['TelescopeDirection']==0.0)
     
@@ -667,8 +667,8 @@ if settings['Estimate_Mol_Gain']:
     
     mol_gain_adj = np.nanmin(hist_med_sm[i_alt_lim])
     
-    print('Current Molecular (Telescope Down) Gain: %f'%mol_gain_down)
-    print('Suggested Molecular (Telescope Down) Gain: %f'%(mol_gain_down*mol_gain_adj))
+    print('\nCurrent Molecular (Telescope Down) Gain: %f'%mol_gain_down)
+    print('Suggested Molecular (Telescope Down) Gain: %f\n'%(mol_gain_down*mol_gain_adj))
 
 
 

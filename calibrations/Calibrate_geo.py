@@ -75,8 +75,8 @@ print('(M/D/Y) %d/%d/%d, starting %.1f UTC for %.1f h'%(month_in,day_in,year_in,
 if input('Run this default date? [y/n]') != 'y':
     airborne_in = input('Is this an airborne calibration? [y/n]')
     if airborne_in == 'y' or airborne_in == 'Y':
-        start_hr = np.float(input("Start Hour (UTC): "))
-        stop_hr = np.float(input("Duration (hours): "))
+#        start_hr = np.float(input("Start Hour (UTC): "))
+#        stop_hr = np.float(input("Duration (hours): "))
         airborne = True
     else:
         print("Enter search range for geo calibration:")
@@ -107,7 +107,9 @@ settings = {
     
     'LRassumed':30,  # assumed lidar ratio for OD estimate
     
-    'airborne':False, # is the lidar airborne (downward poinging)    
+    'airborne':False, # is the lidar airborne (downward poinging) 
+    'Airspeed_Threshold':15, # threshold for determining start and end of the flight (in m/s)
+    'ground_range_buffer':3e3,  # max altitude of ground [m] to avoid counting it as a cloud    
     
     'pol_xtalk':0.015,
     
@@ -252,8 +254,8 @@ if settings['airborne']:
 
 # grab raw data from netcdf files
 [timeD,time_dt,time_sec],var_1d_data, profs = gv.load_raw_data(cal_start,cal_stop,var_2d_list,var_1d_list,basepath=basepath,verbose=True,as_prof=True)
-time_start = datetime.datetime(year_in,month_in,day_in)+datetime.timedelta(hours=start_hr)
-time_stop = time_start + datetime.timedelta(hours=stop_hr)
+#time_start = datetime.datetime(year_in,month_in,day_in)+datetime.timedelta(hours=start_hr)
+#time_stop = time_start + datetime.timedelta(hours=stop_hr)
 
 
 ## grab raw data from netcdf files
@@ -282,18 +284,28 @@ lidar_location = lp.get_calval(time_start,cal_json,"Location",returnlist=['latit
 
 tres = settings['tres']
 BGIndex = settings['BGIndex']
-MaxAlt = settings['MaxAlt']
+#if settings['airborne']:
+#    MaxAlt = np.nanmin(air_data['GGALT'])-settings['ground_range_buffer']
+#else:
+#    MaxAlt = settings['MaxAlt']
+    
+    
 # set the master time to match all 2D profiles to
 # (1d data will not be resampled)
 master_time = np.arange(time_sec[0]-tres/2,time_sec[-1]+tres/2,tres)
 
 time_1d,var_1d = gv.var_time_resample(master_time,time_sec,var_1d_data,average=True)
+#var_1d = var_1d_data
+#time_1d = time_sec
+
 int_profs = {}  # obtain time integrated profiles
 for var in profs.keys():
     if settings['RemoveCals']:
         # remove instances where the I2 cell is removed
         profs[var].remove_time_indices(cal_indices)
+        
     profs[var].time_resample(tedges=master_time,update=True,remainder=False)
+        
 #    int_profs[var] = profs[var].copy()
 #    int_profs[var].time_integrate()
     
@@ -307,6 +319,12 @@ for var in profs.keys():
     elif var == 'combined_lo' and settings['diff_geo_correct']:
         profs[var].diff_geo_overlap_correct(diff_data['lo_diff_geo'])
         profs[var].gain_scale(1.0/diff_data['lo_norm'])
+        
+if settings['airborne']:
+    air_data_t = gv.interp_aircraft_data(profs['combined_hi'].time,air_data)
+    ground_mask = (air_data_t['GGALT']-settings['ground_range_buffer'])[:,np.newaxis] < profs['combined_hi'].range_array[np.newaxis,:]
+    profs['combined_hi'].profile[np.nonzero(ground_mask)] = np.nan
+    profs['combined_hi'].mask(ground_mask)
     
 #    profs[var].slice_range(range_lim=[0,MaxAlt])
 #    int_profs[var].bg_subtract(BGIndex)
@@ -318,7 +336,8 @@ if settings['airborne']:
     temp,pres = gv.get_TP_from_aircraft(air_data,profs['molecular'],telescope_direction=var_1d['TelescopeDirection'])
 elif settings['load_reanalysis']:
     pres,temp = ex.load_fixed_point_NCEP_TandP(profs['molecular'],lidar_location,reanalysis_path)
-    beta_m = lp.get_beta_m(temp,pres,profs['molecular'].wavelength)
+
+beta_m = lp.get_beta_m(temp,pres,profs['molecular'].wavelength)
     
     
 if settings['hsrl_rb_adjust']:
@@ -374,7 +393,7 @@ i_rm = np.nonzero(accum_beta_a > bs_th)[0]
 
 beta_aer.remove_time_indices(i_rm,label='Cloud Filter')
 beta_m.remove_time_indices(i_rm,label='Cloud Filter')
-if settings['EstimateExtinction']:
+if settings['EstimateExtinction'] and not settings['airborne']:
         
     alpha_aer = beta_aer.copy()
     #alpha_aer.remove_mask()
@@ -484,207 +503,20 @@ if save_cal == 'y' or save_cal == 'Y':
     save_cal_file_ez = 'geofile_GVHSRL'+time_dt[0].strftime('%Y%m%d')   
     print('Saving python vars to:\n  '+save_path_ez+save_cal_file_ez+'.npz') 
     
-    np.savez(save_path_ez+save_cal_file_ez,start_time=time_dt[0],stop_time=time_dt[-1], \
-            geo_mol=geo_fit,geo_mol_var=geo_raw.profile_variance.data.flatten(),\
-            geo_raw = geo_raw.profile.data.flatten(),\
+#    if hasattr(geo_raw.profile_variance,'mask'):
+#        geo_var = geo_raw.profile_variance.flatten().data
+#    else:
+#        geo_var = geo_raw.profile_variance.flatten()
+    
+    np.savez(save_path_ez+save_cal_file_ez,start_time=cal_start,stop_time=cal_stop, \
+            geo_mol=geo_fit,geo_mol_var=geo_raw.profile_variance.flatten().data,\
+            geo_raw = geo_raw.profile.flatten().data,\
             sg_win = settings['sg_win'], sg_order = settings['sg_order'], \
             range_array=geo_raw.range_array, \
             TelescopeDirection = np.nanmean(var_1d_data['TelescopeDirection']), \
             airborne=settings['airborne'])
     
 
-"""    
-    
-
-# plot I2 cell status
-#plt.figure(); 
-#plt.plot(time_sec/3600,var_1d_data['RemoveLongI2Cell'])
-#plt.grid(b=True)
-#plt.xlabel('time [h-UTC]')
-#plt.ylabel('Value')
-#plt.title('RemoveLongI2Cell')
-
-# equation for estimating transmit power is assumed based on known approximate
-# DAQ output.  The conversion used here could be incorrect.
-fig, ax1 = plt.subplots(); 
-ax1.plot(time_sec/3600.0,0.5*var_1d_data['total_energy']/var_1d_data['DATA_shot_count'][:,0],'b'); 
-ax1.set_xlabel('time [h-UTC]'); 
-ax1.set_ylabel('Transmit Power [mW]', color='b')
-ax1.tick_params('y', colors='b')
-ax1.grid(b=True)
-ax2 = ax1.twinx(); 
-ax2.plot(time_sec/3600,var_1d_data['RemoveLongI2Cell'],'r');
-ax2.set_ylabel('RemoveLongI2Cell', color='r')
-ax2.tick_params('y', colors='r')
 
 
-# set the master time to match all 2D profiles to
-# (1d data will not be resampled)
-master_time = np.arange(time_sec[0]-tres/2,time_sec[-1]+tres/2,tres)
-
-for var in profs.keys():
-    profs[var].time_resample(tedges=master_time,update=True,remainder=False)
-    profs[var].bg_subtract(BGIndex)
-
-## option to remove all data where the I2 cell is not removed.
-## depricated
-#if FilterI2:
-#    i2_size = var_1d_data['RemoveLongI2Cell'].size  # size of array.  Don't apply to any arrays that don't have matching time dimensions
-#    i2_rem = np.nonzero(var_1d_data['RemoveLongI2Cell'] < 50)[0]  # data points where the I2 cell is removed
-#    
-#    for var in var_1d_data.keys():
-#            if var_1d_data[var].size == i2_size:
-#                var_1d_data[var] = var_1d_data[var][i2_rem]
-#            else:
-#                print(var+' does not have time dimension that matches RemoveLongI2Cell')
-#    
-#    time_dt = time_dt[i2_rem]
-#    time_sec = time_sec[i2_rem]
-
-lp.plotprofiles(profs)
-# overlay profiles and I2 cell status to help determine the calibration interval
-fig_data = lp.pcolor_profiles([profs['combined_hi'],profs['molecular']],ylimits=[0,12],climits=[[1e-4,1e4],[1e-4,1e4]])  
-fig_data[1][1].plot(time_sec/3600,var_1d_data['RemoveLongI2Cell']/25,'b--')      
-plt.show(block=False)
-
-# check if the I2 cell is ever removed in the data.  If not, kill the 
-# process.  No point in running the calibration
-if all(var_1d_data['RemoveLongI2Cell'] > 50):
-    print('No intervals found with I2 cell removed')
-    RunCal = False
-
-else:
-    RunCal = True
-    # find times where the i2 cell was inserted/removed
-    ical = np.nonzero(np.diff(var_1d_data['RemoveLongI2Cell'])!=0)[0]
-    if var_1d_data['RemoveLongI2Cell'][0] > 50:
-        i0 = ical[::2]  # start indices
-        i1 = ical[1::2] # stop indices
-    else:
-        i0 = np.concatenate((np.zeros(1),ical[1::2]))  # start indices
-        i1 = ical[::2] # stop indices
-        
-    # ask user to select the interval to use
-    print('Found calibration intervals:')
-    for ai in range(len(i0)):
-        if ai < i1.size:
-            print('%d.)  %.2f - %.2f UTC'%(ai,time_sec[i0[ai]]/3600,time_sec[i1[ai]]/3600))
-        else:
-            print('%d.)  %.2f - End of file UTC'%(ai,time_sec[i0[ai]]/3600))
-            i1 = np.concatenate((i1,np.array([-1])))
-    
-    print('%d.)  custom'%(ai+1))    
-    cal_index = np.int(input('Select Interval (invalid number quits cal): '))
-    
-        
-    
-    if cal_index > len(i0) or cal_index < 0:
-        # if the user gives an out of bounds number, quit the routine
-        RunCal = False
-    elif cal_index == len(i0):
-        # the user wants to enter a custom range
-        t_input1 = np.float(input('Enter start time in h-UTC: '))
-        t_input2 = np.float(input('Enter stop time in h-UTC:'))
-        time_range = [t_input1, t_input2]
-        i0 = np.array(list(i0) + np.argmin(np.abs(time_sec-t_input1)))
-        i1 = np.array(list(i1) + np.argmin(np.abs(time_sec-t_input2)))
-    else:
-        # the user selects a pre-defined calibration interval
-        time_range = [5*60+time_sec[i0[cal_index]],time_sec[i1[cal_index]]-5*60]
-if RunCal:
-    # integrate the profiles over the selected time region
-    for pname in profs.keys():
-        profs[pname].slice_time(time_range)
-        profs[pname].time_integrate()
-    
-    # ratio the profiles to obtain the diff-geo corrections
-    pHi = profs['combined_hi'].copy()   
-    pLo = profs['combined_lo'].copy() 
-#    pHiLo = profs['combined_hi'].copy()
-    
-    # using LidarProfile data types helps propagate the error
-    pHi.divide_prof(profs['molecular'])   
-    pLo.divide_prof(profs['molecular'])  
-#    pHiLo.divide_prof(profs['combined_lo'])  
-  
-    hi_smooth = gv.savitzky_golay(pHi.profile.flatten(), sg_win, sg_order, deriv=0)  
-    #    dhi_smooth = savitzky_golay(pHi.profile.flatten(), 11, 4, deriv=1)
-        
-    plt.figure()
-    plt.plot(pHi.profile.flatten())
-    plt.plot(hi_smooth)
-    plt.title('Hi/Mol Ratio')
-    plt.show(block=False)
-    
-    i_norm = 1000
-    i_const = np.int(input('Make constant above index (e.g. 500): '))
-    i_const_max = np.nonzero(pHi.SNR().flatten() < 0.2*pHi.SNR().flatten()[i_const])[0]
-    i_const_max = i_const_max[np.nonzero(i_const_max > i_const)[0][0]]
-    
-    
-    hi_diff_geo = hi_smooth
-#    hi_diff_geo[i_const:] = hi_diff_geo[i_const]
-#    plt.plot(hi_diff_geo)
-    
-    hi_diff_geo = gv.fit_high_range(hi_diff_geo,pHi.profile_variance,i_const,i_const_max)
-    plt.plot(hi_diff_geo,'--')
-    
-    hi_norm = hi_diff_geo[i_norm]
-    hi_diff_geo = hi_diff_geo/hi_norm
-    
-    lo_smooth = gv.savitzky_golay(pLo.profile.flatten(), sg_win, sg_order, deriv=0) 
-    
-    plt.figure()
-    plt.plot(pLo.profile.flatten())
-    plt.plot(lo_smooth)
-    plt.title('Lo/Mol Ratio')
-    plt.show(block=False)
-    
-    i_const = np.int(input('Make constant above index (e.g. 590): '))
-    i_const_max = np.nonzero(pLo.SNR().flatten() < 0.2*pLo.SNR().flatten()[i_const])[0]
-    i_const_max = i_const_max[np.nonzero(i_const_max > i_const)[0][0]]
-    
-    
-    lo_diff_geo = lo_smooth
-#    lo_diff_geo[i_const:] = lo_diff_geo[i_const]
-#    plt.plot(lo_diff_geo)
-    
-    lo_diff_geo = gv.fit_high_range(lo_diff_geo,pLo.profile_variance,i_const,i_const_max)
-    plt.plot(lo_diff_geo,'--')
-    plt.show(block=False)
-    
-    lo_norm = lo_diff_geo[i_norm]
-    lo_diff_geo = lo_diff_geo/lo_norm
-    
-    save_cal = input("Save Calibrations[y/n]")
-    
-    if save_cal == 'y' or save_cal == 'Y':
-        write_data = np.ones((hi_diff_geo.size,4))
-        write_data[:,0] = np.arange(hi_diff_geo.size)
-        write_data[:,1] = hi_diff_geo
-        write_data[:,2] = lo_diff_geo
-        
-        header_str = 'profile data from ' + time_dt[i0[cal_index]].strftime('%d-%b-%y %H:%M')+' -->'+time_dt[i1[cal_index]].strftime('%H:%M UTC') +'\n'
-        header_str = header_str+'Gains normalized range bin = %d'%i_norm + '\n'
-        header_str = header_str+'bin #\tdiff_hi/mol\tdiff_lo/mol\tdiff_i2a/mol'
-    
-        save_cal_file = 'diff_default_geofile_'+time_dt[i0[cal_index]].strftime('%Y%m%dT%H%M')+'.geo'
-
-        save_cal_file_ez = 'diff_geo_GVHSRL'+time_dt[i0[cal_index]].strftime('%Y%m%d')+'_tmp'
-        
-        print('Saving to:\n  '+save_file_path+save_cal_file)        
-        
-        np.savetxt(save_file_path+save_cal_file,write_data,fmt='\t%d\t%.4e\t%.4e\t%.4e',header=header_str)
-        
-        print('Saving python vars to:\n  '+save_path_ez+save_cal_file_ez+'.npz') 
-        
-        np.savez(save_path_ez+save_cal_file_ez,start_time=time_dt[i0[cal_index]],stop_time=time_dt[i1[cal_index]], \
-            hi_diff_geo=hi_diff_geo,lo_diff_geo=lo_diff_geo, \
-            hi_diff_var=pHi.profile_variance.data.flatten(),lo_diff_var=pLo.profile_variance.data.flatten(),\
-            hi_prof = pHi.profile.data.flatten(),lo_prof = pLo.profile.data.flatten(),\
-            sg_win = sg_win, sg_order = sg_order, i_norm = i_norm, 
-            range_array=pHi.range_array,lo_norm=lo_norm,hi_norm=hi_norm, \
-            TelescopeDirection = np.nanmean(var_1d_data['TelescopeDirection'][i0[cal_index]:i1[cal_index]]))
-        
-"""
 
