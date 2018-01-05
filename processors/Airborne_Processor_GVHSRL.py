@@ -614,7 +614,7 @@ if settings['Estimate_Mol_Gain']:
     plt.ylabel('Altitude [m]')
     plt.title('Telescope Up')
     
-    i_alt_lim = np.nonzero(np.logical_and(balt > 2000,balt < 6500))[0]
+    i_alt_lim = np.nonzero(np.logical_and(balt > 2000,balt < 4000))[0]
     
     mol_gain_adj = np.nanmin(hist_med_sm[i_alt_lim])
     
@@ -663,7 +663,7 @@ if settings['Estimate_Mol_Gain']:
     plt.ylabel('Altitude [m]')
     plt.title('Telescope Down')
     
-    i_alt_lim = np.nonzero(np.logical_and(balt > 2000,balt < 6500))[0]
+    i_alt_lim = np.nonzero(np.logical_and(balt > 2000,balt < 4000))[0]
     
     mol_gain_adj = np.nanmin(hist_med_sm[i_alt_lim])
     
