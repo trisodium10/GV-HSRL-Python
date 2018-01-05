@@ -9,7 +9,7 @@ import datetime
 
 proj = 'SOCRATES'
 flt = proj+'tf01'
-flight_time_start = datetime.timedelta(hours=20,minutes=40)
+flight_time_start = datetime.timedelta(hours=20,minutes=0)
 flight_time_stop = datetime.timedelta(hours=22,minutes=0)
 
 settings = {
@@ -50,7 +50,7 @@ settings = {
     
     
 #basepath = '/scr/eldora1/HSRL_data/'  # old path - still works with link from HSRL_data to /hsrl/raw/
-basepath = '/scr/eldora1/rsfdata/hsrl/raw/'  # new absolute path
+#basepath = '/scr/eldora1/rsfdata/hsrl/raw/'  # new absolute path
 #basepath = '/Users/mhayman/Documents/HSRL/GVHSRL_data/'  # local computer data path
         
 aircraft_basepath = {
