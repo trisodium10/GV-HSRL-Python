@@ -692,25 +692,25 @@ dPart.mask(np.isnan(dPart.profile))
 dVol.mask(np.isnan(dVol.profile))
 
 save_prof_list = [beta_a,dPart,dVol,BSR,beta_m]
-save_var1d_post = {'TelescopeDirection':'1-Lidar Pointing Up, 0-Lidar Pointing Down',
-                   'polarization':'System Quarter Waveplate orientation'}
-save_air_post = {'THDG': 'aircraft heading',
-                 'TASX': 'airspeed [m/s]',
-                 'GGLAT': 'latitude',
-                 'PITCH': 'pitch angle',
-                 'GGALT': 'altitude [m]',
-                 'PSXC': 'ambiant pressure in hPa',
-                 'ROLL': 'aircraft roll angle',
-                 'GGLON': 'longitude',
-                 'ATX': 'ambiant temperature in C'}
+save_var1d_post = {'TelescopeDirection':{'description':'1-Lidar Pointing Up, 0-Lidar Pointing Down','units':'none'},
+                   'polarization':{'description':'System Quarter Waveplate orientation','units':'degrees'}}
+save_air_post = {'THDG': {'description':'aircraft heading','units':'degrees'},
+                 'TASX': {'description':'airspeed','units':'meters/second'},
+                 'GGLAT': {'description':'latitude','units':'degrees'},
+                 'PITCH': {'description':'aircraft pitch angle','units':'degrees'},
+                 'GGALT': {'description':'altitude','units':'meters'},
+                 'PSXC': {'description':'ambiant pressure','units':'hPa'},
+                 'ROLL': {'description':'aircraft roll angle','units':'degrees'},
+                 'GGLON': {'description':'longitude','units':'degrees'},
+                 'ATX': {'description':'ambiant temperature', 'units':'C'}}
 
 if settings['save_data']:
     for ai in range(len(save_prof_list)):
         save_prof_list[ai].write2nc(save_data_file) #,name_override=True,tag=var_name)
     for var in save_var1d_post.keys():
-        lp.write_var2nc(var_post[var],str(var),save_data_file,description=save_var1d_post[var])
+        lp.write_var2nc(var_post[var],str(var),save_data_file,description=save_var1d_post[var]['description'],units=save_var1d_post[var]['units'])
     for var in save_air_post.keys():
-        lp.write_var2nc(air_data_post[var],str(var),save_data_file,description=save_air_post[var])
+        lp.write_var2nc(air_data_post[var],str(var),save_data_file,description=save_air_post[var]['description'],units=save_air_post[var]['units'])
 
 if settings['plot_2D']:
     if settings['plot_date']:
