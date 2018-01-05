@@ -64,6 +64,11 @@ default_settings = {
     'MaxAlt':10e3,
     'MinAlt':-30,
     
+    'get_extinction':False,  # process data for extinction    
+    
+    'time_ref2takeoff':False,    # flight_time_start and 
+                                 # time_stop are referened to takeoff time
+    
     'RemoveCals':True,  # don't include instances where the I2 cell is removed
                         # scan files are not included in the file search so they
                         # are removed anyway
@@ -222,14 +227,20 @@ air_data = gv.load_aircraft_data(filePathAircraft,var_aircraft)
 iflight = np.nonzero(air_data['TASX'] > settings['Airspeed_Threshold'])[0]
 it0 = iflight[0]  # index when aircraft starts moving
 it1 = iflight[-1]  # index when aircraft stops moving
+time_takeoff = flight_date[usr_flt]+datetime.timedelta(seconds=np.int(air_data['Time'][it0]))
+time_landing = flight_date[usr_flt]+datetime.timedelta(seconds=np.int(air_data['Time'][it1]))
 print('Flight time is: ')
-print('   '+(flight_date[usr_flt]+datetime.timedelta(seconds=np.int(air_data['Time'][it0]))).strftime('%H:%M %d-%b, %Y to'))
-print('   '+(flight_date[usr_flt]+datetime.timedelta(seconds=np.int(air_data['Time'][it1]))).strftime('%H:%M %d-%b, %Y'))
+print('   '+time_takeoff.strftime('%H:%M %d-%b, %Y to'))
+print('   '+time_landing.strftime('%H:%M %d-%b, %Y'))
 print('')
 
 try: 
-    time_start = flight_date[usr_flt]+flight_time_start
-    time_stop = flight_date[usr_flt]+flight_time_stop
+    if settings['time_ref2takeoff']:
+        time_start = time_takeoff + flight_time_start
+        time_stop = time_takeoff + flight_time_stop
+    else:
+        time_start = flight_date[usr_flt]+flight_time_start
+        time_stop = flight_date[usr_flt]+flight_time_stop
 except NameError:
     time_sel = input('Enter start hour (UTC) or press [Enter] select start of flight: ')
     if time_sel == '':
@@ -247,6 +258,11 @@ except NameError:
         stop_hr = np.float(time_sel)
         time_stop = time_start+datetime.timedelta(seconds=np.int(stop_hr*3600))
 
+# check for out of bounds time limits
+if time_start > time_landing:
+    time_start = time_landing - datetime.timedelta(minutes=1)
+if time_stop < time_takeoff:
+    time_stop = time_takeoff + datetime.timedelta(minutes=1)
 
 print('Processing: ')
 print('   '+time_start.strftime('%H:%M %d-%b, %Y to'))
@@ -296,6 +312,16 @@ else:
 baseline_file = lp.get_calval(time_start,cal_json,"Baseline File")[0]
 diff_pol_file = lp.get_calval(time_start,cal_json,"Polarization",returnlist=['diff_geo'])
 i2_file = lp.get_calval(time_start,cal_json,"I2 Scan")
+
+if settings['get_extinction']:
+    geo_file_up,geo_file_down = lp.get_calval(time_start,cal_json,"Geo File",returnlist=['value','down_file'])
+    geo_up = np.load(cal_file_path+geo_file_up)
+    if len(geo_file_down) > 0:
+        geo_down = np.load(cal_file_path+geo_file_down)
+    else:
+        geo_data = geo_up
+        
+
 
 # load differential overlap correction
 diff_data_up = np.load(cal_file_path+diff_geo_file)
@@ -354,6 +380,7 @@ elif tres > 0.5:
     air_data_post = air_data_t
 else:
     master_time_post = np.arange(sec_start-tres/2,sec_stop+tres/2,tres)
+    
 
 ## setup molecular gain vector based on telescope pointing direction
 #mol_gain = np.zeros(var_post['TelescopeDirection'].shape)
@@ -369,6 +396,16 @@ if len(diff_geo_file_down) > 0:
         diff_data[var] = np.ones((var_1d['TelescopeDirection'].size,diff_data_up[var].size))
         diff_data[var][np.nonzero(var_1d['TelescopeDirection']==1.0)[0],:] = diff_data_up[var]
         diff_data[var][np.nonzero(var_1d['TelescopeDirection']==0.0)[0],:] = diff_data_down[var]
+
+# setup variable geo overlap (up vs down pointing) if supplied
+if settings['get_extinction']:
+    if len(geo_file_down) > 0:
+        geo_data = {}
+        key_list = ['geo_mol','geo_mol_var']
+        for var in key_list:
+            geo_data[var] = np.ones((var_1d['TelescopeDirection'].size,geo_up[var].size))
+            geo_data[var][np.nonzero(var_1d['TelescopeDirection']==1.0)[0],:] = geo_up[var]
+            geo_data[var][np.nonzero(var_1d['TelescopeDirection']==0.0)[0],:] = geo_down[var]
 
 """
 Main Profile Processing Loop
@@ -438,7 +475,10 @@ if tres_post > 0:
         np.array([profs['molecular'].time[-1]+tres_post*0.5])))
     time_post,var_post = gv.var_time_resample(master_time_post,time_sec,var_1d_data,average=True)
     air_data_post = gv.interp_aircraft_data(time_post,air_data)
-
+else:
+    time_post = time_1d
+    var_post = var_1d
+    air_data_post = air_data_t
 
 # setup molecular gain vector based on telescope pointing direction
 mol_gain = np.zeros(var_post['TelescopeDirection'].shape)
