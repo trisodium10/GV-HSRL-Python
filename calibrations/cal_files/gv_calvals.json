@@ -39,7 +39,8 @@
 		{"date": "1-Jul-2015 0:0","value": "NA", "cal_file":"pol_cal_default_20150722T19200.json", "diff_geo":"cross_pol_diff_geo_GVHSRL20150722.npz","change_type": "abrupt"},
 		{"date": "1-Sep-2015 0:0","value": "NA", "cal_file":"pol_cal_default_20160407T16520.json", "diff_geo":"cross_pol_diff_geo_GVHSRL20160301.npz","change_type": "abrupt"},
 		{"date": "20-Oct-2016 0:0","value": "NA", "cal_file":"pol_cal_default_20161020T21000.json", "diff_geo":"cross_pol_diff_geo_GVHSRL20161024.npz","change_type": "gradual"},
-		{"date": "14-Nov-2017 0:0","value": "NA", "cal_file":"pol_cal_default_20171114T17000.json", "diff_geo":"cross_pol_diff_geo_GVHSRL20171114.npz","change_type": "gradual"}
+		{"date": "14-Nov-2017 0:0","value": "NA", "cal_file":"pol_cal_default_20171114T17000.json", "diff_geo":"cross_pol_diff_geo_GVHSRL20171114.npz","change_type": "gradual"},
+           {"date": "20-Dec-2017 0:0","value": "NA", "cal_file":"pol_cal_default_20171220T19000.json", "diff_geo":"cross_pol_diff_geo_GVHSRL20171220.npz","change_type": "abrupt"}
 	],
 
 	"Location": [
