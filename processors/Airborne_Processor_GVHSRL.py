@@ -81,6 +81,7 @@ default_settings = {
     'load_reanalysis':False, # load T and P reanalysis from NCEP/NCAR Model
     
     'plot_2D':True,   # pcolor plot the BSR and depolarization profiles
+    'show_plots':True, # show plots in matplotlib window
     'plot_date':True,  # plot results in date time format.  Otherwise plots as hour floats
     'save_plots':False, # save the plot data
     
@@ -515,8 +516,6 @@ if settings['hsrl_rb_adjust']:
     
 #    beta_mol_norm = lp.RB_Spectrum(temp.profile.flatten(),pres.profile.flatten()*9.86923e-6,profs['molecular'].wavelength,nu=nu,norm=True)
 #    eta_i2 = np.sum(Ti2[:,np.newaxis]*beta_mol_norm,axis=0)
-    print( eta_i2.size)
-    print( temp.profile.size)
     eta_i2 = eta_i2.reshape(temp.profile.shape)
     profs['molecular'].multiply_piecewise(1.0/eta_i2)
 
@@ -709,10 +708,15 @@ save_air_post = {'THDG': {'description':'aircraft heading','units':'degrees'},
                  'ATX': {'description':'ambiant temperature', 'units':'C'}}
 
 if settings['save_data']:
+    print('saveing profiles')
     for ai in range(len(save_prof_list)):
         save_prof_list[ai].write2nc(save_data_file) #,name_override=True,tag=var_name)
+        
+    print('saving lidar status data')
     for var in save_var1d_post.keys():
         lp.write_var2nc(var_post[var],str(var),save_data_file,description=save_var1d_post[var]['description'],units=save_var1d_post[var]['units'])
+    
+    print('saving aircraft variables')    
     for var in save_air_post.keys():
         lp.write_var2nc(air_data_post[var],str(var),save_data_file,description=save_air_post[var]['description'],units=save_air_post[var]['units'])
 
@@ -741,4 +745,5 @@ if settings['plot_2D']:
     #dPart.mask(dPartMask)
     #lp.pcolor_profiles([BSR,dVol],scale=['log','linear'],climits=[[1,5e2],[0,1.0]])
     #lp.pcolor_profiles([dVol],scale=['linear'],climits=[[0,1]])
-plt.show()
+if settings['show_plots']:
+    plt.show()
