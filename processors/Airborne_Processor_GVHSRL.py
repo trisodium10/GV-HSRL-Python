@@ -511,15 +511,19 @@ if settings['hsrl_rb_adjust']:
     
     Tc2 = np.interp(nu,i2_data['freq']*1e9,i2_data['combined_scan'])  # combined transmission
     
-    beta_mol_norm = lp.RB_Spectrum(temp.profile.flatten(),pres.profile.flatten()*9.86923e-6,profs['molecular'].wavelength,nu=nu,norm=True)
-    eta_i2 = np.sum(Ti2[:,np.newaxis]*beta_mol_norm,axis=0)
+    [eta_i2,eta_c] = lp.RB_Efficiency([Ti2,Tc2],temp.profile.flatten(),pres.profile.flatten()*9.86923e-6,profs['molecular'].wavelength,nu=nu,norm=True)
+    
+#    beta_mol_norm = lp.RB_Spectrum(temp.profile.flatten(),pres.profile.flatten()*9.86923e-6,profs['molecular'].wavelength,nu=nu,norm=True)
+#    eta_i2 = np.sum(Ti2[:,np.newaxis]*beta_mol_norm,axis=0)
+    print( eta_i2.size)
+    print( temp.profile.size)
     eta_i2 = eta_i2.reshape(temp.profile.shape)
     profs['molecular'].multiply_piecewise(1.0/eta_i2)
 
     profs['molecular'].gain_scale(mol_gain,gain_var = (mol_gain*0.05)**2)
 
         
-    eta_c = np.sum(Tc2[:,np.newaxis]*beta_mol_norm,axis=0)
+#    eta_c = np.sum(Tc2[:,np.newaxis]*beta_mol_norm,axis=0)
     eta_c = eta_c.reshape(temp.profile.shape)
     profs['combined_hi'].multiply_piecewise(1.0/eta_c)
     profs['cross'].multiply_piecewise(1.0/eta_c)
