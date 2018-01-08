@@ -15,10 +15,11 @@ import datetime
 #fname = 'diff_default_geofile_20171025T1805.geo'
 #fname  = 'diff_default_geofile_20120201T0000.geo'
 #fname  = 'cross_pol_diff_geofile_20161024T0000.geo'
-fname = 'i2-default-scan-20150701T0000.cal'
+#fname = 'i2-default-scan-20150701T0000.cal'
+fname  = 'cross_pol_diff_geofile_20171220T0000.geo'
 
-#read_path = '/Users/mhayman/Documents/Python/Lidar/GV-HSRL-Python/calibrations/cal_files/'
-read_path = '/scr/eldora1/HSRL_data/2015/07/'
+read_path = '/Users/mhayman/Documents/Python/Lidar/GV-HSRL-Python/calibrations/cal_files/'
+#read_path = '/scr/eldora1/HSRL_data/2015/07/'
 
 write_path = '/Users/mhayman/Documents/Python/Lidar/GV-HSRL-Python/calibrations/cal_files/' #GV-HSRL-Python/calibrations/cal_files/'
 
