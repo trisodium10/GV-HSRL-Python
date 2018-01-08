@@ -87,6 +87,10 @@ default_settings = {
     
     'save_data':False, # save data as netcdf
     
+    'time_axis_scale':5.0,  # scale for horizontal axis on pcolor plots
+    'count_mask_threshold':2.0,  # count mask threshold (combined_hi).  If set to zero, no mask applied  
+    'd_part_res_lim':0.25,  # resolution limit to decide where to mask particle depolarization data
+    
     'Estimate_Mol_Gain':True, # use statistics on BSR to estimate the molecular gain
     
     'hsrl_rb_adjust':True, # adjust for Rayleigh Brillouin Spectrum
@@ -151,6 +155,9 @@ try:
 except NameError:
     aircraft_basepath = default_aircraft_basepath
 
+"""
+Load variable lists
+"""
 
 # list of 1D variables to load
 var_1d_list = ['total_energy','RemoveLongI2Cell'\
@@ -680,9 +687,11 @@ if settings['Estimate_Mol_Gain']:
 # add a diagnostic for diff overlap between lo and hi channels as a function
 # of count rate or backscatter coeff
 
+count_mask = profs['combined_hi'].profile < settings['count_mask_threshold']
+
 #dPartMask = dPart.profile_variance > 1.0
 #dPart.mask(dPartMask)
-dPart.mask(dPart.profile_variance > 1.0)
+dPart.mask(dPart.profile_variance > settings['d_part_res_lim']**2)
 dPart.mask(dPart.profile > 1.0)
 dPart.mask(dPart.profile < -0.1)
 
@@ -693,6 +702,14 @@ beta_a.mask(np.isnan(beta_a.profile))
 BSR.mask(np.isnan(BSR.profile))
 dPart.mask(np.isnan(dPart.profile))
 dVol.mask(np.isnan(dVol.profile))
+
+if settings['count_mask_threshold'] > 0:
+    beta_a.mask(count_mask)
+    dPart.mask(count_mask)
+    dVol.mask(count_mask)
+    profs['combined_hi'].mask(count_mask)
+
+
 
 save_prof_list = [beta_a,dPart,dVol,BSR,beta_m]
 save_var1d_post = {'TelescopeDirection':{'description':'1-Lidar Pointing Up, 0-Lidar Pointing Down','units':'none'},
@@ -728,14 +745,22 @@ if settings['plot_2D']:
         t1d_plt = time_1d/3600.0
     
 #    rfig = lp.pcolor_profiles([BSR,dPart],scale=['log','linear'],climits=[[1,1e2],[0,0.7]],ylimits=[MinAlt*1e-3,MaxAlt*1e-3],title_add=proj_label,plot_date=plot_date)
-    rfig = lp.pcolor_profiles([beta_a,dPart],scale=['log','linear'],climits=[[1e-8,1e-3],[0,1.0]],ylimits=[MinAlt*1e-3,MaxAlt*1e-3],title_add=proj_label,plot_date=settings['plot_date'])
+    rfig = lp.pcolor_profiles([beta_a,dPart],scale=['log','linear'],
+                              climits=[[1e-8,1e-3],[0,1.0]],
+                              ylimits=[MinAlt*1e-3,MaxAlt*1e-3],
+                              title_add=proj_label,
+                              plot_date=settings['plot_date'],t_axis_scale=settings['time_axis_scale'])
     if settings['as_altitude']:
         for ai in range(len(rfig[1])):
             rfig[1][ai].plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude      
     if settings['save_plots']:
         plt.savefig(save_plots_path+'Aerosol_Backscatter_'+save_plots_base,dpi=300)
         
-    rfig = lp.pcolor_profiles([profs['combined_hi'],dVol],scale=['log','linear'],climits=[[1e-1,1e4],[0,1.0]],ylimits=[MinAlt*1e-3,MaxAlt*1e-3],title_add=proj_label,plot_date=settings['plot_date'])
+    rfig = lp.pcolor_profiles([profs['combined_hi'],dVol],scale=['log','linear'],
+                              climits=[[1e-1,1e4],[0,1.0]],
+                              ylimits=[MinAlt*1e-3,MaxAlt*1e-3],
+                              title_add=proj_label,
+                              plot_date=settings['plot_date'],t_axis_scale=settings['time_axis_scale'])
     if settings['as_altitude']:
         for ai in range(len(rfig[1])):
             rfig[1][ai].plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude
