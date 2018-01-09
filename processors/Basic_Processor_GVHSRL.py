@@ -73,9 +73,10 @@ Estimate_Mol_Gain = True # use statistics on BSR to estimate the molecular gain
 #sg_order = 5
 
 #basepath = '/scr/eldora1/HSRL_data/'  # old path - still works with link from HSRL_data to /hsrl/raw/
-basepath = '/scr/eldora1/rsfdata/hsrl/raw/'  # new absolute path
+#basepath = '/scr/eldora1/rsfdata/hsrl/raw/'  # new absolute path
 #basepath = '/Users/mhayman/Documents/HSRL/GVHSRL_data/'  # local computer data path
-        
+basepath = '/scr/rain1/rsfdata/projects/socrates/hsrl/raw/' # socrates path
+    
 year_in = 2017
 month_in = 10
 day_in = 27
