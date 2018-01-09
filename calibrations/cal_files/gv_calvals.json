@@ -45,7 +45,8 @@
 
 	"Location": [
 		{"date": "1-Sep-2015 0:0","location": "Boulder, CO, USA","latitude": 40.038589, "longitude": -105.238968, "Project":"none", "description": "Lidar Lab", "change_type": "abrupt"},
-           {"date": "7-Dec-2017 0:0","location": "Broomfield, CO, USA","latitude": 39.912763, "longitude": -105.118251, "Project":"SOCRATES", "description": "GV", "change_type": "abrupt"}
+           {"date": "7-Dec-2017 0:0","location": "Broomfield, CO, USA","latitude": 39.912763, "longitude": -105.118251, "Project":"SOCRATES", "description": "GV", "change_type": "abrupt"},
+           {"date": "8-Jan-2018 0:0","location": "Kona, HI, USA","latitude": 19.729125, "longitude": -156.042596, "Project":"SOCRATES", "description": "GV", "change_type": "abrupt"}
 	],
 
 	"Flights": [
@@ -67,7 +68,8 @@
 		{"date": "12-Aug-2015 0:0","Project":"CSET","Flight Number": 16,"Flight Designation": "rf"},
 
            {"date": "2-Jan-2018 0:0","Project":"SOCRATES","Flight Number": 1,"Flight Designation": "tf"},
-           {"date": "4-Jan-2018 0:0","Project":"SOCRATES","Flight Number": 2,"Flight Designation": "tf"}
+           {"date": "4-Jan-2018 0:0","Project":"SOCRATES","Flight Number": 2,"Flight Designation": "tf"},
+           {"date": "8-Jan-2018 0:0","Project":"SOCRATES","Flight Number": 1,"Flight Designation": "ff"}
 	],
 
 	"Comments": [
