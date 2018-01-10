@@ -9,7 +9,10 @@ import sys
 import os
 
 #filename = inspect.getframeinfo(inspect.currentframe()).filename
-filename = __file__
+try:
+    filename = fullpath
+except NameError:
+    filename = __file__
 
 
 # add the path to GVHSRLlib manually
@@ -420,7 +423,13 @@ Main Profile Processing Loop
 loop through each lidar profile in profs and perform basic processing 
 operations
 """
-    
+
+if settings['as_altitude']:
+    # maximum range required for this dataset
+    range_trim = np.max([np.max(MaxAlt-air_data_t['GGALT']),np.max(air_data_t['GGALT']-MinAlt)])+4*zres
+else:
+    # set maximum range to MaxAlt if range centered processing
+    range_trim = MaxAlt
 
 int_profs = {}  # obtain time integrated profiles
 for var in profs.keys():
@@ -433,12 +442,7 @@ for var in profs.keys():
     int_profs[var] = profs[var].copy()
     int_profs[var].time_integrate()
     
-    if settings['as_altitude']:
-        # maximum range required for this dataset
-        range_trim = np.max([np.max(MaxAlt-air_data_t['GGALT']),np.max(air_data_t['GGALT']-MinAlt)])+4*zres
-    else:
-        # set maximum range to MaxAlt if range centered processing
-        range_trim = MaxAlt
+    
     
     if var == 'molecular' and settings['Denoise_Mol']:
         MolRaw = profs['molecular'].copy()    
@@ -462,6 +466,13 @@ for var in profs.keys():
             profs[var].diff_geo_overlap_correct(diff_data['hi_diff_geo'],geo_reference='molecular')  
         else:
             profs[var].diff_geo_overlap_correct(diff_data['hi_diff_geo'],geo_reference='molecular')
+    elif var == 'molecular' and settings['get_extinction']:
+        # if retrieving extinction, use a range centered profile to obtain it
+        mol_ext = profs['molecular'].copy()
+        mol_ext.multiply_piecewise(geo_data['geo_mol'])
+        mol_ext.time_resample(tedges=master_time_post,update=True,remainder=False)
+        mol_ext.slice_range(range_lim=[0,range_trim])
+        
     profs[var].slice_range(range_lim=[0,range_trim])
   
     if settings['as_altitude']:
@@ -505,6 +516,14 @@ else:
     temp,pres = gv.get_TP_from_aircraft(air_data,profs['molecular'],telescope_direction=var_post['TelescopeDirection'])
 beta_m = lp.get_beta_m(temp,pres,profs['molecular'].wavelength)
 
+
+if settings['get_extinction'] and settings['as_altitude']:
+    temp_ext,pres_ext = gv.get_TP_from_aircraft(air_data,mol_ext,telescope_direction=var_post['TelescopeDirection'])
+    beta_m_ext = lp.get_beta_m(temp_ext,pres_ext,profs['molecular'].wavelength)
+else:
+    beta_m_ext = beta_m.copy()
+
+
 if settings['Denoise_Mol']:
     MolDenoise,tune_list = mle.DenoiseMolecular(MolRaw,beta_m_sonde=beta_m, \
                             MaxAlt=MaxAlt,accel = False,tv_lim =[1.5, 2.8],N_tv_pts=59, \
@@ -537,16 +556,39 @@ if settings['hsrl_rb_adjust']:
     if settings['Denoise_Mol']:
         MolDenoise.multiply_piecewise(1.0/eta_i2)
         MolDenoise.gain_scale(mol_gain)
+        
+    if settings['get_extinction'] and settings['as_altitude']:
+        [eta_i2_ext] = lp.RB_Efficiency([Ti2],temp_ext.profile.flatten(),pres_ext.profile.flatten()*9.86923e-6,profs['molecular'].wavelength,nu=nu,norm=True)
+        eta_i2_ext = eta_i2_ext.reshape(temp_ext.profile.shape)
+        mol_ext.multiply_piecewise(1.0/eta_i2_ext)
+        mol_ext.range_correct()
+        
 else:
     # Rescale molecular channel to match combined channel gain
     profs['molecular'].gain_scale(mol_gain,gain_var = (mol_gain*0.05)**2)
     if settings['Denoise_Mol']:
         MolDenoise.gain_scale(mol_gain)
 
-
 beta_a = lp.AerosolBackscatter(profs['molecular'],profs['combined_hi'],beta_m)
 
-
+if settings['get_extinction']:
+    ext_sg_wid = 21
+    ext_sg_order = 4
+    OD = mol_ext/beta_m_ext
+    OD.descript = 'Total optical depth from aircraft altitude'
+    OD.label = 'Optical Depth'
+    OD.profile_type = 'unitless'
+    
+    alpha_a = OD.copy()
+    alpha_a.descript = 'Aerosol Extinction Coefficient'
+    alpha_a.label = 'Aerosol Extinction Coefficient'
+    alpha_a.profile_type = '$m^{-1}$'
+    for ai in range(alpha_a.profile.shape[0]):
+        alpha_a.profile[ai,:] = -2*gv.savitzky_golay(np.log(alpha_a.profile[ai,:].flatten()), ext_sg_wid, ext_sg_order, deriv=1)
+    alpha_a = alpha_a/alpha_a.mean_dR # not sure this is the right scaling factor
+#    alpha_a = alpha_a - beta_m_ext*(8*np.pi/3)  # remove molecular extinction
+    if settings['as_altitude']:
+        alpha_a.range2alt(master_alt,air_data_post,telescope_direction=var_post['TelescopeDirection'])
 
 BSR = profs['combined_hi']/profs['molecular']
 BSR.descript = 'Ratio of combined to molecular backscatter'
@@ -690,6 +732,7 @@ if settings['Estimate_Mol_Gain']:
 count_mask = profs['combined_hi'].profile < settings['count_mask_threshold']
 
 #dPartMask = dPart.profile_variance > 1.0
+dPartMask = dPart.profile_variance > settings['d_part_res_lim']**2
 #dPart.mask(dPartMask)
 dPart.mask(dPart.profile_variance > settings['d_part_res_lim']**2)
 dPart.mask(dPart.profile > 1.0)
@@ -703,11 +746,16 @@ BSR.mask(np.isnan(BSR.profile))
 dPart.mask(np.isnan(dPart.profile))
 dVol.mask(np.isnan(dVol.profile))
 
+
 if settings['count_mask_threshold'] > 0:
     beta_a.mask(count_mask)
     dPart.mask(count_mask)
     dVol.mask(count_mask)
     profs['combined_hi'].mask(count_mask)
+    
+    if settings['get_extinction']:
+        alpha_a.mask(count_mask)
+        alpha_a.mask(dPart.profile.mask)
 
 
 
@@ -766,6 +814,18 @@ if settings['plot_2D']:
             rfig[1][ai].plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude
     if settings['save_plots']:
         plt.savefig(save_plots_path+'AttenuatedBackscatter_'+save_plots_base,dpi=300)
+    
+    if settings['get_extinction']:
+        rfig = lp.pcolor_profiles([alpha_a],scale=['log'],
+                                  climits=[[1e-5,1e-2]],
+                                  ylimits=[MinAlt*1e-3,MaxAlt*1e-3],
+                                  title_add=proj_label,
+                                  plot_date=settings['plot_date'],t_axis_scale=settings['time_axis_scale'])
+        if settings['as_altitude']:
+            for ai in range(len(rfig[1])):
+                rfig[1][ai].plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude
+        if settings['save_plots']:
+            plt.savefig(save_plots_path+'Extinction_'+save_plots_base,dpi=300)
     #lp.plotprofiles(profs)
     #dPart.mask(dPartMask)
     #lp.pcolor_profiles([BSR,dVol],scale=['log','linear'],climits=[[1,5e2],[0,1.0]])
