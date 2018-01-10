@@ -38,7 +38,7 @@ import GVHSRLlib as gv
 
 import MLELidarProfileFunctions as mle
     
-
+reload(lp)
 
 # input and raw_input are the same for python 3 and 2 respectively
 # this makes it so input always accepts a string
@@ -159,6 +159,7 @@ if settings['save_plots']:
         print('  No save path (save_plots_path) is provided')
         settings['save_plots'] = False
 
+profs = {}
 # grab raw data from netcdf files
 [timeD,time_dt,time_sec],var_1d_data, profs = gv.load_raw_data(time_start,time_stop,var_2d_list,var_1d_list,basepath=basepath,verbose=True,as_prof=True,loadQWP=settings['loadQWP'])
 
