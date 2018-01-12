@@ -138,11 +138,12 @@ t0 = time_start0-day_start
 
 time_start = time_start0
 time_stop = day_start + datetime.timedelta(seconds=np.floor(t0.total_seconds()/time_increment.total_seconds())*time_increment.total_seconds())+time_duration
-
-while time_start < time_stop0:
-    # check if we are going to overrrun the data
-    if time_stop > time_stop0:
-        time_stop = time_stop0
+run_loop = True
+while run_loop:
+#    # check if we are going to overrrun the data
+#    if time_stop > time_stop0:
+#        time_stop = time_stop0
+        
 #    g['time_start'] = time_start
 #    g['time_stop'] = time_stop
 #    
@@ -150,9 +151,10 @@ while time_start < time_stop0:
     
     dp.ProcessAirborneDataChunk(time_start,time_stop,
                              settings=settings,paths=paths,process_vars=process_vars)
-    
-#    time_start = time_stop #+datetime.timedelta(seconds=0.1)
-    time_start = time_start+time_increment
-    time_stop = time_stop+time_increment
-    
+    if time_stop > time_stop0:
+        run_loop = False
+    else:
+        time_start = time_start+time_increment
+        time_stop = time_stop+time_increment
+    #    time_start = time_stop #+datetime.timedelta(seconds=0.1)
     

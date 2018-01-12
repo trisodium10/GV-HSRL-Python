@@ -593,7 +593,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         for ai in range(alpha_a.profile.shape[0]):
             alpha_a.profile[ai,:] = -2*gv.savitzky_golay(np.log(alpha_a.profile[ai,:].flatten()), ext_sg_wid, ext_sg_order, deriv=1)
         alpha_a = alpha_a/alpha_a.mean_dR # not sure this is the right scaling factor
-    #    alpha_a = alpha_a - beta_m_ext*(8*np.pi/3)  # remove molecular extinction
+        alpha_a = alpha_a - beta_m_ext*(8*np.pi/3)  # remove molecular extinction
         if settings['as_altitude']:
             alpha_a.range2alt(master_alt,air_data_post,telescope_direction=var_post['TelescopeDirection'])
     
@@ -801,7 +801,10 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                         + datetime.timedelta(seconds=sec) for sec in time_1d])   
         else:
             t1d_plt = time_1d/3600.0
-        tlims = [time_post[0]/3600.0, time_post[-1]/3600.0]
+        
+        tlims = [(time_start-flight_date[usr_flt]).total_seconds()/3600.0,
+                  (time_stop-flight_date[usr_flt]).total_seconds()/3600.0]
+#        tlims = [time_post[0]/3600.0, time_post[-1]/3600.0]
     #    rfig = lp.pcolor_profiles([BSR,dPart],scale=['log','linear'],climits=[[1,1e2],[0,0.7]],ylimits=[MinAlt*1e-3,MaxAlt*1e-3],title_add=proj_label,plot_date=plot_date)
         rfig = lp.pcolor_profiles([beta_a],scale=['log'],
                                   climits=[[1e-8,1e-3]],
