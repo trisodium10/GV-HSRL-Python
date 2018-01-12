@@ -5,8 +5,11 @@ Created on Wed Jan  3 11:38:22 2018
 @author: mhayman
 """
 import os
+import sys
 import datetime
 import numpy as np
+
+
 
 
 
@@ -14,17 +17,21 @@ import numpy as np
 Process a full flight in hour increments
 """
 
-
-proj = 'SOCRATES'
-#flt = proj+'tf02'
-#flight_time_start = datetime.timedelta(hours=18,minutes=00)
-#flight_time_stop = datetime.timedelta(hours=19,minutes=0)
-#flight_time_stop = flight_time_start + datetime.timedelta(hours=0,minutes=30)
+process_vars = {}
+process_vars['proj'] = 'SOCRATES'
+#process_vars['flt'] = process_vars['proj']+'tf02'
+process_vars['flight_time_start'] = datetime.timedelta(hours=18,minutes=00)
+process_vars['flight_time_stop'] = datetime.timedelta(hours=18,minutes=30)
+#process_vars['flight_time_stop'] = process_vars['flight_time_start'] + datetime.timedelta(hours=0,minutes=30)
 
 # size of each processing step
-time_increment = datetime.timedelta(hours=1,minutes=00)
+time_increment = datetime.timedelta(hours=0,minutes=15)
+# size of a processesed data set
+time_duration = datetime.timedelta(hours=1,minutes=0)
+#time_duration = time_increment
 
 settings = {
+    'full_flight':True, # process the entire flight
     'tres':0.5,  # resolution in time in seconds (0.5 sec) before altitude correction
     'tres_post':10.0, # resolution after altitude correction (in seconds) -  set to zero to not use
     'zres':7.5,  # altitude resolution in meters (7.5 m minimum)
@@ -44,6 +51,8 @@ settings = {
     'Remove_Off_Data':True, # remove instances where the lidar does not appear
                             # to be running
     
+    'get_extinction':True, # retrieve extinction estimate
+    
     'diff_geo_correct':True,  # apply differential overlap correction
     
     'load_reanalysis':False, # load T and P reanalysis from NCEP/NCAR Model
@@ -55,6 +64,8 @@ settings = {
     'save_plots':True, # save the plot data
     
     'save_data':False, # save data as netcdf
+    
+    'save_flight_folder':True, # save data/plots in folders according to flight name
     
     'time_axis_scale':5.0,  # scale for horizontal axis on pcolor plots    
     'count_mask_threshold':2.0,  # count mask threshold (combined_hi).  If set to zero, no mask applied 
@@ -97,33 +108,51 @@ PathFile = os.path.abspath(__file__+'/../')+'/gv_hsrl_socrates_paths.py'
 # load path data for this computer
 exec(open(PathFile).read())
 
+# add the path to GVHSRLlib manually
+library_path = os.path.abspath(paths['software_path']+'/processors/')
+print(library_path)
+if library_path not in sys.path:
+    sys.path.append(library_path)
 
+import Airborne_GVHSRL_DataProcessor as dp
+import Airborne_GVHSRL_DataSelection as ds
 
-Processor = software_path + 'processors/Airborne_GVHSRL_DataProcessor.py'
-DataSelector = software_path + 'processors/Airborne_GVHSRL_DataSelection.py'
-fullpath = os.path.abspath(Processor)
+#Processor = software_path + 'processors/Airborne_GVHSRL_DataProcessor.py'
+#DataSelector = software_path + 'processors/Airborne_GVHSRL_DataSelection.py'
+
+time_start0,time_stop0,settings,paths,process_vars = \
+    ds.SelectAirborneData(settings=settings,paths=paths,process_vars=process_vars)
+
+#fullpath = os.path.abspath(Processor)
 #g = globals().copy()
 #g['__file__'] = fullpath
+#
+## obtain the time references for processing the flight
+#exec(open(DataSelector).read())
+#g['settings'] = settings
 
-# obtain the time references for processing the flight
-exec(open(DataSelector).read())
-
-time_start0 = time_start
-time_stop0 = time_stop
+#time_start0 = time_start
+#time_stop0 = time_stop
 day_start = datetime.datetime(year=time_start0.year,month=time_start0.month,day=time_start0.day)
 t0 = time_start0-day_start
 
 time_start = time_start0
-time_stop = day_start + datetime.timedelta(seconds=np.floor(t0.total_seconds()/time_increment.total_seconds())*time_increment.total_seconds())+time_increment
+time_stop = day_start + datetime.timedelta(seconds=np.floor(t0.total_seconds()/time_increment.total_seconds())*time_increment.total_seconds())+time_duration
 
-while time_start <= time_stop0:
+while time_start < time_stop0:
     # check if we are going to overrrun the data
     if time_stop > time_stop0:
         time_stop = time_stop0
-        
-    exec(open(Processor).read())
+#    g['time_start'] = time_start
+#    g['time_stop'] = time_stop
+#    
+#    exec(open(Processor).read())
     
-    time_start = time_stop+datetime.timedelta(seconds=0.1)
+    dp.ProcessAirborneDataChunk(time_start,time_stop,
+                             settings=settings,paths=paths,process_vars=process_vars)
+    
+#    time_start = time_stop #+datetime.timedelta(seconds=0.1)
+    time_start = time_start+time_increment
     time_stop = time_stop+time_increment
     
     
