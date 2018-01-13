@@ -93,6 +93,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         'save_data':False, # save data as netcdf
         
         'time_axis_scale':5.0,  # scale for horizontal axis on pcolor plots
+        'alt_axis_scale':1.0,   # scale for vertical axis on pcolor plots
         'count_mask_threshold':2.0,  # count mask threshold (combined_hi).  If set to zero, no mask applied  
         'd_part_res_lim':0.25,  # resolution limit to decide where to mask particle depolarization data
         
@@ -591,15 +592,16 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         OD.profile_type = 'unitless'
         
         alpha_a = OD.copy()
-        alpha_a.descript = 'Aerosol Extinction Coefficient'
-        alpha_a.label = 'Aerosol Extinction Coefficient'
-        alpha_a.profile_type = '$m^{-1}$'
         for ai in range(alpha_a.profile.shape[0]):
             alpha_a.profile[ai,:] = -2*gv.savitzky_golay(np.log(alpha_a.profile[ai,:].flatten()), ext_sg_wid, ext_sg_order, deriv=1)
         alpha_a = alpha_a/alpha_a.mean_dR # not sure this is the right scaling factor
         alpha_a = alpha_a - beta_m_ext*(8*np.pi/3)  # remove molecular extinction
         if settings['as_altitude']:
             alpha_a.range2alt(master_alt,air_data_post,telescope_direction=var_post['TelescopeDirection'])
+        
+        alpha_a.descript = 'Aerosol Extinction Coefficient'
+        alpha_a.label = 'Aerosol Extinction Coefficient'
+        alpha_a.profile_type = '$m^{-1}$'
     
     BSR = profs['combined_hi']/profs['molecular']
     BSR.descript = 'Ratio of combined to molecular backscatter'
@@ -777,6 +779,8 @@ def ProcessAirborneDataChunk(time_start,time_stop,
     
     
     save_prof_list = [beta_a,dPart,dVol,BSR,beta_m]
+    if settings['get_extinction']:
+        save_prof_list.extend([alpha_a])
     save_var1d_post = {'TelescopeDirection':{'description':'1-Lidar Pointing Up, 0-Lidar Pointing Down','units':'none'},
                        'polarization':{'description':'System Quarter Waveplate orientation','units':'degrees'}}
     save_air_post = {'THDG': {'description':'aircraft heading','units':'degrees'},
@@ -790,7 +794,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                      'ATX': {'description':'ambiant temperature', 'units':'C'}}
     
     if settings['save_data']:
-        print('saveing profiles')
+        print('saving profiles')
         for ai in range(len(save_prof_list)):
             save_prof_list[ai].write2nc(save_data_file) #,name_override=True,tag=var_name)
             
@@ -820,6 +824,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                                   title_add=proj_label,
                                   plot_date=settings['plot_date'],
                                   t_axis_scale=settings['time_axis_scale'],
+                                  h_axis_scale=settings['alt_axis_scale'],
                                   minor_ticks=5,major_ticks=1)
         if settings['as_altitude']:
             for ai in range(len(rfig[1])):
@@ -833,6 +838,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                                   title_add=proj_label,
                                   plot_date=settings['plot_date'],
                                   t_axis_scale=settings['time_axis_scale'],
+                                  h_axis_scale=settings['alt_axis_scale'],
                                   minor_ticks=5,major_ticks=1)
         if settings['as_altitude']:
             for ai in range(len(rfig[1])):
@@ -846,6 +852,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                                   title_add=proj_label,
                                   plot_date=settings['plot_date'],
                                   t_axis_scale=settings['time_axis_scale'],
+                                  h_axis_scale=settings['alt_axis_scale'],
                                   minor_ticks=5,major_ticks=1)
         if settings['as_altitude']:
             for ai in range(len(rfig[1])):
@@ -859,6 +866,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                                   title_add=proj_label,
                                   plot_date=settings['plot_date'],
                                   t_axis_scale=settings['time_axis_scale'],
+                                  h_axis_scale=settings['alt_axis_scale'],
                                   minor_ticks=5,major_ticks=1)
         if settings['as_altitude']:
             for ai in range(len(rfig[1])):
@@ -874,6 +882,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                                       title_add=proj_label,
                                       plot_date=settings['plot_date'],
                                       t_axis_scale=settings['time_axis_scale'],
+                                      h_axis_scale=settings['alt_axis_scale'],
                                       minor_ticks=5,major_ticks=1)
             if settings['as_altitude']:
                 for ai in range(len(rfig[1])):
