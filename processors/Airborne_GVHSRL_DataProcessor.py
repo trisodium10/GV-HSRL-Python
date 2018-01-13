@@ -581,6 +581,10 @@ def ProcessAirborneDataChunk(time_start,time_stop,
     if settings['get_extinction']:
         ext_sg_wid = 21
         ext_sg_order = 4
+        ext_tres = 20  # extinction time resolution in seconds
+        ext_zres = 15   # extinction range resolution in meters
+        mol_ext.conv(ext_tres/mol_ext.mean_dt,ext_zres/mol_ext.mean_dR)
+        beta_m_ext.conv(ext_tres/beta_m_ext.mean_dt,ext_zres/beta_m_ext.mean_dR)
         OD = mol_ext/beta_m_ext
         OD.descript = 'Total optical depth from aircraft altitude'
         OD.label = 'Optical Depth'
@@ -631,103 +635,106 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         # This segment estimates what the molecular gain should be 
         # based on a histogram minimum in BSR over the loaded data
         
-        iUp = np.nonzero(var_post['TelescopeDirection']==1.0)
+        iUp = np.nonzero(var_post['TelescopeDirection']==1.0)[0]
         
-        BSRprof = BSR.profile[iUp,:].flatten()
-        BSRalt = (np.ones(BSR.profile[iUp,:].shape)*BSR.range_array[np.newaxis,:]).flatten()
+        lp.Estimate_Mol_Gain(BSR,iKeep=iUp,mol_gain=mol_gain_up,alt_lims=[2000,4000],label='Telescope Up',plot=True)
         
-        BSRalt = np.delete(BSRalt,np.nonzero(np.isnan(BSRprof)))
-        BSRprof = np.delete(BSRprof,np.nonzero(np.isnan(BSRprof)))
-    
-        bbsr = np.linspace(0,4,400)
-        bsnr = np.linspace(1,100,250) # snr (70,100,250)
-    
-        balt = np.concatenate((BSR.range_array-BSR.mean_dR/2,BSR.range_array[-1:]+BSR.mean_dR/2))
-    
-        """
-        perform analysis by altitude
-        """
+#        BSRprof = BSR.profile[iUp,:].flatten()
+#        BSRalt = (np.ones(BSR.profile[iUp,:].shape)*BSR.range_array[np.newaxis,:]).flatten()
+#        
+#        BSRalt = np.delete(BSRalt,np.nonzero(np.isnan(BSRprof)))
+#        BSRprof = np.delete(BSRprof,np.nonzero(np.isnan(BSRprof)))
+#    
+#        bbsr = np.linspace(0,4,400)
+#        bsnr = np.linspace(1,100,250) # snr (70,100,250)
+#    
+#        balt = np.concatenate((BSR.range_array-BSR.mean_dR/2,BSR.range_array[-1:]+BSR.mean_dR/2))
+#    
+#        """
+#        perform analysis by altitude
+#        """
+#        
+#        hbsr = np.histogram2d(BSRprof,BSRalt,bins=[bbsr,balt])
+#        
+#        i_hist_median = np.argmax(hbsr[0],axis=0)
+#        iset = np.arange(hbsr[0].shape[1])
+#        dh1 = hbsr[0][i_hist_median,iset]-hbsr[0][i_hist_median-1,iset]
+#        dh2 = hbsr[0][i_hist_median+1,iset]-hbsr[0][i_hist_median,iset]
+#        dbsr = np.mean(np.diff(bbsr))
+#        bsr1 = bbsr[i_hist_median]
+#        bsr2 = bbsr[i_hist_median+1]
+#        
+#        m_0 = (dh2-dh1)/dbsr
+#        b_0 = dh1-m_0*bsr1
+#        
+#        Nsm = 6  # number of bins to smooth over
+#        hist_median = (-b_0)/m_0
+#        hist_med_sm = np.convolve(hist_median,np.ones(Nsm)*1.0/Nsm,mode='same')
+#        
+#        plt.figure()
+#        plt.pcolor(bbsr,balt,hbsr[0].T)
+#        plt.plot(hist_median,balt[1:],'r--')
+#        plt.plot(hist_med_sm,balt[1:],'g--')
+#        plt.xlabel('BSR')
+#        plt.ylabel('Altitude [m]')
+#        plt.title('Telescope Up')
+#        
+#        i_alt_lim = np.nonzero(np.logical_and(balt > 2000,balt < 4000))[0]
+#        
+#        mol_gain_adj = np.nanmin(hist_med_sm[i_alt_lim])
+#        
+#        print('\nCurrent Molecular (Telescope Up) Gain: %f'%mol_gain_up)
+#        print('Suggested Molecular (Telescope Up) Gain: %f\n'%(mol_gain_up*mol_gain_adj))
         
-        hbsr = np.histogram2d(BSRprof,BSRalt,bins=[bbsr,balt])
+        iDown = np.nonzero(var_post['TelescopeDirection']==0.0)[0]
+        lp.Estimate_Mol_Gain(BSR,iKeep=iDown,mol_gain=mol_gain_down,alt_lims=[2000,4000],label='Telescope Down',plot=True)
         
-        i_hist_median = np.argmax(hbsr[0],axis=0)
-        iset = np.arange(hbsr[0].shape[1])
-        dh1 = hbsr[0][i_hist_median,iset]-hbsr[0][i_hist_median-1,iset]
-        dh2 = hbsr[0][i_hist_median+1,iset]-hbsr[0][i_hist_median,iset]
-        dbsr = np.mean(np.diff(bbsr))
-        bsr1 = bbsr[i_hist_median]
-        bsr2 = bbsr[i_hist_median+1]
-        
-        m_0 = (dh2-dh1)/dbsr
-        b_0 = dh1-m_0*bsr1
-        
-        Nsm = 6  # number of bins to smooth over
-        hist_median = (-b_0)/m_0
-        hist_med_sm = np.convolve(hist_median,np.ones(Nsm)*1.0/Nsm,mode='same')
-        
-        plt.figure()
-        plt.pcolor(bbsr,balt,hbsr[0].T)
-        plt.plot(hist_median,balt[1:],'r--')
-        plt.plot(hist_med_sm,balt[1:],'g--')
-        plt.xlabel('BSR')
-        plt.ylabel('Altitude [m]')
-        plt.title('Telescope Up')
-        
-        i_alt_lim = np.nonzero(np.logical_and(balt > 2000,balt < 4000))[0]
-        
-        mol_gain_adj = np.nanmin(hist_med_sm[i_alt_lim])
-        
-        print('\nCurrent Molecular (Telescope Up) Gain: %f'%mol_gain_up)
-        print('Suggested Molecular (Telescope Up) Gain: %f\n'%(mol_gain_up*mol_gain_adj))
-        
-        iDown = np.nonzero(var_post['TelescopeDirection']==0.0)
-        
-        BSRprof = BSR.profile[iDown,:].flatten()
-        BSRalt = (np.ones(BSR.profile[iDown,:].shape)*BSR.range_array[np.newaxis,:]).flatten()
-        
-        BSRalt = np.delete(BSRalt,np.nonzero(np.isnan(BSRprof)))
-        BSRprof = np.delete(BSRprof,np.nonzero(np.isnan(BSRprof)))
-    
-        bbsr = np.linspace(0,4,400)
-        bsnr = np.linspace(1,100,250) # snr (70,100,250)
-    
-        balt = np.concatenate((BSR.range_array-BSR.mean_dR/2,BSR.range_array[-1:]+BSR.mean_dR/2))
-    
-        """
-        perform analysis by altitude
-        """
-        
-        hbsr = np.histogram2d(BSRprof,BSRalt,bins=[bbsr,balt])
-        
-        i_hist_median = np.argmax(hbsr[0],axis=0)
-        iset = np.arange(hbsr[0].shape[1])
-        dh1 = hbsr[0][i_hist_median,iset]-hbsr[0][i_hist_median-1,iset]
-        dh2 = hbsr[0][i_hist_median+1,iset]-hbsr[0][i_hist_median,iset]
-        dbsr = np.mean(np.diff(bbsr))
-        bsr1 = bbsr[i_hist_median]
-        bsr2 = bbsr[i_hist_median+1]
-        
-        m_0 = (dh2-dh1)/dbsr
-        b_0 = dh1-m_0*bsr1
-        
-        Nsm = 6  # number of bins to smooth over
-        hist_median = (-b_0)/m_0
-        hist_med_sm = np.convolve(hist_median,np.ones(Nsm)*1.0/Nsm,mode='same')
-        
-        plt.figure()
-        plt.pcolor(bbsr,balt,hbsr[0].T)
-        plt.plot(hist_median,balt[1:],'r--')
-        plt.plot(hist_med_sm,balt[1:],'g--')
-        plt.xlabel('BSR')
-        plt.ylabel('Altitude [m]')
-        plt.title('Telescope Down')
-        
-        i_alt_lim = np.nonzero(np.logical_and(balt > 2000,balt < 4000))[0]
-        
-        mol_gain_adj = np.nanmin(hist_med_sm[i_alt_lim])
-        
-        print('\nCurrent Molecular (Telescope Down) Gain: %f'%mol_gain_down)
-        print('Suggested Molecular (Telescope Down) Gain: %f\n'%(mol_gain_down*mol_gain_adj))
+#        BSRprof = BSR.profile[iDown,:].flatten()
+#        BSRalt = (np.ones(BSR.profile[iDown,:].shape)*BSR.range_array[np.newaxis,:]).flatten()
+#        
+#        BSRalt = np.delete(BSRalt,np.nonzero(np.isnan(BSRprof)))
+#        BSRprof = np.delete(BSRprof,np.nonzero(np.isnan(BSRprof)))
+#    
+#        bbsr = np.linspace(0,4,400)
+#        bsnr = np.linspace(1,100,250) # snr (70,100,250)
+#    
+#        balt = np.concatenate((BSR.range_array-BSR.mean_dR/2,BSR.range_array[-1:]+BSR.mean_dR/2))
+#    
+#        """
+#        perform analysis by altitude
+#        """
+#        
+#        hbsr = np.histogram2d(BSRprof,BSRalt,bins=[bbsr,balt])
+#        
+#        i_hist_median = np.argmax(hbsr[0],axis=0)
+#        iset = np.arange(hbsr[0].shape[1])
+#        dh1 = hbsr[0][i_hist_median,iset]-hbsr[0][i_hist_median-1,iset]
+#        dh2 = hbsr[0][i_hist_median+1,iset]-hbsr[0][i_hist_median,iset]
+#        dbsr = np.mean(np.diff(bbsr))
+#        bsr1 = bbsr[i_hist_median]
+#        bsr2 = bbsr[i_hist_median+1]
+#        
+#        m_0 = (dh2-dh1)/dbsr
+#        b_0 = dh1-m_0*bsr1
+#        
+#        Nsm = 6  # number of bins to smooth over
+#        hist_median = (-b_0)/m_0
+#        hist_med_sm = np.convolve(hist_median,np.ones(Nsm)*1.0/Nsm,mode='same')
+#        
+#        plt.figure()
+#        plt.pcolor(bbsr,balt,hbsr[0].T)
+#        plt.plot(hist_median,balt[1:],'r--')
+#        plt.plot(hist_med_sm,balt[1:],'g--')
+#        plt.xlabel('BSR')
+#        plt.ylabel('Altitude [m]')
+#        plt.title('Telescope Down')
+#        
+#        i_alt_lim = np.nonzero(np.logical_and(balt > 2000,balt < 4000))[0]
+#        
+#        mol_gain_adj = np.nanmin(hist_med_sm[i_alt_lim])
+#        
+#        print('\nCurrent Molecular (Telescope Down) Gain: %f'%mol_gain_down)
+#        print('Suggested Molecular (Telescope Down) Gain: %f\n'%(mol_gain_down*mol_gain_adj))
     
     
     
@@ -811,7 +818,9 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                                   ylimits=[MinAlt*1e-3,MaxAlt*1e-3],
                                   tlimits=tlims,
                                   title_add=proj_label,
-                                  plot_date=settings['plot_date'],t_axis_scale=settings['time_axis_scale'])
+                                  plot_date=settings['plot_date'],
+                                  t_axis_scale=settings['time_axis_scale'],
+                                  minor_ticks=5,major_ticks=1)
         if settings['as_altitude']:
             for ai in range(len(rfig[1])):
                 rfig[1][ai].plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude      
@@ -822,7 +831,9 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                                   climits=[[0,1.0]],
                                   ylimits=[MinAlt*1e-3,MaxAlt*1e-3],tlimits=tlims,
                                   title_add=proj_label,
-                                  plot_date=settings['plot_date'],t_axis_scale=settings['time_axis_scale'])
+                                  plot_date=settings['plot_date'],
+                                  t_axis_scale=settings['time_axis_scale'],
+                                  minor_ticks=5,major_ticks=1)
         if settings['as_altitude']:
             for ai in range(len(rfig[1])):
                 rfig[1][ai].plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude      
@@ -833,7 +844,9 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                                   climits=[[1e-1,1e4]],
                                   ylimits=[MinAlt*1e-3,MaxAlt*1e-3],tlimits=tlims,
                                   title_add=proj_label,
-                                  plot_date=settings['plot_date'],t_axis_scale=settings['time_axis_scale'])
+                                  plot_date=settings['plot_date'],
+                                  t_axis_scale=settings['time_axis_scale'],
+                                  minor_ticks=5,major_ticks=1)
         if settings['as_altitude']:
             for ai in range(len(rfig[1])):
                 rfig[1][ai].plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude
@@ -844,7 +857,9 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                                   climits=[[0,1.0]],
                                   ylimits=[MinAlt*1e-3,MaxAlt*1e-3],tlimits=tlims,
                                   title_add=proj_label,
-                                  plot_date=settings['plot_date'],t_axis_scale=settings['time_axis_scale'])
+                                  plot_date=settings['plot_date'],
+                                  t_axis_scale=settings['time_axis_scale'],
+                                  minor_ticks=5,major_ticks=1)
         if settings['as_altitude']:
             for ai in range(len(rfig[1])):
                 rfig[1][ai].plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude
@@ -857,7 +872,9 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                                       climits=[[1e-5,1e-2]],
                                       ylimits=[MinAlt*1e-3,MaxAlt*1e-3],tlimits=tlims,
                                       title_add=proj_label,
-                                      plot_date=settings['plot_date'],t_axis_scale=settings['time_axis_scale'])
+                                      plot_date=settings['plot_date'],
+                                      t_axis_scale=settings['time_axis_scale'],
+                                      minor_ticks=5,major_ticks=1)
             if settings['as_altitude']:
                 for ai in range(len(rfig[1])):
                     rfig[1][ai].plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude

@@ -32,4 +32,12 @@ save_plots_path = os.environ['HOME'] + '/Documents/HSRL/GVHSRL/plots/'
 
 software_path = os.environ['HOME']+'/Documents/Python/Lidar/GV-HSRL-Python/'
 
+paths = {
+        'basepath':basepath,
+        'aircraft_basepath':aircraft_basepath,
+        'save_data_path':save_data_path,
+        'save_plots_path':save_plots_path,
+        'software_path':software_path
+        }
+
 #Processor = os.environ['HOME']+'/Documents/Python/Lidar/GV-HSRL-Python/processors/Airborne_Processor_GVHSRL.py'

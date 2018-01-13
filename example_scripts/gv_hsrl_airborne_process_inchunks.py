@@ -21,17 +21,17 @@ process_vars = {}
 process_vars['proj'] = 'SOCRATES'
 #process_vars['flt'] = process_vars['proj']+'tf02'
 process_vars['flight_time_start'] = datetime.timedelta(hours=18,minutes=00)
-process_vars['flight_time_stop'] = datetime.timedelta(hours=18,minutes=29)
+process_vars['flight_time_stop'] = datetime.timedelta(hours=18,minutes=59)
 #process_vars['flight_time_stop'] = process_vars['flight_time_start'] + datetime.timedelta(hours=0,minutes=30)
 
 # size of each processing step
-time_increment = datetime.timedelta(hours=0,minutes=20)
+time_increment = datetime.timedelta(hours=0,minutes=30)
 # size of a processesed data set
 time_duration = datetime.timedelta(hours=1,minutes=0)
 #time_duration = time_increment
 
 settings = {
-    'full_flight':True, # process the entire flight
+    'full_flight':False, # process the entire flight
     'tres':0.5,  # resolution in time in seconds (0.5 sec) before altitude correction
     'tres_post':10.0, # resolution after altitude correction (in seconds) -  set to zero to not use
     'zres':7.5,  # altitude resolution in meters (7.5 m minimum)
@@ -61,7 +61,7 @@ settings = {
     'show_plots':False, # show plots in a matplotlib window
     'plot_date':True,  # plot results in date time format.  Otherwise plots as hour floats
     
-    'save_plots':True, # save the plot data
+    'save_plots':False, # save the plot data
     
     'save_data':False, # save data as netcdf
     
@@ -148,22 +148,14 @@ while run_loop:
 #    g['time_stop'] = time_stop
 #    
 #    exec(open(Processor).read())
-        
-    # only save data every hour increment
-    if time_start.minute == 0:
-        settings['save_data'] = True
-        if time_stop >= time_stop0:
-            run_loop = False
-    else:
-        settings['save_data'] = False
-        
     
     dp.ProcessAirborneDataChunk(time_start,time_stop,
                              settings=settings,paths=paths,process_vars=process_vars)
-    
-
-    time_start = time_start+time_increment
-    time_stop = time_stop+time_increment
+    if time_stop >= time_stop0:
+        run_loop = False
+    else:
+        time_start = time_start+time_increment
+        time_stop = time_stop+time_increment
     #    time_start = time_stop #+datetime.timedelta(seconds=0.1)
     
 plt.show()
