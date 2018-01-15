@@ -577,7 +577,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         if settings['Denoise_Mol']:
             MolDenoise.gain_scale(mol_gain)
     
-    beta_a = lp.AerosolBackscatter(profs['molecular'],profs['combined_hi'],beta_m)
+    beta_a = lp.AerosolBackscatter(profs['molecular'],(profs['combined_hi']+profs['cross']),beta_m)
     
     if settings['get_extinction']:
         ext_sg_wid = 21
@@ -603,7 +603,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         alpha_a.label = 'Aerosol Extinction Coefficient'
         alpha_a.profile_type = '$m^{-1}$'
     
-    BSR = profs['combined_hi']/profs['molecular']
+    BSR = (profs['combined_hi']+profs['cross'])/profs['molecular']
     BSR.descript = 'Ratio of combined to molecular backscatter'
     BSR.label = 'Backscatter Ratio'
     BSR.profile_type = 'unitless'
