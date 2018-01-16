@@ -156,7 +156,10 @@ def load_raw_data(start_time,stop_time,var_2d_list,var_1d_list,basepath = '/scr/
         File_Time = datetime.datetime(*FileDate[idir].timetuple()[:4])+datetime.timedelta(hours=Hour)
         # check if this file is in the search time period
         if File_Time >= start_time_hr and File_Time <= stop_time:
-            
+            if verbose:
+                print( 'Processing %d UT' %Hour)
+                print( '['+SubFiles[idir]+']')
+                
             f = nc4.Dataset(SubFiles[idir],'r')
             
             # System for time array still needs work
@@ -208,8 +211,6 @@ def load_raw_data(start_time,stop_time,var_2d_list,var_1d_list,basepath = '/scr/
                 
                 
                 if verbose:
-                    print( 'Processing %d UT' %Hour)
-                    print( '['+SubFiles[idir]+']')
                     print( 'Profile Integration Time: %f seconds' %np.median(np.diff(time_sec0)))
                     print( 'Processing QWP as %s\n' %QWP_Status)
                     
