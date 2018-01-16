@@ -151,7 +151,7 @@ def load_raw_data(start_time,stop_time,var_2d_list,var_1d_list,basepath = '/scr/
     # load them if we should
     for idir in range(len(SubFiles)):
         # get the file start time from the file name
-        iTime = np.char.find(SubFiles[idir],'T')
+        iTime = np.char.find(SubFiles[idir],'T',len(basepath),-1)
         Hour = np.double(SubFiles[idir][iTime+1:iTime+3])
         File_Time = datetime.datetime(*FileDate[idir].timetuple()[:4])+datetime.timedelta(hours=Hour)
         # check if this file is in the search time period
