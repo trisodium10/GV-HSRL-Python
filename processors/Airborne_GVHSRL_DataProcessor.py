@@ -69,7 +69,10 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         'MaxAlt':10e3,
         'MinAlt':-30,
         
-        'get_extinction':False,  # process data for extinction    
+        'get_extinction':False,  # process data for extinction   
+        
+        'baseline_subtract':False, # use baseline subtraction
+        'deadtime_correct':False,  # correct for APD deadtime
         
         'time_ref2takeoff':False,    # flight_time_start and 
                                      # time_stop are referened to takeoff time
@@ -136,9 +139,10 @@ def ProcessAirborneDataChunk(time_start,time_stop,
     default_basepath = '/Users/mhayman/Documents/HSRL/GVHSRL_data/'  # local path
     
     try:
-        basepath
-    except NameError:
+        basepath = paths['basepath']
+    except KeyError:
         basepath = default_basepath
+        paths['basepath'] = basepath
     #basepath = '/scr/eldora1/HSRL_data/'  # old path - still works with link from HSRL_data to /hsrl/raw/
     #basepath = '/Users/mhayman/Documents/HSRL/GVHSRL_data/'  # local computer data path
      
@@ -178,105 +182,11 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         cal_json = json.loads(f.read())
     f.close()
     
-#    proj_list = []
-#    year_list = []
-#    for ai in range(len(cal_json['Flights'])):
-#        if not cal_json['Flights'][ai]['Project'] in proj_list:
-#            proj_list.extend([cal_json['Flights'][ai]['Project']])
-#            year_list.extend([lp.json_str_to_datetime(cal_json['Flights'][ai]['date'])])
-#            print('%d.) '%(len(proj_list)) + proj_list[-1] + ', ' + year_list[-1].strftime('%Y'))
-#    print('')
-#    # check if the project/flight has been passed in 
-#    # if not, ask the user for it    
-#    try: 
-#        proj
-#    except NameError:    
-#        # interactive prompt to determine desired flight
-#      
-#        usr_proj = np.int(input('Select Project: '))-1
-#        if usr_proj < 0 or usr_proj > len(proj_list)-1:
-#            print('Selection is not recognized')
-#        else:
-#            proj = proj_list[usr_proj]
-#    
-#    flight_list = []
-#    flight_date = []
-#    flight_label = []
-#    try:
-#        flt
-#        for ai in range(len(cal_json['Flights'])):
-#            if cal_json['Flights'][ai]['Project'] == proj:
-#                flight_list.extend([proj+cal_json['Flights'][ai]['Flight Designation'] + str(cal_json['Flights'][ai]['Flight Number']).zfill(2)])
-#                flight_date.extend([lp.json_str_to_datetime(cal_json['Flights'][ai]['date'])])
-#                flight_label.extend([cal_json['Flights'][ai]['Flight Designation'].upper()+str(cal_json['Flights'][ai]['Flight Number']).zfill(2)])
-#                print('%d.) '%len(flight_list) + ' ' + flight_list[-1] + ', ' + flight_date[-1].strftime('%d-%b, %Y'))
-#                if flight_list[-1] == flt:
-#                    usr_flt = len(flight_list)-1
-#                    print('^^^^^^^^^^')
-#                    
-#    except NameError:
-#        for ai in range(len(cal_json['Flights'])):
-#            if cal_json['Flights'][ai]['Project'] == proj:
-#                flight_list.extend([proj+cal_json['Flights'][ai]['Flight Designation'] + str(cal_json['Flights'][ai]['Flight Number']).zfill(2)])
-#                flight_date.extend([lp.json_str_to_datetime(cal_json['Flights'][ai]['date'])])
-#                flight_label.extend([cal_json['Flights'][ai]['Flight Designation'].upper()+str(cal_json['Flights'][ai]['Flight Number']).zfill(2)])
-#                print('%d.) '%len(flight_list) + ' ' + flight_list[-1] + ', ' + flight_date[-1].strftime('%d-%b, %Y'))
-#        
-#        usr_flt = np.int(input('Select Flight: '))-1
-#        if usr_flt < 0 or usr_flt > len(flight_list)-1:
-#            print('Selection is not recognized')
-#        else:
-#            flt = flight_list[usr_flt]
-#            
-#    filePathAircraft = aircraft_basepath[proj] + flt + '.nc'
-#    
-#    
-#            
+       
     filePathAircraft = paths['filePathAircraft']
     #  load aircraft data    
     air_data = gv.load_aircraft_data(filePathAircraft,var_aircraft)
-#    
-#    # locate time range where aircraft is flying
-#    iflight = np.nonzero(air_data['TASX'] > settings['Airspeed_Threshold'])[0]
-#    it0 = iflight[0]  # index when aircraft starts moving
-#    it1 = iflight[-1]  # index when aircraft stops moving
-#    time_takeoff = flight_date[usr_flt]+datetime.timedelta(seconds=np.int(air_data['Time'][it0]))
-#    time_landing = flight_date[usr_flt]+datetime.timedelta(seconds=np.int(air_data['Time'][it1]))
-#    print('Flight time is: ')
-#    print('   '+time_takeoff.strftime('%H:%M %d-%b, %Y to'))
-#    print('   '+time_landing.strftime('%H:%M %d-%b, %Y'))
-#    print('')
-#    
-#    try: 
-#        if settings['time_ref2takeoff']:
-#            time_start = time_takeoff + flight_time_start
-#            time_stop = time_takeoff + flight_time_stop
-#        else:
-#            time_start = flight_date[usr_flt]+flight_time_start
-#            time_stop = flight_date[usr_flt]+flight_time_stop
-#    except NameError:
-#        time_sel = input('Enter start hour (UTC) or press [Enter] select start of flight: ')
-#        if time_sel == '':
-#            time_start = flight_date[usr_flt]+datetime.timedelta(seconds=np.int(air_data['Time'][it0]))
-#            
-#        else:
-#            start_hr = np.float(time_sel)
-#            time_start = flight_date[usr_flt]+datetime.timedelta(seconds=np.int(start_hr*3600))
-#            
-#        
-#        time_sel = input('Enter duration or press [Enter] for end of flight: ')
-#        if time_sel == '':
-#            time_stop = flight_date[usr_flt]+datetime.timedelta(seconds=np.int(air_data['Time'][it1]))
-#        else:
-#            stop_hr = np.float(time_sel)
-#            time_stop = time_start+datetime.timedelta(seconds=np.int(stop_hr*3600))
-#    
-#    # check for out of bounds time limits
-#    if time_start > time_landing:
-#        time_start = time_landing - datetime.timedelta(minutes=1)
-#    if time_stop < time_takeoff:
-#        time_stop = time_takeoff + datetime.timedelta(minutes=1)
-#    
+
     print('Processing: ')
     print('   '+time_start.strftime('%H:%M %d-%b, %Y to'))
     print('   '+time_stop.strftime('%H:%M %d-%b, %Y'))
@@ -328,6 +238,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
     baseline_file = lp.get_calval(time_start,cal_json,"Baseline File")[0]
     diff_pol_file = lp.get_calval(time_start,cal_json,"Polarization",returnlist=['diff_geo'])
     i2_file = lp.get_calval(time_start,cal_json,"I2 Scan")
+    dead_time = lp.get_calval(time_start,cal_json,"Dead_Time",returnlist=['combined_hi','cross','combined_lo','molecular'])
     
     if settings['get_extinction']:
         geo_file_up,geo_file_down = lp.get_calval(time_start,cal_json,"Geo File",returnlist=['value','down_file'])
@@ -420,11 +331,17 @@ def ProcessAirborneDataChunk(time_start,time_stop,
     if settings['get_extinction']:
         if len(geo_file_down) > 0:
             geo_data = {}
-            key_list = ['geo_mol','geo_mol_var']
+            key_list = ['geo_mol','geo_mol_var','Nprof']
             for var in key_list:
-                geo_data[var] = np.ones((var_1d['TelescopeDirection'].size,geo_up[var].size))
-                geo_data[var][np.nonzero(var_1d['TelescopeDirection']==1.0)[0],:] = geo_up[var]
-                geo_data[var][np.nonzero(var_1d['TelescopeDirection']==0.0)[0],:] = geo_down[var]
+                if var in geo_up.keys():
+                    geo_data[var] = np.ones((var_1d['TelescopeDirection'].size,geo_up[var].size))
+                    geo_data[var][np.nonzero(var_1d['TelescopeDirection']==1.0)[0],:] = geo_up[var]
+                    if var in geo_down.keys():
+                        geo_data[var][np.nonzero(var_1d['TelescopeDirection']==0.0)[0],:] = geo_down[var]
+                    else:
+                        geo_data[var][np.nonzero(var_1d['TelescopeDirection']==0.0)[0],:] = geo_up[var]
+                else:
+                    geo_data[var] = np.ones((var_1d['TelescopeDirection'].size,1))
     
     """
     Main Profile Processing Loop
@@ -450,10 +367,19 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         int_profs[var] = profs[var].copy()
         int_profs[var].time_integrate()
         
+        if settings['deadtime_correct']:
+            profs[var].nonlinear_correct(dead_time[var],laser_shot_count=2000*profs[var].NumProfsList[:,np.newaxis],std_deadtime=5e-9)
         
         
         if var == 'molecular' and settings['Denoise_Mol']:
             MolRaw = profs['molecular'].copy()    
+
+        if settings['baseline_subtract']:        
+            # baseline subtract  profiles
+            profs[var].baseline_subtract(baseline_data['save_data'][var]['fit'], \
+                baseline_var = baseline_data['save_data'][var]['variance'], \
+                tx_norm=var_1d['total_energy'][:,np.newaxis]/baseline_data['avg_energy'])
+                
         
         # background subtract the profile
         profs[var].bg_subtract(BGIndex)
@@ -525,7 +451,8 @@ def ProcessAirborneDataChunk(time_start,time_stop,
     beta_m = lp.get_beta_m(temp,pres,profs['molecular'].wavelength)
     
     
-    if settings['get_extinction'] and settings['as_altitude']:
+    if (settings['get_extinction']  or settings['Denoise_Mol']) and settings['as_altitude']:
+#        temp_ext,pres_ext = gv.get_TP_from_aircraft(air_data,mol_ext,telescope_direction=var_1d['TelescopeDirection'])
         temp_ext,pres_ext = gv.get_TP_from_aircraft(air_data,mol_ext,telescope_direction=var_post['TelescopeDirection'])
         beta_m_ext = lp.get_beta_m(temp_ext,pres_ext,profs['molecular'].wavelength)
     else:
@@ -533,9 +460,18 @@ def ProcessAirborneDataChunk(time_start,time_stop,
     
     
     if settings['Denoise_Mol']:
-        MolDenoise,tune_list = mle.DenoiseMolecular(MolRaw,beta_m_sonde=beta_m, \
+        MolDenoise,tune_list = mle.DenoiseMolecular(MolRaw,beta_m_sonde=beta_m_ext, \
                                 MaxAlt=MaxAlt,accel = False,tv_lim =[1.5, 2.8],N_tv_pts=59, \
-                                geo_data=dict(geo_prof=np.array([2e14])),bg_index=-10,n=20)
+                                geo_data=geo_data,bg_index=-10,n=20,geo_key='geo_mol') # dict(geo_prof=np.array([2e14]))
+        
+        MolDenoise.slice_range(range_lim=[0,range_trim])
+      
+        if settings['as_altitude']:
+            MolDenoise.range2alt(master_alt,air_data_t,telescope_direction=var_1d['TelescopeDirection'])
+           
+        
+        if tres_post > 0 or tres <= 0.5:
+            MolDenoise.time_resample(tedges=master_time_post,update=True,remainder=False)
     
     if settings['hsrl_rb_adjust']:
         print('Obtaining Rayleigh-Brillouin Correction')
@@ -598,6 +534,9 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         alpha_a = alpha_a - beta_m_ext*(8*np.pi/3)  # remove molecular extinction
         if settings['as_altitude']:
             alpha_a.range2alt(master_alt,air_data_post,telescope_direction=var_post['TelescopeDirection'])
+            
+#        if tres_post > 0 or tres <= 0.5:
+#            alpha_a.time_resample(tedges=master_time_post,update=True,remainder=False)
         
         alpha_a.descript = 'Aerosol Extinction Coefficient'
         alpha_a.label = 'Aerosol Extinction Coefficient'
