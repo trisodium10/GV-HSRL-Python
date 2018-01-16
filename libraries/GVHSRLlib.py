@@ -228,15 +228,21 @@ def load_raw_data(start_time,stop_time,var_2d_list,var_1d_list,basepath = '/scr/
                     
         
             f.close()
-    #timeD = timeD[:,:8]
-    timeD[:,6] = timeD[:,6]*1e3+timeD[:,7]
-    time_dt = [datetime.datetime(*x) for x in timeD[:,:7]]
-    time_dt0 = datetime.datetime(time_dt[0].year,time_dt[0].month,time_dt[0].day)
-    time_sec = np.array([(x-time_dt0).total_seconds() for x in time_dt])
-    
-    time_dt = np.array(time_dt)
-    
-    time_list = [timeD,time_dt,time_sec]
+    if len(timeD) > 0:
+        #timeD = timeD[:,:8]
+        timeD[:,6] = timeD[:,6]*1e3+timeD[:,7]
+        time_dt = [datetime.datetime(*x) for x in timeD[:,:7]]
+        time_dt0 = datetime.datetime(time_dt[0].year,time_dt[0].month,time_dt[0].day)
+        time_sec = np.array([(x-time_dt0).total_seconds() for x in time_dt])
+        
+        time_dt = np.array(time_dt)
+        
+        time_list = [timeD,time_dt,time_sec]
+    else:
+        time_list = []
+        print('No lidar data found in')
+        print('   ' + basepath)
+        print('   ' + 'last search dir: ' + FilePath0)
     
     
     # if requested, load 2D data as data types LidarProfile
