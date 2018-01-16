@@ -157,7 +157,7 @@ def load_raw_data(start_time,stop_time,var_2d_list,var_1d_list,basepath = '/scr/
         # check if this file is in the search time period
         if File_Time >= start_time_hr and File_Time <= stop_time:
             if verbose:
-                print( 'Processing %d UT' %Hour)
+                print( 'Loading %d UT' %Hour)
                 print( '['+SubFiles[idir]+']')
                 
             f = nc4.Dataset(SubFiles[idir],'r')
