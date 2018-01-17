@@ -135,7 +135,7 @@ def load_raw_data(start_time,stop_time,var_2d_list,var_1d_list,basepath = '/scr/
     timeD = np.array([])
     
     start_time_hr = datetime.datetime(year=start_time.year,month=start_time.month,day=start_time.day,hour=start_time.hour)    
-    
+    start_date = datetime.datetime(year=start_time.year,month=start_time.month,day=start_time.day,hour=0)   
     # build list of files falling on the requested dates
     day_iter =  start_time.date()
     SubFiles = []
@@ -232,7 +232,7 @@ def load_raw_data(start_time,stop_time,var_2d_list,var_1d_list,basepath = '/scr/
         #timeD = timeD[:,:8]
         timeD[:,6] = timeD[:,6]*1e3+timeD[:,7]
         time_dt = [datetime.datetime(*x) for x in timeD[:,:7]]
-        time_dt0 = datetime.datetime(time_dt[0].year,time_dt[0].month,time_dt[0].day)
+        time_dt0 = start_date #datetime.datetime(time_dt[0].year,time_dt[0].month,time_dt[0].day)
         time_sec = np.array([(x-time_dt0).total_seconds() for x in time_dt])
         
         time_dt = np.array(time_dt)
