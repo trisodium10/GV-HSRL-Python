@@ -108,7 +108,7 @@ def fit_high_range(profile,profile_var,i_min,i_max,order=1):
     return profile_out
     
     
-def load_raw_data(start_time,stop_time,var_2d_list,var_1d_list,basepath = '/scr/eldora1/rsfdata/hsrl/raw/',verbose=True,as_prof=True,loadQWP='fixed'):
+def load_raw_data(start_time,stop_time,var_2d_list,var_1d_list,basepath = '/scr/eldora1/rsfdata/hsrl/raw/',verbose=True,as_prof=True,loadQWP='fixed',date_reference=0):
     """
     loads GVHSRL raw data from netcdf files stored in basepath
     accepts a list of the variables to be loaded (their netcdf names)
@@ -127,15 +127,19 @@ def load_raw_data(start_time,stop_time,var_2d_list,var_1d_list,basepath = '/scr/
               'fixed': load only fixed QWP data
               'rotating': load only rotating QWP data
     
-    
+    date_reference - datetime object reference for time axis.  this is needed when processing
+        flights in chunks across midnight
     """
     
     var_1d_data = dict(zip(var_1d_list,[np.array([])]*len(var_1d_list)))
     var_2d_data = dict(zip(var_2d_list,[np.array([])]*len(var_2d_list)))
     timeD = np.array([])
     
-    start_time_hr = datetime.datetime(year=start_time.year,month=start_time.month,day=start_time.day,hour=start_time.hour)    
-    start_date = datetime.datetime(year=start_time.year,month=start_time.month,day=start_time.day,hour=0)   
+    start_time_hr = datetime.datetime(year=start_time.year,month=start_time.month,day=start_time.day,hour=start_time.hour)
+    if hasattr(date_reference,'year'):
+        start_date = date_reference
+    else:
+        start_date = datetime.datetime(year=start_time.year,month=start_time.month,day=start_time.day,hour=0)   
     # build list of files falling on the requested dates
     day_iter =  start_time.date()
     SubFiles = []

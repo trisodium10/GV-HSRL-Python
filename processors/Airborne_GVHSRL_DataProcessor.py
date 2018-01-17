@@ -47,7 +47,8 @@ except NameError:
     pass
 
 def ProcessAirborneDataChunk(time_start,time_stop,
-                             settings={},paths={},process_vars={}):
+                             settings={},paths={},process_vars={},
+                             date_reference=0):
 
     filename = __file__
 #    print(filename)
@@ -134,6 +135,10 @@ def ProcessAirborneDataChunk(time_start,time_stop,
     MaxAlt = settings['MaxAlt']
     MinAlt = settings['MinAlt']
     
+    if not hasattr(date_reference,'year'):
+        date_reference = datetime.datetime(year=time_start.year,month=time_start.month,day=time_start.day)
+        
+    
     #default_basepath = '/scr/eldora1/rsfdata/hsrl/raw/'  # new absolute path
     #default_basepath = '/scr/rain1/rsfdata/projects/socrates/hsrl/raw/'
     default_basepath = '/Users/mhayman/Documents/HSRL/GVHSRL_data/'  # local path
@@ -217,7 +222,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
             settings['save_plots'] = False
     
     # grab raw data from netcdf files
-    [timeD,time_dt,time_sec],var_1d_data, profs = gv.load_raw_data(time_start,time_stop,var_2d_list,var_1d_list,basepath=basepath,verbose=True,as_prof=True,loadQWP=settings['loadQWP'])
+    [timeD,time_dt,time_sec],var_1d_data, profs = gv.load_raw_data(time_start,time_stop,var_2d_list,var_1d_list,basepath=basepath,verbose=True,as_prof=True,loadQWP=settings['loadQWP'],date_reference=date_reference)
     
     run_processing = len(profs) > 0    
     
