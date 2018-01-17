@@ -79,7 +79,7 @@ settings = {
     
     'Airspeed_Threshold':15, # threshold for determining start and end of the flight (in m/s)
     
-    'loadQWP':'fixed',  # load 'fixed','rotating', or 'all' QWP data
+    'loadQWP':'all',  # load 'fixed','rotating', or 'all' QWP data
     
     'as_altitude':True # process in altitude centered format or range centered format
     }
@@ -162,7 +162,7 @@ while run_loop:
                              settings=settings,paths=paths,process_vars=process_vars)
     
 
-    time_start = time_start+time_increment
+    time_start = time_stop
     time_stop = time_stop+time_increment
     #    time_start = time_stop #+datetime.timedelta(seconds=0.1)
     
