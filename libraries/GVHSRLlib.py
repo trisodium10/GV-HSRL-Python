@@ -238,45 +238,51 @@ def load_raw_data(start_time,stop_time,var_2d_list,var_1d_list,basepath = '/scr/
         time_dt = np.array(time_dt)
         
         time_list = [timeD,time_dt,time_sec]
+    
+    
+    
+        # if requested, load 2D data as data types LidarProfile
+        if as_prof:
+            prof_list = []
+            prof_names = []
+            
+            for var in var_2d_data.keys():
+                # check for known channel names to fill in the lidar profile definitions
+                if var == 'molecular':
+                    plabel = 'Molecular Backscatter Channel'
+                    pdescript = 'Parallel Polarization\nMolecular Backscatter Returns'
+                elif var == 'cross':
+                    plabel = 'Cross Polarization Channel'
+                    pdescript = 'Cross Polarization\nCombined Aerosol and Molecular Returns'
+                elif var == 'combined_hi':
+                    plabel = 'High Gain Total Backscatter Channel'
+                    pdescript = 'Parallel Polarization\nHigh Gain\nCombined Aerosol and Molecular Returns'
+                elif var == 'combined_lo':
+                    plabel = 'Low Gain Total Backscatter Channel'
+                    pdescript = 'Parallel Polarization\nLow Gain\nCombined Aerosol and Molecular Returns'
+                else:
+                    plabel = 'Unassigned Channel'
+                    pdescript = 'Unassigned Channel Description'
+                
+                prof_list = prof_list+[lp.LidarProfile(var_2d_data[var],\
+                    time_sec,label=plabel,\
+                    descript = pdescript,\
+                    bin0=37,lidar='GV-HSRL',StartDate=start_time.date())]
+                prof_names = prof_names + [var]
+                
+            profs_2d = dict(zip(prof_names,prof_list))
+        else:
+            profs_2d = var_2d_data
     else:
         time_list = []
         print('No lidar data found in')
         print('   ' + basepath)
         print('   ' + 'last search dir: ' + FilePath0)
-    
-    
-    # if requested, load 2D data as data types LidarProfile
-    if as_prof:
-        prof_list = []
-        prof_names = []
         
-        for var in var_2d_data.keys():
-            # check for known channel names to fill in the lidar profile definitions
-            if var == 'molecular':
-                plabel = 'Molecular Backscatter Channel'
-                pdescript = 'Parallel Polarization\nMolecular Backscatter Returns'
-            elif var == 'cross':
-                plabel = 'Cross Polarization Channel'
-                pdescript = 'Cross Polarization\nCombined Aerosol and Molecular Returns'
-            elif var == 'combined_hi':
-                plabel = 'High Gain Total Backscatter Channel'
-                pdescript = 'Parallel Polarization\nHigh Gain\nCombined Aerosol and Molecular Returns'
-            elif var == 'combined_lo':
-                plabel = 'Low Gain Total Backscatter Channel'
-                pdescript = 'Parallel Polarization\nLow Gain\nCombined Aerosol and Molecular Returns'
-            else:
-                plabel = 'Unassigned Channel'
-                pdescript = 'Unassigned Channel Description'
-            
-            prof_list = prof_list+[lp.LidarProfile(var_2d_data[var],\
-                time_sec,label=plabel,\
-                descript = pdescript,\
-                bin0=37,lidar='GV-HSRL',StartDate=start_time.date())]
-            prof_names = prof_names + [var]
-            
-        profs_2d = dict(zip(prof_names,prof_list))
-    else:
-        profs_2d = var_2d_data
+        # return empties if no data
+        time_list = []
+        var_1d_data = {}
+        profs_2d = {}
     
     return time_list, var_1d_data, profs_2d
 
