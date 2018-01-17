@@ -366,8 +366,8 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         #        profs[var].trim_to_on()  # remove points where lidar isn't transmitting
             if tres > 0.5:
                 profs[var].time_resample(tedges=master_time,update=True,remainder=False)
-            int_profs[var] = profs[var].copy()
-            int_profs[var].time_integrate()
+#            int_profs[var] = profs[var].copy()
+#            int_profs[var].time_integrate()
             
             if settings['deadtime_correct']:
                 profs[var].nonlinear_correct(dead_time[var],laser_shot_count=2000*profs[var].NumProfsList[:,np.newaxis],std_deadtime=5e-9)
@@ -406,8 +406,10 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                 # if retrieving extinction, use a range centered profile to obtain it
                 mol_ext = profs['molecular'].copy()
                 mol_ext.multiply_piecewise(geo_data['geo_mol'])
-                mol_ext.time_resample(tedges=master_time_post,update=True,remainder=False)
                 mol_ext.slice_range(range_lim=[0,range_trim])
+                if tres_post > 0 or tres <= 0.5:
+                    mol_ext.time_resample(tedges=master_time_post,update=True,remainder=False)
+                
                 
             profs[var].slice_range(range_lim=[0,range_trim])
           
@@ -454,6 +456,10 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         
         
         if (settings['get_extinction']  or settings['Denoise_Mol']) and settings['as_altitude']:
+            print(var_post['TelescopeDirection'].shape)
+            print(mol_ext.time.size)
+            print(mol_ext.profile.size)
+            print(profs['molecular'].time.size)
     #        temp_ext,pres_ext = gv.get_TP_from_aircraft(air_data,mol_ext,telescope_direction=var_1d['TelescopeDirection'])
             temp_ext,pres_ext = gv.get_TP_from_aircraft(air_data,mol_ext,telescope_direction=var_post['TelescopeDirection'])
             beta_m_ext = lp.get_beta_m(temp_ext,pres_ext,profs['molecular'].wavelength)
