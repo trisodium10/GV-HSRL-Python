@@ -427,9 +427,12 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         # reformulate the master time based on the time that appears in the profiles
         # after processing
         if tres_post > 0:
+            print(master_time_post.shape)
+            
             master_time_post = np.concatenate((np.array([profs['molecular'].time[0]-tres_post*0.5]), \
                 0.5*np.diff(profs['molecular'].time)+profs['molecular'].time[:-1], \
                 np.array([profs['molecular'].time[-1]+tres_post*0.5])))
+            print(master_time_post.shape)
             time_post,var_post = gv.var_time_resample(master_time_post,time_sec,var_1d_data,average=True)
             air_data_post = gv.interp_aircraft_data(time_post,air_data)
         else:
