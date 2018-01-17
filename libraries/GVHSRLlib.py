@@ -348,7 +348,9 @@ def var_time_resample(tedges,var_time,varlist,average=True,remainder=False):
     if np.sum((itime>0)*(itime<tedges.size))!=0:
         
 #                iremain = np.nonzero(self.time > tedges[-1])[0]
-        iremain = np.int(np.max(itime))  # the remainder starts at the maximum bin where data exists
+        
+#        iremain = np.int(np.max(itime))  # the remainder starts at the maximum bin where data exists
+        iremain = tedges.size
 #                if not remainder and iremain < tedges.size:
 #                    iremain = iremain+1  # make sure to include the last bin of data if remainder isn't being used.
         iremainList = np.nonzero(var_time > tedges[iremain-1])[0]
@@ -421,6 +423,99 @@ def var_time_resample(tedges,var_time,varlist,average=True,remainder=False):
             return timeNew,var_return,varRem
         else:
             return timeNew,var_return
+
+#def var_time_resample(tedges,var_time,varlist,average=True,remainder=False):
+#    """
+#    regrids 1D data onto a predefined time grid
+#    tedges - desired time grid
+#    var_time - time array of current variables
+#    varlist - list or dict of the variables to be regridded
+#    average - (if True) bin by averaging, (if False) bin by summing
+#    remainder - (if True) returns remainder that didn't fit onto the grid
+#    """    
+#    
+#    varlist_new = []
+#    remlist = []
+#    var_names = []
+#    # deterimine the bins for each time index       
+#    itime = np.digitize(var_time,tedges)
+#    # Only run if the profiles fit in the master timing array (tedges), otherwise everything is a remainder
+#    if np.sum((itime>0)*(itime<tedges.size))!=0:
+#        
+##                iremain = np.nonzero(self.time > tedges[-1])[0]
+#        iremain = np.int(np.max(itime))  # the remainder starts at the maximum bin where data exists
+##                if not remainder and iremain < tedges.size:
+##                    iremain = iremain+1  # make sure to include the last bin of data if remainder isn't being used.
+#        iremainList = np.nonzero(var_time > tedges[iremain-1])[0]
+#        iprofstart = np.int(np.max(np.array([1,np.min(itime)])))
+##                print('start index: %d\nstop index: %d'%(iprofstart,iremain))
+#        
+##                profNew = np.zeros((np.size(tedges)-1,self.profile.shape[1]))
+##                timeNew = 0.5*tedges[1:]+0.5*tedges[:-1] 
+#        timeNew = -np.diff(tedges[iprofstart-1:iremain])*0.5+tedges[iprofstart:iremain]
+#        for xi,var in enumerate(varlist):
+#            if isinstance(varlist,dict):
+#                varOld = varlist[var].copy()
+#            else:
+#                varOld = var.copy()
+#            
+#            if varOld.ndim == 1:
+#                varOld = varOld[:,np.newaxis]
+#            
+#            varNew = np.zeros((iremain-iprofstart,varOld.shape[1]))
+#            
+###                itimeNew = np.arange(iprofstart,iremain)
+##            var_profNew = np.zeros(profNew.shape)
+##            shot_countNew = np.zeros(timeNew.shape)
+##            self.NumProfList = np.zeros(timeNew.shape)
+#                  
+#
+#            for ai in range(np.size(timeNew)):
+#                if hasattr(varOld,'mask'):
+#    #                        NumProf = np.nansum(np.logical_not(self.profile[itime == ai+iprofstart,:].mask),axis=0)
+#    #                        NumProfDiv = NumProf.copy()
+#    #                        NumProfDiv[np.nonzero(NumProf==0)] = 1
+#                    NumProf = np.nanmax(np.nansum(np.logical_not(varOld[itime == ai+iprofstart,:].mask),axis=0))
+#                    
+#                    if NumProf == 0:
+#                        NumProfDiv = 1.0
+#                    else:
+#                        NumProfDiv = NumProf
+#                else:
+#                    NumProf = varOld[itime == ai+iprofstart,:].shape[0]
+#                    if NumProf == 0:
+#                        NumProfDiv = 1.0
+#                    else:
+#                        NumProfDiv = np.float(NumProf)
+#                if not average:
+#                    NumProfDiv = 1.0
+#    
+#                varNew[ai,:] = np.nansum(varOld[itime == ai+iprofstart,:],axis=0)/NumProfDiv
+#                
+#            if remainder:
+#                varRem = varOld[iremainList,:].copy()
+#                if varRem.shape[1] == 1:
+#                    remlist = remlist + [varRem.flatten()]
+#                else:
+#                    remlist = remlist + [varRem]
+#            
+#            if varNew.shape[1] == 1:
+#                varlist_new = varlist_new + [varNew.flatten()]
+#            else:
+#                varlist_new = varlist_new + [varNew]
+#            
+#            if isinstance(varlist,dict):
+#                var_names = var_names + [var]
+#        
+#        if isinstance(varlist,dict):
+#            var_return = dict(zip(var_names,varlist_new))  
+#        else:
+#            var_return = varlist_new
+#                
+#        if remainder:
+#            return timeNew,var_return,varRem
+#        else:
+#            return timeNew,var_return
             
 def get_TP_from_aircraft(air_data,profile,telescope_direction=[],lidar_tilt=[0,4.0]):
     """
