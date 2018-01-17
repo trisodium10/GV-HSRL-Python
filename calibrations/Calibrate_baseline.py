@@ -149,6 +149,7 @@ else:
     # the user selects a pre-defined calibration interval
     time_range = [1*60+t_profs[i0[cal_index]],t_profs[i1[cal_index]]-1*60]
 
+save_data = {}
 if RunCal:
     # integrate the profiles over the selected time region
     for pname in profs.keys():
@@ -287,6 +288,9 @@ if RunCal:
         else:
             baseline_data[var] = sol_merge
           
+        save_data[var]['raw'] = profs[var].profile.flatten().copy()
+        save_data[var]['fit'] = sol_merge.copy()
+        save_data[var]['variance'] = profs[var].profile_variance.flatten().copy()
     
     
 save_cal = input("Save Calibrations[y/n]")
@@ -320,6 +324,7 @@ if save_cal == 'y' or save_cal == 'Y':
     
     np.savetxt(save_file_path+save_file_name,write_data,fmt='\t%d\t%.3e\t%.3e\t%.3e\t%.3e\t%.3e\t%.3e',header=header_str,comments='#')
     
-    np.savez(save_file_path+save_ez,write_data,raw_data = raw_data, \
+    # save_data['channel_name']['raw or fit']
+    np.savez(save_file_path+save_ez,save_data, \
         cal_range = np.array([time_dt[i0[cal_index]],time_dt[i1[cal_index]]]), \
         avg_energy = avg_energy)

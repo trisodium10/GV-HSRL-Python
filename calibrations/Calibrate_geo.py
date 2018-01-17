@@ -514,7 +514,7 @@ if save_cal == 'y' or save_cal == 'Y':
             sg_win = settings['sg_win'], sg_order = settings['sg_order'], \
             range_array=geo_raw.range_array, \
             TelescopeDirection = np.nanmean(var_1d_data['TelescopeDirection']), \
-            airborne=settings['airborne'])
+            airborne=settings['airborne'],Nprof=profs['moleculr'].NumProfList)
     
 
 
