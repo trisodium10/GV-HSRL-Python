@@ -222,12 +222,18 @@ def ProcessAirborneDataChunk(time_start,time_stop,
             settings['save_plots'] = False
     
     # grab raw data from netcdf files
-    [timeD,time_dt,time_sec],var_1d_data, profs = gv.load_raw_data(time_start,time_stop,var_2d_list,var_1d_list,basepath=basepath,verbose=True,as_prof=True,loadQWP=settings['loadQWP'],date_reference=date_reference)
+    time_list,var_1d_data, profs = gv.load_raw_data(time_start,time_stop,var_2d_list,var_1d_list,basepath=basepath,verbose=True,as_prof=True,loadQWP=settings['loadQWP'],date_reference=date_reference)
+    
+    
     
     run_processing = len(profs) > 0    
     
     while run_processing:
         #execute processing if data was found
+    
+        timeD = time_list[0]
+        time_dt = time_list[1]
+        time_sec = time_list[2]
     
         # find instances in raw data where I2 cell is removed
         if 'RemoveLongI2Cell' in var_1d_data.keys():
@@ -491,10 +497,10 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         
         
         if (settings['get_extinction']  or settings['Denoise_Mol']) and settings['as_altitude']:
-            print(var_post['TelescopeDirection'].size)
-            print(mol_ext.profile.shape)
-            print(profs['molecular'].time.size)
-            print(time_post.size)
+#            print(var_post['TelescopeDirection'].size)
+#            print(mol_ext.profile.shape)
+#            print(profs['molecular'].time.size)
+#            print(time_post.size)
     #        temp_ext,pres_ext = gv.get_TP_from_aircraft(air_data,mol_ext,telescope_direction=var_1d['TelescopeDirection'])
             temp_ext,pres_ext = gv.get_TP_from_aircraft(air_data,mol_ext,telescope_direction=var_post['TelescopeDirection'])
             beta_m_ext = lp.get_beta_m(temp_ext,pres_ext,profs['molecular'].wavelength)
