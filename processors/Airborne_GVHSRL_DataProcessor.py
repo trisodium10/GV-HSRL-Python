@@ -192,6 +192,10 @@ def ProcessAirborneDataChunk(time_start,time_stop,
     print('   '+time_stop.strftime('%H:%M %d-%b, %Y'))
     print('')
     
+#    plt.figure()
+#    plt.plot(air_data['Time']/3600.0,air_data['TASX'])
+#    plt.show()    
+    
     flt = process_vars['flt']
     
     if settings['save_data']:
@@ -215,7 +219,9 @@ def ProcessAirborneDataChunk(time_start,time_stop,
     # grab raw data from netcdf files
     [timeD,time_dt,time_sec],var_1d_data, profs = gv.load_raw_data(time_start,time_stop,var_2d_list,var_1d_list,basepath=basepath,verbose=True,as_prof=True,loadQWP=settings['loadQWP'])
     
-    if len(profs) > 0:
+    run_processing = len(profs) > 0    
+    
+    while run_processing:
         #execute processing if data was found
     
         # find instances in raw data where I2 cell is removed
@@ -283,6 +289,9 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         #master_time = np.arange(time_sec[0]-tres/2,time_sec[-1]+tres/2,tres) #
         sec_start = np.max([time_sec[0],(time_start-flight_date[usr_flt]).total_seconds()])
         sec_stop = np.min([time_sec[-1],(time_stop-flight_date[usr_flt]).total_seconds()])
+        print('found data for')
+        print('   %f h-UTC to'%sec_start/3600.0)
+        print('   %f h-UTC to'%sec_stop/3600.0)
         if tres > 0.5:
             master_time = np.arange(sec_start-tres/2,sec_stop+tres/2,tres)
             time_1d,var_1d = gv.var_time_resample(master_time,time_sec,var_1d_data,average=True)
@@ -302,17 +311,23 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         
         # time resolution after range to altitude conversion
         if tres_post > 0:
+            print('post time res: %f seconds'%tres_post)
             master_time_post = np.arange(sec_start-tres_post/2,sec_stop+tres_post/2,tres_post)
         #    time_post,var_post = gv.var_time_resample(master_time_post,time_sec,var_1d_data,average=True)
         #    air_data_post = gv.interp_aircraft_data(time_post,air_data)
         elif tres > 0.5:
+            print('using tres')
             master_time_post = master_time
             time_post = time_1d
             var_post = var_1d
             air_data_post = air_data_t
         else:
+            print('no change to time resolution')
             master_time_post = np.arange(sec_start-tres/2,sec_stop+tres/2,tres)
-            
+        print('master_time_post limits')
+        print('   %f - %f h UTC'%(master_time_post[0]/3600.0,master_time_post[-1]/3600.0))
+        print('   %f second resolution'%np.mean(np.diff(master_time_post)))
+        print('   %d data points'%master_time_post.size)
         
         ## setup molecular gain vector based on telescope pointing direction
         #mol_gain = np.zeros(var_post['TelescopeDirection'].shape)
@@ -418,18 +433,24 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                
             
             if tres_post > 0 or tres <= 0.5:
-                print(var+' resample:')
-                print('  [start,end] = [%f,%f] h UTC'%(profs[var].time[0]/3600.0,profs[var].time[-1]/3600.0))
-                print('  resolution = %f sec'%profs[var].mean_dt)
+#                print(var+' resample:')
+#                print('  [start,end] = [%f,%f] h UTC'%(profs[var].time[0]/3600.0,profs[var].time[-1]/3600.0))
+#                print('  resolution = %f sec'%profs[var].mean_dt)
+#                print('  %d data points'%profs[var].profile.shape[0])
                 profs[var].time_resample(tedges=master_time_post,update=True,remainder=False)
-                print('  -- Now --')
-                print('  [start,end] = [%f,%f]'%(profs[var].time[0]/3600.0,profs[var].time[-1]/3600.0))
-                print('  resolution = %f sec'%profs[var].mean_dt)
+            if profs[var].profile.size == 0:
+                run_processing = False
+#                print('  -- Now --')
+#                print('  [start,end] = [%f,%f]'%(profs[var].time[0]/3600.0,profs[var].time[-1]/3600.0))
+#                print('  resolution = %f sec'%profs[var].mean_dt)
+#                print('  %d data points'%profs[var].profile.shape[0])
+#                print(profs[var].ProcessingStatus)
                 
-            
-            int_profs[var] = profs[var].copy()
-            int_profs[var].time_integrate()
-        
+            else:
+                int_profs[var] = profs[var].copy()
+                int_profs[var].time_integrate()
+        if not run_processing:
+            break
         # reformulate the master time based on the time that appears in the profiles
         # after processing
         if tres_post > 0:

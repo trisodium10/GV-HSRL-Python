@@ -103,7 +103,7 @@ def SelectAirborneData(settings={},paths={},process_vars={}):
 #        'Denoise_Mol':False, # run PTV denoising on molecular channel
         
         
-        'Airspeed_Threshold':15, # threshold for determining start and end of the flight (in m/s)
+        'Airspeed_Threshold':25, # threshold for determining start and end of the flight (in m/s)
         
 #        'loadQWP':'fixed',  # load 'fixed','rotating', or 'all' QWP data
         
