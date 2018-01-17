@@ -290,8 +290,8 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         sec_start = np.max([time_sec[0],(time_start-flight_date[usr_flt]).total_seconds()])
         sec_stop = np.min([time_sec[-1],(time_stop-flight_date[usr_flt]).total_seconds()])
         print('found data for')
-        print('   %f h-UTC to'%sec_start/3600.0)
-        print('   %f h-UTC to'%sec_stop/3600.0)
+        print('   %f h-UTC to'%(sec_start/3600.0))
+        print('   %f h-UTC to'%(sec_stop/3600.0))
         if tres > 0.5:
             master_time = np.arange(sec_start-tres/2,sec_stop+tres/2,tres)
             time_1d,var_1d = gv.var_time_resample(master_time,time_sec,var_1d_data,average=True)
