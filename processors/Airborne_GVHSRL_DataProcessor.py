@@ -418,7 +418,13 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                
             
             if tres_post > 0 or tres <= 0.5:
+                print(var+' resample:')
+                print('  [start,end] = [%f,%f] h UTC'%(profs[var].time[0]/3600.0,profs[var].time[-1]/3600.0))
+                print('  resolution = %f sec'%profs[var].mean_dt)
                 profs[var].time_resample(tedges=master_time_post,update=True,remainder=False)
+                print('  -- Now --')
+                print('  [start,end] = [%f,%f]'%(profs[var].time[0]/3600.0,profs[var].time[-1]/3600.0))
+                print('  resolution = %f sec'%profs[var].mean_dt)
                 
             
             int_profs[var] = profs[var].copy()
