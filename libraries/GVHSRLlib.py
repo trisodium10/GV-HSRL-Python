@@ -354,7 +354,9 @@ def var_time_resample(tedges,var_time,varlist,average=True,remainder=False):
 #                if not remainder and iremain < tedges.size:
 #                    iremain = iremain+1  # make sure to include the last bin of data if remainder isn't being used.
         iremainList = np.nonzero(var_time > tedges[iremain-1])[0]
-        iprofstart = np.int(np.max(np.array([1,np.min(itime)])))
+        
+#        iprofstart = np.int(np.max(np.array([1,np.min(itime)])))
+        iprofstart = 1
 #                print('start index: %d\nstop index: %d'%(iprofstart,iremain))
         
 #                profNew = np.zeros((np.size(tedges)-1,self.profile.shape[1]))
