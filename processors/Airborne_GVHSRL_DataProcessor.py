@@ -462,6 +462,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
             print(var_post['TelescopeDirection'].size)
             print(mol_ext.profile.shape)
             print(profs['molecular'].time.size)
+            print(time_post)
     #        temp_ext,pres_ext = gv.get_TP_from_aircraft(air_data,mol_ext,telescope_direction=var_1d['TelescopeDirection'])
             temp_ext,pres_ext = gv.get_TP_from_aircraft(air_data,mol_ext,telescope_direction=var_post['TelescopeDirection'])
             beta_m_ext = lp.get_beta_m(temp_ext,pres_ext,profs['molecular'].wavelength)
