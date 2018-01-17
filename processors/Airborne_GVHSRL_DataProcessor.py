@@ -482,7 +482,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         
         Tc2 = np.interp(nu,i2_data['freq']*1e9,i2_data['combined_scan'])  # combined transmission
         
-        [eta_i2,eta_c] = lp.RB_Efficiency([Ti2,Tc2],temp.profile.flatten(),pres.profile.flatten()*9.86923e-6,profs['molecular'].wavelength,nu=nu,norm=True)
+        [eta_i2,eta_c] = lp.RB_Efficiency([Ti2,Tc2],temp.profile.flatten(),pres.profile.flatten()*9.86923e-6,profs['molecular'].wavelength,nu=nu,norm=True,max_size=10000)
         
     #    beta_mol_norm = lp.RB_Spectrum(temp.profile.flatten(),pres.profile.flatten()*9.86923e-6,profs['molecular'].wavelength,nu=nu,norm=True)
     #    eta_i2 = np.sum(Ti2[:,np.newaxis]*beta_mol_norm,axis=0)
@@ -502,7 +502,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
             MolDenoise.gain_scale(mol_gain)
             
         if settings['get_extinction'] and settings['as_altitude']:
-            [eta_i2_ext] = lp.RB_Efficiency([Ti2],temp_ext.profile.flatten(),pres_ext.profile.flatten()*9.86923e-6,profs['molecular'].wavelength,nu=nu,norm=True)
+            [eta_i2_ext] = lp.RB_Efficiency([Ti2],temp_ext.profile.flatten(),pres_ext.profile.flatten()*9.86923e-6,profs['molecular'].wavelength,nu=nu,norm=True,max_size=10000)
             eta_i2_ext = eta_i2_ext.reshape(temp_ext.profile.shape)
             mol_ext.multiply_piecewise(1.0/eta_i2_ext)
             mol_ext.range_correct()
