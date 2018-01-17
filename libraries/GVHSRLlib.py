@@ -457,9 +457,13 @@ def get_TP_from_aircraft(air_data,profile,telescope_direction=[],lidar_tilt=[0,4
         telescope_direction = np.sign(telescope_direction-0.5)
 
         # create a 2D array of all the raw altitude data caputured by the lidar
+#        alt_raw = \
+#            (profile.range_array[:,np.newaxis]*telescope_direction[np.newaxis,:]\
+#            *np.cos((air_data_int['ROLL'][np.newaxis,:]+lidar_tilt[1])*np.pi/180)*np.cos((air_data_int['PITCH'][np.newaxis,:]+lidar_tilt[0])*np.pi/180)\
+#            +air_data_int['GGALT'][np.newaxis,:]).T
         alt_raw = \
             (profile.range_array[:,np.newaxis]*telescope_direction[np.newaxis,:]\
-            *np.cos((air_data_int['ROLL'][np.newaxis,:]+lidar_tilt[1])*np.pi/180)*np.cos((air_data_int['PITCH'][np.newaxis,:]+lidar_tilt[0])*np.pi/180)\
+            *np.cos((air_data_int['ROLL']-lidar_tilt[1]*telescope_direction)*np.pi/180)*np.cos((air_data_int['PITCH']+lidar_tilt[0])*np.pi/180)\
             +air_data_int['GGALT'][np.newaxis,:]).T
 
         TempAir = b_T-0.0065*alt_raw
