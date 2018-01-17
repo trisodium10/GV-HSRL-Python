@@ -456,9 +456,8 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         
         
         if (settings['get_extinction']  or settings['Denoise_Mol']) and settings['as_altitude']:
-            print(var_post['TelescopeDirection'].shape)
-            print(mol_ext.time.size)
-            print(mol_ext.profile.size)
+            print(var_post['TelescopeDirection'].size)
+            print(mol_ext.profile.shape)
             print(profs['molecular'].time.size)
     #        temp_ext,pres_ext = gv.get_TP_from_aircraft(air_data,mol_ext,telescope_direction=var_1d['TelescopeDirection'])
             temp_ext,pres_ext = gv.get_TP_from_aircraft(air_data,mol_ext,telescope_direction=var_post['TelescopeDirection'])
