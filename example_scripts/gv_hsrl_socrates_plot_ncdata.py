@@ -141,13 +141,20 @@ while loop_data:
         ncfilename = nclist[fi]
         f = nc4.Dataset(ncfilename,'r')
         alt_data0 = lp.ncvar(f,'GGALT')
+        t_data0 = lp.ncvar(f,'time').astype(np.float)
         f.close()
+        
+        print(alt_data0.shape)
+        print(t_data0.shape)
+        
         
         if prof_start:
             alt_data = alt_data0.copy()
+            t_data = t_data0.copy()
             prof_start = False
         else:
             alt_data = np.concatenate((alt_data,alt_data0))
+            t_data = np.concatenate((t_data,t_data0))
 #        print('alt_data')
 #        print(alt_data.shape)
         
@@ -179,9 +186,9 @@ while loop_data:
                                               )
             if settings['plot_date']:
                 t1d_plt = mdates.date2num([datetime.datetime.fromordinal(profs[var].StartDate.toordinal()) \
-                            + datetime.timedelta(seconds=sec) for sec in profs[var].time])   
+                            + datetime.timedelta(seconds=sec) for sec in t_data])   
             else:
-                t1d_plt = profs[var].time/3600.0
+                t1d_plt = t_data/3600.0
         
             for ai in range(len(rfig[1])):
                 rfig[1][ai].plot(t1d_plt,alt_data*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude     
