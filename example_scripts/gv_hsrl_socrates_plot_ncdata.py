@@ -144,8 +144,6 @@ while loop_data:
         t_data0 = lp.ncvar(f,'time').astype(np.float)
         f.close()
         
-        print(alt_data0.shape)
-        print(t_data0.shape)
         
         
         if prof_start:
