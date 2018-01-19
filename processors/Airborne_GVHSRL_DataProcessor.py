@@ -509,9 +509,14 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         
         
         if settings['Denoise_Mol']:
-            MolDenoise,tune_list = mle.DenoiseMolecular(MolRaw,beta_m_sonde=beta_m_ext, \
-                                    MaxAlt=MaxAlt,accel = False,tv_lim =[1.5, 2.8],N_tv_pts=59, \
-                                    geo_data=geo_data,bg_index=-10,n=20,geo_key='geo_mol') # dict(geo_prof=np.array([2e14]))
+            print('Denoising Molecular CHannel')
+            MolDenoise,tune_list = mle.DenoiseMolecular(MolRaw,beta_m_sonde=beta_m_ext.copy(), \
+                                    MaxAlt=range_trim,accel = False,tv_lim =[1.5, 2.8],N_tv_pts=59, \
+                                    bg_index=-10,n=1) # dict(geo_prof=np.array([2e14])), geo_data=geo_data,geo_key='geo_mol'
+            # testing and debugging
+            MolRaw.bg_subtract(-10)
+            lp.plotprofiles([MolRaw,MolDenoise],time=18.4*3600)
+            plt.show()
             
             MolDenoise.slice_range(range_lim=[0,range_trim])
           
@@ -519,8 +524,8 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                 MolDenoise.range2alt(master_alt,air_data_t,telescope_direction=var_1d['TelescopeDirection'])
                
             
-            if tres_post > 0 or tres <= 0.5:
-                MolDenoise.time_resample(tedges=master_time_post,update=True,remainder=False)
+#            if tres_post > 0 or tres <= 0.5:
+#                MolDenoise.time_resample(tedges=master_time_post,update=True,remainder=False)
         
         if settings['hsrl_rb_adjust']:
             print('Obtaining Rayleigh-Brillouin Correction')
@@ -607,7 +612,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         
         dVol = profs['cross']/(profs['combined_hi']+profs['cross'])
         #dVol = profs['combined_hi'].copy()
-        dVol.descript = 'Propensity of Volume to depolarize (d)'
+        dVol.descript = 'Propensity of Volume to depolarize (d).  This is not identical to the depolarization ratio.  See Gimmestad: 10.1364/AO.47.003795 or Hayman and Thayer: 10.1364/JOSAA.29.000400'
         dVol.label = 'Volume Depolarization'
         dVol.profile_type = 'unitless'
         
@@ -615,7 +620,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         
         #Particle Depolarization = dVol/(1.0-1.0/BSR) - d_mol/(BSR-1)
         dPart = (BSR*dVol-d_mol)/(BSR-1)
-        dPart.descript = 'Propensity of Particles to depolarize (d)'
+        dPart.descript = 'Propensity of Particles to depolarize (d).  This is not identical to the depolarization ratio.  See Gimmestad: 10.1364/AO.47.003795 or Hayman and Thayer: 10.1364/JOSAA.29.000400'
         dPart.label = 'Particle Depolarization'
         dPart.profile_type = 'unitless'
         
@@ -769,6 +774,8 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         save_prof_list = [beta_a,dPart,dVol,BSR,beta_m]
         if settings['get_extinction']:
             save_prof_list.extend([alpha_a])
+        if settings['Denoise_Mol']:
+            save_prof_list.extend([MolDenoise])
         save_var1d_post = {'TelescopeDirection':{'description':'1-Lidar Pointing Up, 0-Lidar Pointing Down','units':'none'},
                            'polarization':{'description':'System Quarter Waveplate orientation','units':'degrees'}}
         save_air_post = {'THDG': {'description':'aircraft heading','units':'degrees'},
@@ -884,7 +891,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         if settings['show_plots']:
             plt.show()
             
-        return 1
+        return save_prof_list
     else:
         # no data was loaded
         return 0
