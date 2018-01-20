@@ -515,7 +515,8 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                                     bg_index=-10,n=1) # dict(geo_prof=np.array([2e14])), geo_data=geo_data,geo_key='geo_mol'
             # testing and debugging
             MolRaw.bg_subtract(-10)
-            lp.plotprofiles([MolRaw,MolDenoise],time=18.4*3600)
+            lp.plotprofiles([MolRaw,MolDenoise],time=22.1*3600)
+            lp.plotprofiles([MolRaw,MolDenoise],time=22.2*3600)
             plt.show()
             
             MolDenoise.slice_range(range_lim=[0,range_trim])
