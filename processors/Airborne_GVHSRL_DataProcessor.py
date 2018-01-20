@@ -509,7 +509,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         
         
         if settings['Denoise_Mol']:
-            print('Denoising Molecular CHannel')
+            print('Denoising Molecular Channel')
             MolDenoise,tune_list = mle.DenoiseMolecular(MolRaw,beta_m_sonde=beta_m_ext.copy(), \
                                     MaxAlt=range_trim,accel = False,tv_lim =[1.5, 2.8],N_tv_pts=59, \
                                     bg_index=-10,n=1) # dict(geo_prof=np.array([2e14])), geo_data=geo_data,geo_key='geo_mol'

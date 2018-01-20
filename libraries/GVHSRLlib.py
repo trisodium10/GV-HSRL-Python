@@ -297,26 +297,33 @@ def load_aircraft_data(filename,var_list):
     var_list - strings of the netcdf variables to load
     """    
 
+    print('Loading aircraft data file:')
+    print('   '+filename)
+    
     var_data = dict(zip(var_list,[np.array([])]*len(var_list)))
-    f = nc4.Dataset(filename,'r')
     
-    i_nan = []  # list of invalid values from the data system     
-    for var in var_data.keys():
-        if any(var in s for s in f.variables):
-            data = lp.ncvar(f,var)
-            if len(var_data[var]) > 0:
-                var_data[var] = np.concatenate((var_data[var],data)) 
-            else:
-                var_data[var] = data.copy()
-            i_nan.extend(list(np.nonzero(var_data[var]==-32767)[0]))
-    i_nan = np.unique(np.array(i_nan))  # force list to be unique
-    
-    # delete data where nans are present
-    for var in var_data.keys():
-        var_data[var] = np.delete(var_data[var],i_nan)
-                
-    print('Aircraft Time Data: %s' %f.variables['Time'].units)
-    f.close()
+    try:
+        f = nc4.Dataset(filename,'r')
+        
+        i_nan = []  # list of invalid values from the data system     
+        for var in var_data.keys():
+            if any(var in s for s in f.variables):
+                data = lp.ncvar(f,var)
+                if len(var_data[var]) > 0:
+                    var_data[var] = np.concatenate((var_data[var],data)) 
+                else:
+                    var_data[var] = data.copy()
+                i_nan.extend(list(np.nonzero(var_data[var]==-32767)[0]))
+        i_nan = np.unique(np.array(i_nan))  # force list to be unique
+        
+        # delete data where nans are present
+        for var in var_data.keys():
+            var_data[var] = np.delete(var_data[var],i_nan)
+                    
+        print('Aircraft Time Data: %s' %f.variables['Time'].units)
+        f.close()
+    except RuntimeError:
+        print('Aircraft data file NOT found')
     
     return var_data
 
