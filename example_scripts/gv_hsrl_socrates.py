@@ -5,17 +5,19 @@ Created on Wed Jan  3 11:38:22 2018
 @author: mhayman
 """
 import os
+import sys
 import datetime
 
-proj = 'SOCRATES'
-flt = proj+'tf02'
-flight_time_start = datetime.timedelta(hours=17,minutes=00)
-flight_time_stop = datetime.timedelta(hours=19,minutes=0)
+process_vars = {}
+process_vars['proj'] = 'SOCRATES'
+process_vars['flt'] = process_vars['proj']+'tf02'
+process_vars['flight_time_start'] = datetime.timedelta(hours=18,minutes=00)
+process_vars['flight_time_stop'] = datetime.timedelta(hours=18,minutes=10)
 #flight_time_stop = flight_time_start + datetime.timedelta(hours=0,minutes=5)
 
 settings = {
     'tres':0.5,  # resolution in time in seconds (0.5 sec) before altitude correction
-    'tres_post':30, # resolution after altitude correction (in seconds) -  set to zero to not use
+    'tres_post':10, # resolution after altitude correction (in seconds) -  set to zero to not use
     'zres':7.5,  # altitude resolution in meters (7.5 m minimum)
     
     #mol_gain = 1.133915#1.0728915  # gain adjustment to molecular channel
@@ -33,6 +35,8 @@ settings = {
     'Remove_Off_Data':True, # remove instances where the lidar does not appear
                             # to be running
     
+    'get_extinction':True, # retrieve extinction estimate
+    
     'diff_geo_correct':True,  # apply differential overlap correction
     
     'load_reanalysis':False, # load T and P reanalysis from NCEP/NCAR Model
@@ -44,11 +48,11 @@ settings = {
     
     'save_data':False, # save data as netcdf
     
-    'Estimate_Mol_Gain':True, # use statistics on BSR to estimate the molecular gain
+    'Estimate_Mol_Gain':False, # use statistics on BSR to estimate the molecular gain
     
     'hsrl_rb_adjust':True, # adjust for Rayleigh Brillouin Spectrum
     
-    'Denoise_Mol':False, # run PTV denoising on molecular channel
+    'Denoise_Mol':True, # run PTV denoising on molecular channel
     
     
     'Airspeed_Threshold':15, # threshold for determining start and end of the flight (in m/s)
@@ -82,9 +86,30 @@ PathFile = os.path.abspath(__file__+'/../')+'/gv_hsrl_socrates_paths.py'
 # load path data for this computer
 exec(open(PathFile).read())
 
-Processor = software_path + 'processors/Airborne_Processor_GVHSRL.py'
-fullpath = os.path.abspath(Processor)
-g = globals().copy()
-g['__file__'] = fullpath
-#exec(open(os.path.abspath(__file__+'/../Path_Settings.py')).read())
-exec(open(Processor).read(),g)
+# add the path to GVHSRLlib manually
+library_path = os.path.abspath(paths['software_path']+'/processors/')
+print(library_path)
+if library_path not in sys.path:
+    sys.path.append(library_path)
+
+import Airborne_GVHSRL_DataProcessor as dp
+import Airborne_GVHSRL_DataSelection as ds
+
+#Processor = software_path + 'processors/Airborne_GVHSRL_DataProcessor.py'
+#DataSelector = software_path + 'processors/Airborne_GVHSRL_DataSelection.py'
+
+
+time_start,time_stop,settings,paths,process_vars = \
+    ds.SelectAirborneData(settings=settings,paths=paths,process_vars=process_vars)
+
+
+proflist = dp.ProcessAirborneDataChunk(time_start,time_stop,
+                             settings=settings,paths=paths,process_vars=process_vars)
+
+#Processor = software_path + 'processors/Airborne_Processor_GVHSRL.py'
+#fullpath = os.path.abspath(Processor)
+#g = globals().copy()
+#g['__file__'] = fullpath
+##exec(open(os.path.abspath(__file__+'/../Path_Settings.py')).read())
+##exec(open(Processor).read(),g)
+#exec(open(Processor).read())
