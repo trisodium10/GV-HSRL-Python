@@ -319,8 +319,8 @@ def load_aircraft_data(filename,var_list):
         # delete data where nans are present
         for var in var_data.keys():
             var_data[var] = np.delete(var_data[var],i_nan)
-        time_ref = datetime.datetime(f.variables['Time'].units,'seconds since %Y-%m-%d %H:%M:%S +0000')
         print('Aircraft Time Data: %s' %f.variables['Time'].units)
+        time_ref = datetime.datetime.strptime(f.variables['Time'].units[:],'seconds since %Y-%m-%d %H:%M:%S +0000')
         f.close()
     except RuntimeError:
         print('Aircraft data file NOT found')
