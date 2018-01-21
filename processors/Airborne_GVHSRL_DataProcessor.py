@@ -114,9 +114,11 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         
         'as_altitude':False, # process in altitude centered format or range centered format
         
-        'SNRlimit':40.0  # minimum integrated SNR to treat the lidar as transmitting
+        'SNRlimit':40.0,  # minimum integrated SNR to treat the lidar as transmitting
                          # used to filter instances where the shutter is closed
                          # toggle this with 'Remove_Off_Data'
+        
+        'use_aircraft_tref':True  # set the time reference based on aircraft data
         }
     
     # check if any settings have been defined.  If not, define it as an empty dict.
