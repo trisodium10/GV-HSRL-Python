@@ -190,12 +190,15 @@ def ProcessAirborneDataChunk(time_start,time_stop,
        
     filePathAircraft = paths['filePathAircraft']
     #  load aircraft data    
-    air_data = gv.load_aircraft_data(filePathAircraft,var_aircraft)
+    air_data,aircraft_t_ref = gv.load_aircraft_data(filePathAircraft,var_aircraft)
 
     print('Processing: ')
     print('   '+time_start.strftime('%H:%M %d-%b, %Y to'))
     print('   '+time_stop.strftime('%H:%M %d-%b, %Y'))
     print('')
+    
+    if settings['use_aircraft_tref']:
+        date_reference = aircraft_t_ref
     
 #    plt.figure()
 #    plt.plot(air_data['Time']/3600.0,air_data['TASX'])
