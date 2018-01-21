@@ -234,7 +234,8 @@ def SelectAirborneData(settings={},paths={},process_vars={}):
     paths['filePathAircraft'] = filePathAircraft
             
     #  load aircraft data    
-    air_data,_ = gv.load_aircraft_data(filePathAircraft,var_aircraft)
+    air_data,aircraft_t_ref = gv.load_aircraft_data(filePathAircraft,var_aircraft)
+    process_vars['aircraft_t_ref'] = aircraft_t_ref
     
     # locate time range where aircraft is flying
     iflight = np.nonzero(air_data['TASX'] > settings['Airspeed_Threshold'])[0]
