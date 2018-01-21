@@ -294,12 +294,16 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         flight_date = process_vars['flight_date']
         usr_flt = process_vars['usr_flt']
         
+        print('flight_date: '+flight_date.strftime('%Y-%b-%d %H:%M'))
+        print('date_reference: '+date_reference.strftime('%Y-%b-%d %H:%M'))
         
         # set the master time to match all 2D profiles to
         # (1d data will not be resampled)
         #master_time = np.arange(time_sec[0]-tres/2,time_sec[-1]+tres/2,tres) #
-        sec_start = np.max([time_sec[0],(time_start-flight_date[usr_flt]).total_seconds()])
-        sec_stop = np.min([time_sec[-1],(time_stop-flight_date[usr_flt]).total_seconds()])
+#        sec_start = np.max([time_sec[0],(time_start-flight_date[usr_flt]).total_seconds()])
+#        sec_stop = np.min([time_sec[-1],(time_stop-flight_date[usr_flt]).total_seconds()])
+        sec_start = np.max([time_sec[0],(time_start-date_reference).total_seconds()])
+        sec_stop = np.min([time_sec[-1],(time_stop-date_reference).total_seconds()])
         print('found data for')
         print('   %f h-UTC to'%(sec_start/3600.0))
         print('   %f h-UTC to'%(sec_stop/3600.0))
@@ -509,6 +513,21 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         
         
         if settings['Denoise_Mol']:
+            
+            if len(geo_file_down) > 0:
+                geo_denoise = {}
+                key_list = ['geo_mol','geo_mol_var','Nprof']
+                for var in key_list:
+                    if var in geo_up.keys():
+                        geo_denoise[var] = np.ones((var_1d['TelescopeDirection'].size,geo_up[var].size))
+                        geo_denoise[var][np.nonzero(var_1d['TelescopeDirection']==1.0)[0],:] = geo_up[var]
+                        if var in geo_down.keys():
+                            geo_denoise[var][np.nonzero(var_1d['TelescopeDirection']==0.0)[0],:] = geo_down[var]
+                        else:
+                            geo_denoise[var][np.nonzero(var_1d['TelescopeDirection']==0.0)[0],:] = geo_up[var]
+                    else:
+                        geo_data[var] = np.ones((var_1d['TelescopeDirection'].size,1))            
+            
             print('Denoising Molecular Channel')
             MolDenoise,tune_list = mle.DenoiseMolecular(MolRaw,beta_m_sonde=beta_m_ext.copy(), \
                                     MaxAlt=range_trim,accel = False,tv_lim =[1.5, 2.8],N_tv_pts=59, \
