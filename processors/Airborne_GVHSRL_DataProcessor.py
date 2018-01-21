@@ -294,7 +294,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         flight_date = process_vars['flight_date']
         usr_flt = process_vars['usr_flt']
         
-        print('flight_date: '+flight_date.strftime('%Y-%b-%d %H:%M'))
+        print('flight_date: '+flight_date[usr_flt].strftime('%Y-%b-%d %H:%M'))
         print('date_reference: '+date_reference.strftime('%Y-%b-%d %H:%M'))
         
         # set the master time to match all 2D profiles to
