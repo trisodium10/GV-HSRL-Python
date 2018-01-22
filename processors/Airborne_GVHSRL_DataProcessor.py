@@ -307,8 +307,10 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         #master_time = np.arange(time_sec[0]-tres/2,time_sec[-1]+tres/2,tres) #
 #        sec_start = np.max([time_sec[0],(time_start-flight_date[usr_flt]).total_seconds()])
 #        sec_stop = np.min([time_sec[-1],(time_stop-flight_date[usr_flt]).total_seconds()])
-        sec_start = np.max([time_sec[0],(time_start-date_reference).total_seconds()])
-        sec_stop = np.min([time_sec[-1],(time_stop-date_reference).total_seconds()])
+#        sec_start = np.max([time_sec[0],(time_start-date_reference).total_seconds()])
+#        sec_stop = np.min([time_sec[-1],(time_stop-date_reference).total_seconds()])
+        sec_start = (time_start-date_reference).total_seconds()
+        sec_stop = (time_stop-date_reference).total_seconds()
         print('found data for')
         print('   %f h-UTC to'%(sec_start/3600.0))
         print('   %f h-UTC to'%(sec_stop/3600.0))
