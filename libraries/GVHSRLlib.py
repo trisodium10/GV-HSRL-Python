@@ -324,6 +324,7 @@ def load_aircraft_data(filename,var_list):
         f.close()
     except RuntimeError:
         print('Aircraft data file NOT found')
+        time_ref=[]
     
     return var_data,time_ref
 
