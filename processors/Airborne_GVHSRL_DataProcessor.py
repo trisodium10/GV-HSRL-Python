@@ -553,8 +553,8 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                 
             print('Denoising Molecular Channel')
             MolDenoise,tune_list = gv.DenoiseMolecular(MolRaw,beta_m_sonde=beta_m_ext.copy(), \
-                                    MaxAlt=range_trim,accel = False,tv_lim =[1.5, 2.8],N_tv_pts=59, \
-                                    bg_index=-10,n=1,geo_data=geo_denoise,geo_key='geo_mol') # dict(geo_prof=np.array([2e14])), geo_data=geo_data,geo_key='geo_mol'
+                                    MaxAlt=range_trim,accel = True,tv_lim =[1.5, 2.8],N_tv_pts=59, \
+                                    bg_index=-10,n=1,geo_data=geo_denoise,geo_key='geo_mol',verbose=True) # dict(geo_prof=np.array([2e14])), geo_data=geo_data,geo_key='geo_mol'
             # testing and debugging
             MolRaw.bg_subtract(-10)
             lp.plotprofiles([MolRaw,MolDenoise],time=22.1*3600)
@@ -611,6 +611,10 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                 MolDenoise.gain_scale(mol_gain)
         
         beta_a = lp.AerosolBackscatter(profs['molecular'],(profs['combined_hi']+profs['cross']),beta_m)
+        if settings['Denoise_Mol']:
+            beta_a_denoise = lp.AerosolBackscatter(MolDenoise,(profs['combined_hi']+profs['cross']),beta_m)
+            beta_a_denoise.descript = 'Poisson total variation denoised calibrated measurement of Aerosol Backscatter Coefficient in m^-1 sr^-1'
+            beta_a_denoise.label = 'Denoised Aerosol Backscatter Coefficient'
         
         if settings['get_extinction']:
             ext_sg_wid = settings['ext_sg_width']
@@ -677,106 +681,13 @@ def ProcessAirborneDataChunk(time_start,time_stop,
             # This segment estimates what the molecular gain should be 
             # based on a histogram minimum in BSR over the loaded data
             
-            iUp = np.nonzero(var_post['TelescopeDirection']==1.0)[0]
-            
+            iUp = np.nonzero(var_post['TelescopeDirection']==1.0)[0]            
             lp.Estimate_Mol_Gain(BSR,iKeep=iUp,mol_gain=mol_gain_up,alt_lims=[2000,4000],label='Telescope Up',plot=True)
             
-    #        BSRprof = BSR.profile[iUp,:].flatten()
-    #        BSRalt = (np.ones(BSR.profile[iUp,:].shape)*BSR.range_array[np.newaxis,:]).flatten()
-    #        
-    #        BSRalt = np.delete(BSRalt,np.nonzero(np.isnan(BSRprof)))
-    #        BSRprof = np.delete(BSRprof,np.nonzero(np.isnan(BSRprof)))
-    #    
-    #        bbsr = np.linspace(0,4,400)
-    #        bsnr = np.linspace(1,100,250) # snr (70,100,250)
-    #    
-    #        balt = np.concatenate((BSR.range_array-BSR.mean_dR/2,BSR.range_array[-1:]+BSR.mean_dR/2))
-    #    
-    #        """
-    #        perform analysis by altitude
-    #        """
-    #        
-    #        hbsr = np.histogram2d(BSRprof,BSRalt,bins=[bbsr,balt])
-    #        
-    #        i_hist_median = np.argmax(hbsr[0],axis=0)
-    #        iset = np.arange(hbsr[0].shape[1])
-    #        dh1 = hbsr[0][i_hist_median,iset]-hbsr[0][i_hist_median-1,iset]
-    #        dh2 = hbsr[0][i_hist_median+1,iset]-hbsr[0][i_hist_median,iset]
-    #        dbsr = np.mean(np.diff(bbsr))
-    #        bsr1 = bbsr[i_hist_median]
-    #        bsr2 = bbsr[i_hist_median+1]
-    #        
-    #        m_0 = (dh2-dh1)/dbsr
-    #        b_0 = dh1-m_0*bsr1
-    #        
-    #        Nsm = 6  # number of bins to smooth over
-    #        hist_median = (-b_0)/m_0
-    #        hist_med_sm = np.convolve(hist_median,np.ones(Nsm)*1.0/Nsm,mode='same')
-    #        
-    #        plt.figure()
-    #        plt.pcolor(bbsr,balt,hbsr[0].T)
-    #        plt.plot(hist_median,balt[1:],'r--')
-    #        plt.plot(hist_med_sm,balt[1:],'g--')
-    #        plt.xlabel('BSR')
-    #        plt.ylabel('Altitude [m]')
-    #        plt.title('Telescope Up')
-    #        
-    #        i_alt_lim = np.nonzero(np.logical_and(balt > 2000,balt < 4000))[0]
-    #        
-    #        mol_gain_adj = np.nanmin(hist_med_sm[i_alt_lim])
-    #        
-    #        print('\nCurrent Molecular (Telescope Up) Gain: %f'%mol_gain_up)
-    #        print('Suggested Molecular (Telescope Up) Gain: %f\n'%(mol_gain_up*mol_gain_adj))
             
             iDown = np.nonzero(var_post['TelescopeDirection']==0.0)[0]
             lp.Estimate_Mol_Gain(BSR,iKeep=iDown,mol_gain=mol_gain_down,alt_lims=[2000,4000],label='Telescope Down',plot=True)
             
-    #        BSRprof = BSR.profile[iDown,:].flatten()
-    #        BSRalt = (np.ones(BSR.profile[iDown,:].shape)*BSR.range_array[np.newaxis,:]).flatten()
-    #        
-    #        BSRalt = np.delete(BSRalt,np.nonzero(np.isnan(BSRprof)))
-    #        BSRprof = np.delete(BSRprof,np.nonzero(np.isnan(BSRprof)))
-    #    
-    #        bbsr = np.linspace(0,4,400)
-    #        bsnr = np.linspace(1,100,250) # snr (70,100,250)
-    #    
-    #        balt = np.concatenate((BSR.range_array-BSR.mean_dR/2,BSR.range_array[-1:]+BSR.mean_dR/2))
-    #    
-    #        """
-    #        perform analysis by altitude
-    #        """
-    #        
-    #        hbsr = np.histogram2d(BSRprof,BSRalt,bins=[bbsr,balt])
-    #        
-    #        i_hist_median = np.argmax(hbsr[0],axis=0)
-    #        iset = np.arange(hbsr[0].shape[1])
-    #        dh1 = hbsr[0][i_hist_median,iset]-hbsr[0][i_hist_median-1,iset]
-    #        dh2 = hbsr[0][i_hist_median+1,iset]-hbsr[0][i_hist_median,iset]
-    #        dbsr = np.mean(np.diff(bbsr))
-    #        bsr1 = bbsr[i_hist_median]
-    #        bsr2 = bbsr[i_hist_median+1]
-    #        
-    #        m_0 = (dh2-dh1)/dbsr
-    #        b_0 = dh1-m_0*bsr1
-    #        
-    #        Nsm = 6  # number of bins to smooth over
-    #        hist_median = (-b_0)/m_0
-    #        hist_med_sm = np.convolve(hist_median,np.ones(Nsm)*1.0/Nsm,mode='same')
-    #        
-    #        plt.figure()
-    #        plt.pcolor(bbsr,balt,hbsr[0].T)
-    #        plt.plot(hist_median,balt[1:],'r--')
-    #        plt.plot(hist_med_sm,balt[1:],'g--')
-    #        plt.xlabel('BSR')
-    #        plt.ylabel('Altitude [m]')
-    #        plt.title('Telescope Down')
-    #        
-    #        i_alt_lim = np.nonzero(np.logical_and(balt > 2000,balt < 4000))[0]
-    #        
-    #        mol_gain_adj = np.nanmin(hist_med_sm[i_alt_lim])
-    #        
-    #        print('\nCurrent Molecular (Telescope Down) Gain: %f'%mol_gain_down)
-    #        print('Suggested Molecular (Telescope Down) Gain: %f\n'%(mol_gain_down*mol_gain_adj))
         
         
         
@@ -804,6 +715,9 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         BSR.mask(np.isnan(BSR.profile))
         dPart.mask(np.isnan(dPart.profile))
         dVol.mask(np.isnan(dVol.profile))
+        
+        if settings['Mol_Denoise']:
+            beta_a_denoise.mask(np.isnan(beta_a_denoise.profile))
         
         
         if settings['count_mask_threshold'] > 0:
@@ -931,6 +845,25 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                         rfig[1][ai].plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude
                 if settings['save_plots']:
                     plt.savefig(save_plots_path+'Extinction_'+save_plots_base,dpi=300)
+                    
+            if settings['Mol_Denoise']:
+                rfig = lp.pcolor_profiles([beta_a_denoised],scale=['log'],
+                                      climits=[[1e-8,1e-3]],
+                                      ylimits=[MinAlt*1e-3,MaxAlt*1e-3],
+                                      tlimits=tlims,
+                                      title_add=proj_label,
+                                      plot_date=settings['plot_date'],
+                                      t_axis_scale=settings['time_axis_scale'],
+                                      h_axis_scale=settings['alt_axis_scale'],
+                                      minor_ticks=5,major_ticks=1)
+                if settings['as_altitude']:
+                    for ai in range(len(rfig[1])):
+                        rfig[1][ai].plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude      
+                if settings['save_plots']:
+                    plt.savefig(save_plots_path+'Denoised_Aerosol_Backscatter_'+save_plots_base,dpi=300)
+                
+                
+                
             #lp.plotprofiles(profs)
             #dPart.mask(dPartMask)
             #lp.pcolor_profiles([BSR,dVol],scale=['log','linear'],climits=[[1,5e2],[0,1.0]])
