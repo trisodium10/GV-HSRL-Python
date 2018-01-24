@@ -554,11 +554,11 @@ def ProcessAirborneDataChunk(time_start,time_stop,
             print('Denoising Molecular Channel')
             MolDenoise,tune_list = gv.DenoiseMolecular(MolRaw,beta_m_sonde=beta_m_ext.copy(), \
                                     MaxAlt=range_trim,accel = True,tv_lim =[1.5, 2.8],N_tv_pts=59, \
-                                    bg_index=-10,n=1,geo_data=geo_denoise,geo_key='geo_mol',verbose=True) # dict(geo_prof=np.array([2e14])), geo_data=geo_data,geo_key='geo_mol'
+                                    bg_index=-10,n=1,geo_data=geo_denoise,geo_key='geo_mol',verbose=False) # dict(geo_prof=np.array([2e14])), geo_data=geo_data,geo_key='geo_mol'
             # testing and debugging
             MolRaw.bg_subtract(-10)
             lp.plotprofiles([MolRaw,MolDenoise],time=22.1*3600)
-            lp.plotprofiles([MolRaw,MolDenoise],time=22.2*3600)
+#            lp.plotprofiles([MolRaw,MolDenoise],time=22.2*3600)
             plt.show()
             
             MolDenoise.slice_range(range_lim=[0,range_trim])
@@ -598,7 +598,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
             
             if settings['Denoise_Mol']:
                 MolDenoise.multiply_piecewise(1.0/eta_i2)
-                MolDenoise.gain_scale(mol_gain)
+                MolDenoise.gain_scale(mol_gain,gain_var = (mol_gain*0.05)**2)
                 
             if settings['get_extinction'] and settings['as_altitude']:
                 [eta_i2_ext] = lp.RB_Efficiency([Ti2],temp_ext.profile.flatten(),pres_ext.profile.flatten()*9.86923e-6,profs['molecular'].wavelength,nu=nu,norm=True,max_size=10000)
