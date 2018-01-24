@@ -71,6 +71,10 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         'MinAlt':-30,
         
         'get_extinction':False,  # process data for extinction   
+        'ext_sg_width':21,  # savitsky-gouley window width (must be odd)
+        'ext_sg_order':3,   # savitsky-gouley polynomial order
+        'ext_tres':15,      # extinction convolution kernel time width in seconds
+        'ext_zres':60,      # extinction convolution kernel range width in meters
         
         'baseline_subtract':False, # use baseline subtraction
         'deadtime_correct':False,  # correct for APD deadtime
@@ -262,7 +266,8 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         baseline_file = lp.get_calval(time_start,cal_json,"Baseline File")[0]
         diff_pol_file = lp.get_calval(time_start,cal_json,"Polarization",returnlist=['diff_geo'])
         i2_file = lp.get_calval(time_start,cal_json,"I2 Scan")
-        dead_time = lp.get_calval(time_start,cal_json,"Dead_Time",returnlist=['combined_hi','cross','combined_lo','molecular'])
+        dead_time_list = lp.get_calval(time_start,cal_json,"Dead_Time",returnlist=['combined_hi','cross','combined_lo','molecular'])
+        dead_time = dict(zip(['combined_hi','cross','combined_lo','molecular'],dead_time_list))
         
         if settings['get_extinction']:
             geo_file_up,geo_file_down = lp.get_calval(time_start,cal_json,"Geo File",returnlist=['value','down_file'])
@@ -407,8 +412,18 @@ def ProcessAirborneDataChunk(time_start,time_stop,
 #            int_profs[var].time_integrate()
             
             if settings['deadtime_correct']:
-                profs[var].nonlinear_correct(dead_time[var],laser_shot_count=2000*profs[var].NumProfsList[:,np.newaxis],std_deadtime=5e-9)
-            
+#                if var == 'combined_hi':
+#                    p_before = profs[var].copy()
+                if hasattr(profs[var],'NumProfsList'):
+                    profs[var].nonlinear_correct(dead_time[var],laser_shot_count=2000*profs[var].NumProfsList[:,np.newaxis],std_deadtime=5e-9)
+                else:
+                    # number of laser shots is based on an assumption that there is one 0.5 second profile per time bin
+                    profs[var].nonlinear_correct(dead_time[var],laser_shot_count=2000,std_deadtime=5e-9)
+
+#                if var == 'combined_hi':
+#                    p_after = profs[var].copy()
+#                    lp.plotprofiles([p_before,p_after],varplot=True,time=18.3*3600)
+#                    lp.plotprofiles([p_after],varplot=True,time=18.1*3600)
             
             if var == 'molecular' and settings['Denoise_Mol']:
                 MolRaw = profs['molecular'].copy()    
@@ -597,10 +612,14 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         beta_a = lp.AerosolBackscatter(profs['molecular'],(profs['combined_hi']+profs['cross']),beta_m)
         
         if settings['get_extinction']:
-            ext_sg_wid = 21
-            ext_sg_order = 4
-            ext_tres = 20  # extinction time resolution in seconds
-            ext_zres = 15   # extinction range resolution in meters
+            ext_sg_wid = settings['ext_sg_width']
+            ext_sg_order = settings['ext_sg_order']
+            ext_tres = settings['ext_tres']
+            ext_zres = settings['ext_zres']
+#            ext_sg_wid = 21
+#            ext_sg_order = 4
+#            ext_tres = 20  # extinction time resolution in seconds
+#            ext_zres = 15   # extinction range resolution in meters
             mol_ext.conv(ext_tres/mol_ext.mean_dt,ext_zres/mol_ext.mean_dR)
             beta_m_ext.conv(ext_tres/beta_m_ext.mean_dt,ext_zres/beta_m_ext.mean_dR)
             OD = mol_ext/beta_m_ext
