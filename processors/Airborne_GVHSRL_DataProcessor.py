@@ -718,7 +718,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         dPart.mask(np.isnan(dPart.profile))
         dVol.mask(np.isnan(dVol.profile))
         
-        if settings['Mol_Denoise']:
+        if settings['Denoise_Mol']:
             beta_a_denoise.mask(np.isnan(beta_a_denoise.profile))
         
         
@@ -848,7 +848,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                 if settings['save_plots']:
                     plt.savefig(save_plots_path+'Extinction_'+save_plots_base,dpi=300)
                     
-            if settings['Mol_Denoise']:
+            if settings['Denoise_Mol']:
                 rfig = lp.pcolor_profiles([beta_a_denoised],scale=['log'],
                                       climits=[[1e-8,1e-3]],
                                       ylimits=[MinAlt*1e-3,MaxAlt*1e-3],
