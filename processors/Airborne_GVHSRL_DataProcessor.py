@@ -735,9 +735,14 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         
         
         save_prof_list = [beta_a,dPart,dVol,BSR,beta_m]
+        # add all channels to list of profilse to save
+        for var in profs.keys():
+            save_prof_list.extend(profs[var])
         if settings['get_extinction']:
+            # add extinction to list of profilse to save
             save_prof_list.extend([alpha_a])
         if settings['Denoise_Mol']:
+            # add denoised molecular observations to list of profilse to save
             save_prof_list.extend([MolDenoise])
         save_var1d_post = {'TelescopeDirection':{'description':'1-Lidar Pointing Up, 0-Lidar Pointing Down','units':'none'},
                            'polarization':{'description':'System Quarter Waveplate orientation','units':'degrees'}}
