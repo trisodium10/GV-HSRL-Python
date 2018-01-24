@@ -11,6 +11,8 @@ import LidarProfileFunctions as lp
 import datetime
 import glob
 
+import ptv.hsrl.denoise as denoise
+from ptv.estimators.poissonnoise import poissonmodel0
 
 
 
@@ -617,3 +619,190 @@ def delete_indices(in_dict,indices):
     for var in in_dict.keys():
         out_dict[var] = np.delete(in_dict[var],indices)
     return out_dict
+    
+    
+def DenoiseMolecular(MolRaw,beta_m_sonde=np.array([np.nan]),
+                     geo_data=dict(geo_prof=np.array([1])),
+                    MaxAlt=np.nan,n=1,start_time=0,end_time=np.nan,
+                    verbose=False,accel = False,tv_lim =[0.4, 1.8],N_tv_pts=48,
+                    bg_index = -50,geo_key='geo_prof',MolGain_Adj = 0.75):
+    """
+    Use Willem Marais' functions to denoise the molecular signal in an 
+    HSRL signal.
+    MolRaw - raw profile
+    beta_m_sonde - estimated molecular backscatter coefficient.  Not used if
+                not provided.
+    geo_data - geometric overlap function.  Not used if not provided
+    MaxAlt - maximum altitude in meters to fit.  Defaults to full profile.
+    n = number of time profiles to process at a time
+    start_time - the profile time to start on.  Defaults to first profile.
+    end_time - the profile time to end on.  Defaults to last profile
+    verbose - set to True to have text output from optimizer routine
+    accel - attempt to accelerate by using previous TV results
+    tv_lim - limits for the tv search space.  default of [0.4, 1.8] are obtained
+        for the DLB-HSRL  other settings may be desirable for other lidar
+    N_tv_pts - number of tv points to evalute in the tv_lim space.  Defaults
+        to 48 used in DLB-HSRL
+    bg_index - index above which to treat as background
+    geo_key - key to access geo overlap data
+    MolGain_Adj - factor to multiply the molecular gain to get a decent agreement
+        between estimated backscatter and observed.
+    """
+    
+#    bg_index = -50    
+    if not np.isnan(end_time):
+        MolRaw.slice_time([start_time,end_time])
+    if any('Background Subtracted' in s for s in MolRaw.ProcessingStatus):
+        BG_Sub_Flag = True
+        MolRaw.profile = MolRaw.profile+MolRaw.bg[:,np.newaxis]
+        Mol_BG_Total = MolRaw.bg*MolRaw.NumProfList
+    else:
+        BG_Sub_Flag = False    
+        Mol_BG_Total = np.mean(MolRaw.profile[:,bg_index:],axis=1)*MolRaw.NumProfList  # get background before we remove the top of the profile
+    
+    
+    
+    
+    if not np.isnan(MaxAlt):    
+        MolRaw.slice_range(range_lim=[0,MaxAlt]) 
+
+    
+    
+    
+    MolDenoise = MolRaw.copy()
+    MolDenoise.label = 'Denoised Molecular Backscatter Channel'
+    MolDenoise.descript = 'Total Variation Denoised\nUnpolarization\nMolecular Backscatter Returns'
+#    MolDenoise.profile_type = '$m^{-3}$'
+        
+    
+    if n  > MolRaw.time.size:
+        n = MolRaw.time.size
+        
+    tune_list = []
+    
+    fit_range_array = MolRaw.range_array.copy()
+    fit_range_array[np.nonzero(fit_range_array==0)] = 1
+    
+    for i_prof in range(np.ceil(MolRaw.time.size*1.0/n).astype(np.int)):
+    
+        istart = i_prof*n
+        iend = np.min(np.array([istart + n,MolRaw.time.size]))
+
+#        MolGain_Adj = 0.75 # 0.5
+
+        MolFit = (MolRaw.profile[istart:iend,:]*MolRaw.NumProfList[istart:iend,np.newaxis]).astype (np.int)
+        NumProf = MolRaw.NumProfList[istart:iend,np.newaxis]
+        
+        Mol_BG = Mol_BG_Total[istart:iend]# np.mean(MolFit[:,bg_index:],axis=1)
+
+
+        # Check what a priori data the user is providing
+        try:
+            geo_len = len(geo_data[geo_key])
+            if geo_len == 1:
+                # no geo data provided.
+                geo_est = np.ones(MolFit.shape[1])*geo_data[geo_key]
+            else:
+                if not 'Nprof' in geo_data.keys():
+                    geo_data['Nprof'] = 1
+                if geo_data[geo_key].ndim == 1:
+                    # 1d array for geo overlap estimate
+                    geofun = 1/np.interp(MolRaw.range_array,geo_data[geo_key][:,0],geo_data[geo_key][:,1])
+                    geo_est = 1.0/geo_data['Nprof']*geofun
+                else:
+                    # 2d array for geo overlap estimate
+                    # typically used for up and down (airborne) pointing
+                    geofun0 = 1.0/geo_data[geo_key][istart:iend,:]
+                    geofun = np.zeros(MolFit.shape)
+                    for iprof in range(geofun.shape[0]):
+                        geofun[iprof,:] = np.interp(MolRaw.range_array,geo_data['range_array'],geofun0[iprof,:])
+                        
+                    geo_est = 1.0/geo_data['Nprof']*geofun
+    #            geo_est = MolRaw.mean_dt/geo_data['Nprof']/geo_data['tres']*geofun
+        except TypeError:
+            geo_est = np.ones(MolFit.shape[1])*geo_data
+            
+        if hasattr(beta_m_sonde,'profile'):
+            # Estimated molecular backscatter is passed to the function
+#            if not np.isnan(MaxAlt):    
+#                beta_m_sonde.slice_range(range_lim=[0,MaxAlt]) 
+            beta_m_2D0 = beta_m_sonde.profile[istart:iend,:]
+            beta_m_2D = np.zeros(MolFit.shape)
+            for iprof in range(beta_m_2D0.shape[0]):
+                beta_m_2D[iprof,:] = np.interp(MolRaw.range_array,beta_m_sonde.range_array,beta_m_2D0[iprof,:])
+            
+        else:
+            beta_m_2D = np.ones(MolFit.shape)
+        
+#        print(beta_m_2D.shape)
+#        print(geo_est.shape)        
+#        print(fit_range_array.shape)
+        
+        
+        # Create the Poisson thin object so that we can do cross-validation
+        poisson_thn_obj = denoise.poissonthin (MolFit.T, p_trn_flt = 0.5, p_vld_flt = 0.5)
+        
+        # define coefficients in fit
+        A_arr = (NumProf*MolGain_Adj*beta_m_2D*geo_est/fit_range_array**2).T
+        A_arr[np.nonzero(A_arr==0)] = 1e-20
+        A_arr[np.nonzero(np.isnan(A_arr))] = 1e-20
+        A_arr[np.nonzero(np.isinf(A_arr))] = 1e-20
+        
+#        # for debugging
+#        import matplotlib.pyplot as plt
+#        plt.figure()
+#        plt.semilogy(MolFit.flatten())
+#        plt.semilogy(A_arr.flatten()+Mol_BG[0])
+
+        sparsa_cfg_obj = denoise.sparsaconf (eps_flt = 1e-5, verbose_int = 1e6)
+        
+        # check if the fit data is 1D or 2D.  1D can be run faster.
+        if MolFit.shape[0] == 1:
+            # Use for 1D denoising
+            est_obj = poissonmodel0 (poisson_thn_obj, A_arr = A_arr, b_arr=Mol_BG[np.newaxis], log_model_bl = True, penalty_str = 'condatTV', 
+                sparsaconf_obj = sparsa_cfg_obj)
+        else:
+            # Use for 2D denoising
+            est_obj = poissonmodel0 (poisson_thn_obj, A_arr = A_arr, b_arr=Mol_BG[np.newaxis], log_model_bl = True, penalty_str = 'TV', 
+                sparsaconf_obj = sparsa_cfg_obj)    
+            
+        # Create the denoiser object
+        if MolFit.shape[0] == 1:
+            # Use for 1D denoising:  
+            # Defaults: log10_reg_lst = [-2, 2], nr_reg_int = 48
+        
+            if accel and i_prof > 0:        
+                tv_reg = [log_tune[np.argmin(valid_val)]*0.8, log_tune[np.argmin(valid_val)]*1.2]  # log of range of TV values to test
+                nr_int = 5  # number of TV values to test
+            else:
+                tv_reg = tv_lim  # log of range of TV values to test
+                nr_int = 17  # number of TV values to test
+                
+            denoise_cnf_obj = denoise.denoiseconf (log10_reg_lst = tv_reg, nr_reg_int =nr_int, 
+                pen_type_str = 'condatTV', verbose_bl = verbose)
+        else:
+            # Use for 2D denoising
+            denoise_cnf_obj = denoise.denoiseconf (log10_reg_lst = [-2, 2], nr_reg_int = 48, 
+                pen_type_str = 'TV', verbose_bl = verbose)
+            
+        denoiser_obj = denoise.denoisepoisson (est_obj, denoise_cnf_obj)
+        # Start the denoising
+        denoiser_obj.denoise ()
+        
+        MolDenoise.profile[istart:iend,:] = denoiser_obj.getdenoised().T/NumProf      
+        
+        log_tune,valid_val = denoiser_obj.get_validation_loss()
+        tune_list.extend([[log_tune,valid_val]])  # store the results from the tuning parameters
+    
+    if BG_Sub_Flag:
+        MolRaw.profile = MolRaw.profile - MolRaw.bg[:,np.newaxis]
+    
+    MolDenoise.bg = Mol_BG_Total/MolRaw.NumProfList
+    MolDenoise.bg_var = Mol_BG_Total/MolRaw.NumProfList**2
+    MolDenoise.profile = MolDenoise.profile-MolDenoise.bg[:,np.newaxis]
+    
+    MolDenoise.ProcessingStatus.extend(['Applied range PTV denoising'])
+    
+    return MolDenoise,tune_list
+        
+
