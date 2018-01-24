@@ -562,9 +562,11 @@ def ProcessAirborneDataChunk(time_start,time_stop,
             plt.show()
             
             MolDenoise.slice_range(range_lim=[0,range_trim])
-          
+
             if settings['as_altitude']:
                 MolDenoise.range2alt(master_alt,air_data_t,telescope_direction=var_1d['TelescopeDirection'])
+            if tres_post > 0 or tres <= 0.5:
+                MolDenoise.time_resample(tedges=master_time_post,update=True,remainder=False)
                
             
 #            if tres_post > 0 or tres <= 0.5:
