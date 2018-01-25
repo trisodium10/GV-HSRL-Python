@@ -854,7 +854,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                     plt.savefig(save_plots_path+'Extinction_'+save_plots_base,dpi=300)
                     
             if settings['Denoise_Mol']:
-                rfig = lp.pcolor_profiles([beta_a_denoised],scale=['log'],
+                rfig = lp.pcolor_profiles([beta_a_denoise],scale=['log'],
                                       climits=[[1e-8,1e-3]],
                                       ylimits=[MinAlt*1e-3,MaxAlt*1e-3],
                                       tlimits=tlims,
