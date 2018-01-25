@@ -625,7 +625,7 @@ def DenoiseMolecular(MolRaw,beta_m_sonde=np.array([np.nan]),
                      geo_data=dict(geo_prof=np.array([1])),
                     MaxAlt=np.nan,n=1,start_time=0,end_time=np.nan,
                     verbose=False,accel = False,tv_lim =[0.4, 1.8],N_tv_pts=48,
-                    bg_index = -50,geo_key='geo_prof',MolGain_Adj = 0.75):
+                    bg_index = -50,geo_key='geo_prof',MolGain_Adj = 0.75,plot_result=False):
     """
     Use Willem Marais' functions to denoise the molecular signal in an 
     HSRL signal.
@@ -647,6 +647,7 @@ def DenoiseMolecular(MolRaw,beta_m_sonde=np.array([np.nan]),
     geo_key - key to access geo overlap data
     MolGain_Adj - factor to multiply the molecular gain to get a decent agreement
         between estimated backscatter and observed.
+    plot_result - plot results of each iteration (for debugging only)
     """
     
 #    bg_index = -50    
@@ -749,11 +750,12 @@ def DenoiseMolecular(MolRaw,beta_m_sonde=np.array([np.nan]),
         A_arr[np.nonzero(np.isinf(A_arr))] = 1e-20
         
 #        # for debugging
-        import matplotlib.pyplot as plt
-        plt.figure()
-        plt.semilogy(MolFit.flatten())
-        plt.semilogy(A_arr.flatten()+Mol_BG[0])
-        plt.show()
+        if plot_result:
+            import matplotlib.pyplot as plt
+            plt.figure()
+            plt.semilogy(MolFit.flatten())
+            plt.semilogy(A_arr.flatten()+Mol_BG[0])
+        
 
         sparsa_cfg_obj = denoise.sparsaconf (eps_flt = 1e-5, verbose_int = 1e6)
         
@@ -792,8 +794,17 @@ def DenoiseMolecular(MolRaw,beta_m_sonde=np.array([np.nan]),
         
         MolDenoise.profile[istart:iend,:] = denoiser_obj.getdenoised().T/NumProf      
         
+        
         log_tune,valid_val = denoiser_obj.get_validation_loss()
         tune_list.extend([[log_tune,valid_val]])  # store the results from the tuning parameters
+        if plot_result:        
+            plt.figure()
+            plt.plot(MolFit)
+            plt.plot(denoiser_obj.getdenoised().flatten())
+            
+            plt.figure()
+            plt.plot(log_tune,valid_val)
+            plt.show()
     
     if BG_Sub_Flag:
         MolRaw.profile = MolRaw.profile - MolRaw.bg[:,np.newaxis]
