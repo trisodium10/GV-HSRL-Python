@@ -625,7 +625,8 @@ def DenoiseMolecular(MolRaw,beta_m_sonde=np.array([np.nan]),
                      geo_data=dict(geo_prof=np.array([1])),
                     MaxAlt=np.nan,n=1,start_time=0,end_time=np.nan,
                     verbose=False,accel = False,tv_lim =[0.4, 1.8],N_tv_pts=48,
-                    bg_index = -50,geo_key='geo_prof',MolGain_Adj = 0.75,plot_result=False):
+                    bg_index = -50,geo_key='geo_prof',MolGain_Adj = 0.75,
+                    plot_result=False,eps_opt = 1e-5):
     """
     Use Willem Marais' functions to denoise the molecular signal in an 
     HSRL signal.
@@ -648,6 +649,7 @@ def DenoiseMolecular(MolRaw,beta_m_sonde=np.array([np.nan]),
     MolGain_Adj - factor to multiply the molecular gain to get a decent agreement
         between estimated backscatter and observed.
     plot_result - plot results of each iteration (for debugging only)
+    eps_opt - optimization precision.
     """
     
 #    bg_index = -50    
@@ -757,7 +759,7 @@ def DenoiseMolecular(MolRaw,beta_m_sonde=np.array([np.nan]),
             plt.semilogy(A_arr.flatten()+Mol_BG[0])
         
 
-        sparsa_cfg_obj = denoise.sparsaconf (eps_flt = 1e-7, verbose_int = 1e6) # change eps from 1e-5 to 1e-7
+        sparsa_cfg_obj = denoise.sparsaconf (eps_flt = eps_opt, verbose_int = 1e6) # change eps from 1e-5 to 1e-7
         
         # check if the fit data is 1D or 2D.  1D can be run faster.
         if MolFit.shape[0] == 1:
