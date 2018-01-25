@@ -556,10 +556,10 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                                     MaxAlt=range_trim,accel = True,tv_lim =[1.5, 2.8],N_tv_pts=59, \
                                     bg_index=-10,n=1,geo_data=geo_denoise,geo_key='geo_mol',verbose=False) # dict(geo_prof=np.array([2e14])), geo_data=geo_data,geo_key='geo_mol'
 #            # testing and debugging
-#            MolRaw.bg_subtract(-10)
-#            lp.plotprofiles([MolRaw,MolDenoise],time=22.1*3600)
-##            lp.plotprofiles([MolRaw,MolDenoise],time=22.2*3600)
-#            plt.show()
+            MolRaw.bg_subtract(-10)
+            lp.plotprofiles([MolRaw,MolDenoise],time=22.12*3600)
+            lp.plotprofiles([MolRaw,MolDenoise],time=22.04*3600)
+            plt.show()
             
             MolDenoise.slice_range(range_lim=[0,range_trim])
 
@@ -610,7 +610,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
             # Rescale molecular channel to match combined channel gain
             profs['molecular'].gain_scale(mol_gain,gain_var = (mol_gain*0.05)**2)
             if settings['Denoise_Mol']:
-                MolDenoise.gain_scale(mol_gain)
+                MolDenoise.gain_scale(mol_gain,gain_var = (mol_gain*0.05)**2)
         
         beta_a = lp.AerosolBackscatter(profs['molecular'],(profs['combined_hi']+profs['cross']),beta_m)
         if settings['Denoise_Mol']:
@@ -744,6 +744,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         if settings['Denoise_Mol']:
             # add denoised molecular observations to list of profilse to save
             save_prof_list.extend([MolDenoise])
+            save_prof_list.extend([beta_a_denoise])
         save_var1d_post = {'TelescopeDirection':{'description':'1-Lidar Pointing Up, 0-Lidar Pointing Down','units':'none'},
                            'polarization':{'description':'System Quarter Waveplate orientation','units':'degrees'}}
         save_air_post = {'THDG': {'description':'aircraft heading','units':'degrees'},
@@ -869,6 +870,21 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                 if settings['save_plots']:
                     plt.savefig(save_plots_path+'Denoised_Aerosol_Backscatter_'+save_plots_base,dpi=300)
                 
+                
+                rfig = lp.pcolor_profiles([beta_a,beta_a_denoise],scale=['log'],
+                                      climits=[[1e-8,1e-3]],
+                                      ylimits=[MinAlt*1e-3,MaxAlt*1e-3],
+                                      tlimits=tlims,
+                                      title_add=proj_label,
+                                      plot_date=settings['plot_date'],
+                                      t_axis_scale=settings['time_axis_scale'],
+                                      h_axis_scale=settings['alt_axis_scale'],
+                                      minor_ticks=5,major_ticks=1)
+                if settings['as_altitude']:
+                    for ai in range(len(rfig[1])):
+                        rfig[1][ai].plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude      
+                if settings['save_plots']:
+                    plt.savefig(save_plots_path+'Compare_Denoised_Aerosol_Backscatter_'+save_plots_base,dpi=300)
                 
                 
             #lp.plotprofiles(profs)
