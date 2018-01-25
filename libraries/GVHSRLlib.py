@@ -749,11 +749,11 @@ def DenoiseMolecular(MolRaw,beta_m_sonde=np.array([np.nan]),
         A_arr[np.nonzero(np.isinf(A_arr))] = 1e-20
         
 #        # for debugging
-#        import matplotlib.pyplot as plt
-#        plt.figure()
-#        plt.semilogy(MolFit.flatten())
-#        plt.semilogy(A_arr.flatten()+Mol_BG[0])
-#        plt.show()
+        import matplotlib.pyplot as plt
+        plt.figure()
+        plt.semilogy(MolFit.flatten())
+        plt.semilogy(A_arr.flatten()+Mol_BG[0])
+        plt.show()
 
         sparsa_cfg_obj = denoise.sparsaconf (eps_flt = 1e-5, verbose_int = 1e6)
         
