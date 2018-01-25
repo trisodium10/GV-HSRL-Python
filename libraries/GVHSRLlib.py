@@ -757,7 +757,7 @@ def DenoiseMolecular(MolRaw,beta_m_sonde=np.array([np.nan]),
             plt.semilogy(A_arr.flatten()+Mol_BG[0])
         
 
-        sparsa_cfg_obj = denoise.sparsaconf (eps_flt = 1e-5, verbose_int = 1e6)
+        sparsa_cfg_obj = denoise.sparsaconf (eps_flt = 1e-7, verbose_int = 1e6) # change eps from 1e-5 to 1e-7
         
         # check if the fit data is 1D or 2D.  1D can be run faster.
         if MolFit.shape[0] == 1:
