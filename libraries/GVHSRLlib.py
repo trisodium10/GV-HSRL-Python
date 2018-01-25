@@ -801,7 +801,7 @@ def DenoiseMolecular(MolRaw,beta_m_sonde=np.array([np.nan]),
         if plot_result:        
             plt.figure()
             plt.semilogy(MolFit)
-            plt.semilogy(denoiser_obj.getdenoised().flatten())
+            plt.semilogy(denoiser_obj.getdenoised().flatten(),'--')
             
             plt.figure()
             plt.plot(log_tune,valid_val)
