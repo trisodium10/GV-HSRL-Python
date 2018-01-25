@@ -779,7 +779,8 @@ def DenoiseMolecular(MolRaw,beta_m_sonde=np.array([np.nan]),
                 nr_int = 5  # number of TV values to test
             else:
                 tv_reg = tv_lim  # log of range of TV values to test
-                nr_int = 17  # number of TV values to test
+#                nr_int = 17  # number of TV values to test
+                nr_int = N_tv_pts
                 
             denoise_cnf_obj = denoise.denoiseconf (log10_reg_lst = tv_reg, nr_reg_int =nr_int, 
                 pen_type_str = 'condatTV', verbose_bl = verbose)
@@ -799,8 +800,8 @@ def DenoiseMolecular(MolRaw,beta_m_sonde=np.array([np.nan]),
         tune_list.extend([[log_tune,valid_val]])  # store the results from the tuning parameters
         if plot_result:        
             plt.figure()
-            plt.plot(MolFit)
-            plt.plot(denoiser_obj.getdenoised().flatten())
+            plt.semilogy(MolFit)
+            plt.semilogy(denoiser_obj.getdenoised().flatten())
             
             plt.figure()
             plt.plot(log_tune,valid_val)
