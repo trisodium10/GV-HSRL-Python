@@ -782,7 +782,10 @@ def DenoiseMolecular(MolRaw,beta_m_sonde=np.array([np.nan]),
             else:
                 tv_reg = tv_lim  # log of range of TV values to test
 #                nr_int = 17  # number of TV values to test
-                nr_int = N_tv_pts
+                if tv_lim[0] == tv_lim[1]:
+                    nr_int = 1
+                else:
+                    nr_int = N_tv_pts
                 
             denoise_cnf_obj = denoise.denoiseconf (log10_reg_lst = tv_reg, nr_reg_int =nr_int, 
                 pen_type_str = 'condatTV', verbose_bl = verbose)
