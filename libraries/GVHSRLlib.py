@@ -800,7 +800,7 @@ def DenoiseMolecular(MolRaw,beta_m_sonde=np.array([np.nan]),
         tune_list.extend([[log_tune,valid_val]])  # store the results from the tuning parameters
         if plot_result:        
             plt.figure()
-            plt.semilogy(MolFit)
+            plt.semilogy(MolFit.flatten())
             plt.semilogy(denoiser_obj.getdenoised().flatten(),'--')
             
             plt.figure()
