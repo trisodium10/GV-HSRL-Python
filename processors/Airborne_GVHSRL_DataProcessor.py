@@ -110,6 +110,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         'hsrl_rb_adjust':True, # adjust for Rayleigh Brillouin Spectrum
         
         'Denoise_Mol':False, # run PTV denoising on molecular channel
+        'denoise_accel':True, # run accelerated denoising (reduced scan region)
         
         
         'Airspeed_Threshold':15, # threshold for determining start and end of the flight (in m/s)
@@ -553,7 +554,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                 
             print('Denoising Molecular Channel')
             MolDenoise,tune_list = gv.DenoiseMolecular(MolRaw,beta_m_sonde=beta_m_ext.copy(), \
-                                    MaxAlt=range_trim,accel = True,tv_lim =[1.5, 2.8],N_tv_pts=59, \
+                                    MaxAlt=range_trim,accel = settings['denoise_accel'],tv_lim =[1.5, 2.8],N_tv_pts=59, \
                                     bg_index=-10,n=1,geo_data=geo_denoise,geo_key='geo_mol',verbose=False) # dict(geo_prof=np.array([2e14])), geo_data=geo_data,geo_key='geo_mol'
 #            # testing and debugging
             MolRaw.bg_subtract(-10)
@@ -871,8 +872,8 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                     plt.savefig(save_plots_path+'Denoised_Aerosol_Backscatter_'+save_plots_base,dpi=300)
                 
                 
-                rfig = lp.pcolor_profiles([beta_a,beta_a_denoise],scale=['log'],
-                                      climits=[[1e-8,1e-3]],
+                rfig = lp.pcolor_profiles([beta_a,beta_a_denoise],scale=['log','log'],
+                                      climits=[[1e-8,1e-3],[1e-8,1e-3]],
                                       ylimits=[MinAlt*1e-3,MaxAlt*1e-3],
                                       tlimits=tlims,
                                       title_add=proj_label,
