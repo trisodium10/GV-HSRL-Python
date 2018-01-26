@@ -78,6 +78,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         
         'baseline_subtract':False, # use baseline subtraction
         'deadtime_correct':False,  # correct for APD deadtime
+        'merge_hi_lo':True,         # merge combined high and low gain channels into a single estimate
         
         'time_ref2takeoff':False,    # flight_time_start and 
                                      # time_stop are referened to takeoff time
@@ -490,6 +491,14 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                 int_profs[var].time_integrate()
         if not run_processing:
             break
+
+        # merge high and low gain combined profiles if option is true
+        if settings['merge_hi_lo']:
+            profs['combined'],_ = gv.merge_hi_lo(profs['combined_hi'],profs['combined_lo'],plot_res=False)
+        else:
+            # if merging is not enabled, use combined high for all calculations
+            profs['combined'] = profs['combined_hi']
+        
         # reformulate the master time based on the time that appears in the profiles
         # after processing
         if tres_post > 0:
@@ -596,7 +605,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                 
         #    eta_c = np.sum(Tc2[:,np.newaxis]*beta_mol_norm,axis=0)
             eta_c = eta_c.reshape(temp.profile.shape)
-            profs['combined_hi'].multiply_piecewise(1.0/eta_c)
+            profs['combined'].multiply_piecewise(1.0/eta_c)
             profs['cross'].multiply_piecewise(1.0/eta_c)
             
             if settings['Denoise_Mol']:
@@ -615,9 +624,9 @@ def ProcessAirborneDataChunk(time_start,time_stop,
             if settings['Denoise_Mol']:
                 MolDenoise.gain_scale(mol_gain,gain_var = (mol_gain*0.05)**2)
         
-        beta_a = lp.AerosolBackscatter(profs['molecular'],(profs['combined_hi']+profs['cross']),beta_m)
+        beta_a = lp.AerosolBackscatter(profs['molecular'],(profs['combined']+profs['cross']),beta_m)
         if settings['Denoise_Mol']:
-            beta_a_denoise = lp.AerosolBackscatter(MolDenoise,(profs['combined_hi']+profs['cross']),beta_m)
+            beta_a_denoise = lp.AerosolBackscatter(MolDenoise,(profs['combined']+profs['cross']),beta_m)
             beta_a_denoise.descript = 'Poisson total variation denoised calibrated measurement of Aerosol Backscatter Coefficient in m^-1 sr^-1'
             beta_a_denoise.label = 'Denoised Aerosol Backscatter Coefficient'
         
@@ -652,7 +661,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
             alpha_a.label = 'Aerosol Extinction Coefficient'
             alpha_a.profile_type = '$m^{-1}$'
         
-        BSR = (profs['combined_hi']+profs['cross'])/profs['molecular']
+        BSR = (profs['combined']+profs['cross'])/profs['molecular']
         BSR.descript = 'Ratio of combined to molecular backscatter'
         BSR.label = 'Backscatter Ratio'
         BSR.profile_type = 'unitless'
@@ -666,7 +675,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         #BSR2.label = 'Backscatter Ratio'
         #BSR2.profile_type = 'unitless'
         
-        dVol = profs['cross']/(profs['combined_hi']+profs['cross'])
+        dVol = profs['cross']/(profs['combined']+profs['cross'])
         #dVol = profs['combined_hi'].copy()
         dVol.descript = 'Propensity of Volume to depolarize (d).  This is not identical to the depolarization ratio.  See Gimmestad: 10.1364/AO.47.003795 or Hayman and Thayer: 10.1364/JOSAA.29.000400'
         dVol.label = 'Volume Depolarization'
@@ -729,7 +738,10 @@ def ProcessAirborneDataChunk(time_start,time_stop,
             beta_a.mask(count_mask)
             dPart.mask(count_mask)
             dVol.mask(count_mask)
-            profs['combined_hi'].mask(count_mask)
+            profs['combined'].mask(count_mask)
+            
+            if settings['Denoise_Mol']:
+                beta_a_denoise.mask(count_mask)
             
             if settings['get_extinction']:
                 alpha_a.mask(count_mask)
@@ -813,7 +825,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
             if settings['save_plots']:
                 plt.savefig(save_plots_path+'Aerosol_Depolarization_'+save_plots_base,dpi=300)        
             
-            rfig = lp.pcolor_profiles([profs['combined_hi']],scale=['log'],
+            rfig = lp.pcolor_profiles([profs['combined']],scale=['log'],
                                       climits=[[1e-1,1e4]],
                                       ylimits=[MinAlt*1e-3,MaxAlt*1e-3],tlimits=tlims,
                                       title_add=proj_label,

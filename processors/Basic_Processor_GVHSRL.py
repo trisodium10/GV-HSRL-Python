@@ -46,6 +46,10 @@ reanalysis_path = os.path.abspath(__file__+'/../../../external_data/')+'/'
 #save_file_path = '/Users/mhayman/Documents/Python/Lidar/'
 #save_file_path = '/h/eol/mhayman/HSRL/hsrl_processing/hsrl_configuration/projDir/calfiles/'
 
+settings = {
+    'deadtime_correct':True
+    }
+
 tres = 1*60.0  # resolution in time in seconds (0.5 sec)
 zres = 10.0  # resolution in altitude points (7.5 m)
 
@@ -74,8 +78,8 @@ Estimate_Mol_Gain = True # use statistics on BSR to estimate the molecular gain
 
 #basepath = '/scr/eldora1/HSRL_data/'  # old path - still works with link from HSRL_data to /hsrl/raw/
 #basepath = '/scr/eldora1/rsfdata/hsrl/raw/'  # new absolute path
-#basepath = '/Users/mhayman/Documents/HSRL/GVHSRL_data/'  # local computer data path
-basepath = '/scr/rain1/rsfdata/projects/socrates/hsrl/raw/' # socrates path
+basepath = '/Users/mhayman/Documents/HSRL/GVHSRL_data/'  # local computer data path
+#basepath = '/scr/rain1/rsfdata/projects/socrates/hsrl/raw/' # socrates path
     
 year_in = 2017
 month_in = 10
@@ -107,8 +111,6 @@ var_2d_list = ['molecular','combined_hi','combined_lo','cross']
 
 
 
-
-
 # grab raw data from netcdf files
 [timeD,time_dt,time_sec],var_1d_data, profs = gv.load_raw_data(time_start,time_stop,var_2d_list,var_1d_list,basepath=basepath,verbose=True,as_prof=True)
 
@@ -129,6 +131,8 @@ diff_data = np.load(cal_file_path+diff_geo_file)
 baseline_data = np.load(cal_file_path+baseline_file)
 #diff_data = np.load(cal_file_path+'diff_geo_GVHSRL20171025_tmp.npz')
 #baseline_data = np.load(cal_file_path+'diff_geo_GVHSRL20171025_tmp.npz')
+dead_time_list = lp.get_calval(time_start,cal_json,"Dead_Time",returnlist=var_2d_list)
+dead_time = dict(zip(var_2d_list,dead_time_list))
 
 lidar_location = lp.get_calval(time_start,cal_json,"Location",returnlist=['latitude','longitude'])
 
@@ -142,6 +146,12 @@ for var in profs.keys():
     if RemoveCals:
         # remove instances where the I2 cell is removed
         profs[var].remove_time_indices(cal_indices)
+    if settings['deadtime_correct']:
+        if hasattr(profs[var],'NumProfsList'):
+            profs[var].nonlinear_correct(dead_time[var],laser_shot_count=2000*profs[var].NumProfsList[:,np.newaxis],std_deadtime=5e-9)
+        else:
+            # number of laser shots is based on an assumption that there is one 0.5 second profile per time bin
+            profs[var].nonlinear_correct(dead_time[var],laser_shot_count=2000,std_deadtime=5e-9)
     profs[var].time_resample(tedges=master_time,update=True,remainder=False)
     int_profs[var] = profs[var].copy()
     int_profs[var].time_integrate()
@@ -150,12 +160,14 @@ for var in profs.keys():
     if var == 'combined_hi' and diff_geo_correct:
         profs[var].diff_geo_overlap_correct(diff_data['hi_diff_geo'])
     elif var == 'combined_lo' and diff_geo_correct:
-        profs[var].diff_geo_overlap_correct(diff_data['hi_diff_geo'])
-        profs[var].gain_scale(1.0/diff_data['lo_norm'])
+        profs[var].diff_geo_overlap_correct(diff_data['lo_diff_geo'])
+#        profs[var].gain_scale(1.0/diff_data['lo_norm'])
     profs[var].slice_range(range_lim=[0,MaxAlt])
     int_profs[var].bg_subtract(BGIndex)
     int_profs[var].slice_range(range_lim=[0,MaxAlt])
 
+
+profs['combined'],_ = gv.merge_hi_lo(profs['combined_hi'],profs['combined_lo'],plot_res=True)
 
 if load_reanalysis:
     pres,temp = ex.load_fixed_point_NCEP_TandP(profs['molecular'],lidar_location,reanalysis_path)
@@ -253,3 +265,26 @@ if plot_2D:
     #dPart.mask(dPartMask)
     #lp.pcolor_profiles([BSR,dVol],scale=['log','linear'],climits=[[1,5e2],[0,1.0]])
     #lp.pcolor_profiles([dVol],scale=['linear'],climits=[[0,1]])
+
+#import scipy.optimize
+#errfun = lambda x: np.nansum((profs['combined_hi'].profile.flatten()-profs['combined_lo'].profile.flatten()*x)**2/(profs['combined_hi'].profile_variance.flatten()+profs['combined_lo'].profile_variance.flatten()*x**2))
+#x0 =  1.0
+#sol1D = scipy.optimize.minimize_scalar(errfun) #,disp=0,x0,maxfun=2000,eta=1e-5 , ,opt_iterations,opt_exit_mode
+#comb_lo_gain = sol1D['x']
+#profs['combined_lo'].gain_scale(comb_lo_gain)
+#
+#
+#plt.figure(); 
+#plt.scatter(np.log10(profs['combined_lo'].profile.flatten()),np.log10(profs['combined_hi'].profile.flatten())); 
+#plt.plot([np.nanmin(np.log10(profs['combined_lo'].profile.flatten())),np.nanmax(np.log10(profs['combined_lo'].profile.flatten()))],[np.nanmin(np.log10(profs['combined_lo'].profile.flatten())),np.nanmax(np.log10(profs['combined_lo'].profile.flatten()))],'k--')
+#
+#combined = profs['combined_hi'].copy()
+#combined_to_lo = np.nonzero(np.logical_or( 
+#    profs['combined_hi'].profile_variance > profs['combined_lo'].profile_variance,
+#    np.isnan(profs['combined_hi'].profile)))
+#combined.profile[combined_to_lo]= profs['combined_lo'].profile[combined_to_lo]
+#combined.profile_variance[combined_to_lo]= profs['combined_lo'].profile_variance[combined_to_lo]
+#combined.descript = 'Merged hi/lo gain combined channel'
+#combined.label = 'Merged Combined Channel'
+#
+#lp.plotprofiles([profs['combined_lo'],profs['combined_hi'],combined],time=18.4*3600.0,varplot=True)

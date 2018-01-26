@@ -14,6 +14,10 @@ import glob
 import ptv.hsrl.denoise as denoise
 from ptv.estimators.poissonnoise import poissonmodel0
 
+import scipy.optimize
+
+import matplotlib.pyplot as plt
+
 
 
 def savitzky_golay(y, window_size, order, deriv=0, rate=1):
@@ -824,3 +828,52 @@ def DenoiseMolecular(MolRaw,beta_m_sonde=np.array([np.nan]),
     return MolDenoise,tune_list
         
 
+def merge_hi_lo(hi_prof,lo_prof,lo_gain=0,plot_res=False):
+    """
+    merge_hi_lo(hi_prof,lo_prof,lo_gain=0,plot_res=False)    
+    
+    merge combined_hi and combined_lo gain profiles into a single profile.
+    Nonlinear correction should be applied to the profiles prior to calling
+    this function in order to capture nonlinear response as an uncertainty 
+    in the hi gain channel.
+    
+    If no lo_gain adjustment is provided, the lo_gain is estimated
+
+    hi_prof - high gain profile
+    lo_prof - low gain profile    
+    plot_res - if true, returns a scatter plot of the data before and after
+        merging
+    
+        
+    
+    """
+    
+    if lo_gain == 0:
+        # if lo_gain is not specified, estimate it using an optimizor
+        errfun = lambda x: np.nansum((hi_prof.profile.flatten()-lo_prof.profile.flatten()*x)**2/(hi_prof.profile_variance.flatten()+lo_prof.profile_variance.flatten()*x**2))
+        sol1D = scipy.optimize.minimize_scalar(errfun) #,disp=0,x0,maxfun=2000,eta=1e-5 , ,opt_iterations,opt_exit_mode
+        lo_gain = sol1D['x']
+        print('hi/lo combined gain estimate: %f'%lo_gain)
+    lo_prof.gain_scale(lo_gain)
+    
+    
+    
+    combined = hi_prof.copy()
+    combined_to_lo = np.nonzero(np.logical_or( 
+        hi_prof.profile_variance > lo_prof.profile_variance,
+        np.isnan(hi_prof.profile)))
+    combined.profile[combined_to_lo]= lo_prof.profile[combined_to_lo]
+    combined.profile_variance[combined_to_lo]= lo_prof.profile_variance[combined_to_lo]
+    combined.descript = 'Merged hi/lo gain combined channel'
+    combined.label = 'Merged Combined Channel'
+    
+    if plot_res:
+        plt.figure(); 
+        plt.scatter(np.log10(lo_prof.profile.flatten()),np.log10(hi_prof.profile.flatten())); 
+        plt.scatter(np.log10(lo_prof.profile.flatten()),np.log10(combined.profile.flatten())); 
+        plt.plot([np.nanmin(np.log10(lo_prof.profile.flatten())),np.nanmax(np.log10(hi_prof.profile.flatten()))],[np.nanmin(np.log10(lo_prof.profile.flatten())),np.nanmax(np.log10(hi_prof.profile.flatten()))],'k--')
+        plt.grid(b=True)
+        plt.xlabel('Scaled Low Gain')
+        plt.ylabel('High Gain/Merged')
+        
+    return combined,lo_gain
