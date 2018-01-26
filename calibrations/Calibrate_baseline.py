@@ -43,6 +43,9 @@ save_file_path = save_path_ez
 
 basepath = '/scr/eldora1/rsfdata/hsrl/raw/'  # new absolute path
 #basepath = '/Users/mhayman/Documents/HSRL/GVHSRL_data/'  # local computer data path
+settings = {
+    'deadtime_correct':True,  # correct deadtime
+    }
 
 tres = 4*60.0  # resolution in time in seconds (0.5 sec)
 
@@ -55,7 +58,9 @@ day_in = 19
 start_hr = 20
 stop_hr = 2
 
-print('This program only writes empty (zeros) baseline files')
+
+
+#print('This program only writes empty (zeros) baseline files')
 
 print('Default Test Date:')
 print('(M/D/Y) %d/%d/%d, starting %.1f UTC for %.1f h'%(month_in,day_in,year_in,start_hr,stop_hr))
@@ -79,6 +84,18 @@ var_2d_list = ['cross','molecular','combined_hi','combined_lo']
 
 [timeD,time_dt,time_sec],var_1d_data, profs = gv.load_raw_data(cal_start,cal_stop,var_2d_list,var_1d_list,basepath=basepath,verbose=True,as_prof=True)
 
+import json
+filename = __file__
+cal_file_path = os.path.abspath(filename+'/../cal_files/')+'/'
+cal_file = cal_file_path + 'gv_calvals.json'
+
+with open(cal_file,"r") as f:
+    cal_json = json.loads(f.read())
+f.close()
+
+dead_time_list = lp.get_calval(cal_start,cal_json,"Dead_Time",returnlist=var_2d_list)
+dead_time = dict(zip(var_2d_list,dead_time_list))
+
 master_time = np.arange(time_sec[0]-tres/2,time_sec[-1]+tres/2,tres)
 
 t_profs,var_1d = gv.var_time_resample(master_time,time_sec,var_1d_data,average=True)
@@ -86,6 +103,12 @@ t_profs,var_1d = gv.var_time_resample(master_time,time_sec,var_1d_data,average=T
 range_int = {}
 plt.figure()
 for ai, var in enumerate(profs.keys()):
+    if settings['deadtime_correct']:
+        if hasattr(profs[var],'NumProfsList'):
+            profs[var].nonlinear_correct(dead_time[var],laser_shot_count=2000*profs[var].NumProfsList[:,np.newaxis],std_deadtime=5e-9)
+        else:
+            # number of laser shots is based on an assumption that there is one 0.5 second profile per time bin
+            profs[var].nonlinear_correct(dead_time[var],laser_shot_count=2000,std_deadtime=5e-9)
     profs[var].time_resample(tedges=master_time,update=True,remainder=False)
     range_int[var] = np.nansum(profs[var].profile,axis=1)
     plt.plot(profs[var].time/3600.0,range_int[var])

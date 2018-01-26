@@ -107,6 +107,8 @@ settings = {
     
     'LRassumed':30,  # assumed lidar ratio for OD estimate
     
+    'deadtime_correct':True,  # correct deadtime
+    
     'airborne':False, # is the lidar airborne (downward poinging) 
     'Airspeed_Threshold':15, # threshold for determining start and end of the flight (in m/s)
     'ground_range_buffer':3e3,  # max altitude of ground [m] to avoid counting it as a cloud    
@@ -252,6 +254,18 @@ if settings['airborne']:
     cal_start = time_start
     cal_stop = time_stop
 
+import json
+filename = __file__
+cal_file_path = os.path.abspath(filename+'/../cal_files/')+'/'
+cal_file = cal_file_path + 'gv_calvals.json'
+
+with open(cal_file,"r") as f:
+    cal_json = json.loads(f.read())
+f.close()
+
+dead_time_list = lp.get_calval(cal_start,cal_json,"Dead_Time",returnlist=var_2d_list)
+dead_time = dict(zip(var_2d_list,dead_time_list))
+
 # grab raw data from netcdf files
 [timeD,time_dt,time_sec],var_1d_data, profs = gv.load_raw_data(cal_start,cal_stop,var_2d_list,var_1d_list,basepath=basepath,verbose=True,as_prof=True)
 #time_start = datetime.datetime(year_in,month_in,day_in)+datetime.timedelta(hours=start_hr)
@@ -304,6 +318,12 @@ for var in profs.keys():
         # remove instances where the I2 cell is removed
         profs[var].remove_time_indices(cal_indices)
         
+    if settings['deadtime_correct']:
+        if hasattr(profs[var],'NumProfsList'):
+            profs[var].nonlinear_correct(dead_time[var],laser_shot_count=2000*profs[var].NumProfsList[:,np.newaxis],std_deadtime=5e-9)
+        else:
+            # number of laser shots is based on an assumption that there is one 0.5 second profile per time bin
+            profs[var].nonlinear_correct(dead_time[var],laser_shot_count=2000,std_deadtime=5e-9)
     profs[var].time_resample(tedges=master_time,update=True,remainder=False)
         
 #    int_profs[var] = profs[var].copy()

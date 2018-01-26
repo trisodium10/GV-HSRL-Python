@@ -44,6 +44,10 @@ save_file_path = save_path_ez
 #save_file_path = '/Users/mhayman/Documents/Python/Lidar/'
 #save_file_path = '/h/eol/mhayman/HSRL/hsrl_processing/hsrl_configuration/projDir/calfiles/'
 
+settings = {
+    'deadtime_correct':True  # correct deadtime
+    }
+
 airborne = False
 
 sg_win = 11
@@ -103,6 +107,17 @@ var_1d_list = ['total_energy','RemoveLongI2Cell'\
 # list of 2D variables (profiles) to load
 var_2d_list = ['molecular','combined_hi','combined_lo']  # 'cross',
 
+import json
+filename = __file__
+cal_file_path = os.path.abspath(filename+'/../cal_files/')+'/'
+cal_file = cal_file_path + 'gv_calvals.json'
+
+with open(cal_file,"r") as f:
+    cal_json = json.loads(f.read())
+f.close()
+
+dead_time_list = lp.get_calval(cal_start,cal_json,"Dead_Time",returnlist=var_2d_list)
+dead_time = dict(zip(var_2d_list,dead_time_list))
 
 
 #basepath = '/scr/eldora1/HSRL_data/'  # old path - still works with link from HSRL_data to /hsrl/raw/
@@ -141,6 +156,12 @@ ax2.tick_params('y', colors='r')
 master_time = np.arange(time_sec[0]-tres/2,time_sec[-1]+tres/2,tres)
 
 for var in profs.keys():
+    if settings['deadtime_correct']:
+        if hasattr(profs[var],'NumProfsList'):
+            profs[var].nonlinear_correct(dead_time[var],laser_shot_count=2000*profs[var].NumProfsList[:,np.newaxis],std_deadtime=5e-9)
+        else:
+            # number of laser shots is based on an assumption that there is one 0.5 second profile per time bin
+            profs[var].nonlinear_correct(dead_time[var],laser_shot_count=2000,std_deadtime=5e-9)
     profs[var].time_resample(tedges=master_time,update=True,remainder=False)
     profs[var].bg_subtract(BGIndex)
 
