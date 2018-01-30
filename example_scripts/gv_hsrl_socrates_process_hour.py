@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 """
 Process a full flight in hour increments
 """
-
+process_start_time = datetime.datetime.now()
 process_vars = {}
 process_vars['proj'] = 'SOCRATES'
 #process_vars['flt'] = process_vars['proj']+'tf02'
@@ -25,7 +25,7 @@ process_vars['flight_time_stop'] = datetime.timedelta(hours=18,minutes=29)
 #process_vars['flight_time_stop'] = process_vars['flight_time_start'] + datetime.timedelta(hours=0,minutes=30)
 
 # size of each processing step
-time_increment = datetime.timedelta(hours=0,minutes=20)
+time_increment = datetime.timedelta(hours=1,minutes=0)
 # size of a processesed data set
 time_duration = datetime.timedelta(hours=1,minutes=0)
 #time_duration = time_increment
@@ -33,7 +33,7 @@ time_duration = datetime.timedelta(hours=1,minutes=0)
 settings = {
     'full_flight':True, # process the entire flight
     'tres':0.5,  # resolution in time in seconds (0.5 sec) before altitude correction
-    'tres_post':10.0, # resolution after altitude correction (in seconds) -  set to zero to not use
+    'tres_post':2.0, # resolution after altitude correction (in seconds) -  set to zero to not use
     'zres':7.5,  # altitude resolution in meters (7.5 m minimum)
     
     #mol_gain = 1.133915#1.0728915  # gain adjustment to molecular channel
@@ -54,32 +54,34 @@ settings = {
     'get_extinction':True, # retrieve extinction estimate
     
     'diff_geo_correct':True,  # apply differential overlap correction
+    'deadtime_correct':True,  # perform deadtime correction
     
     'load_reanalysis':False, # load T and P reanalysis from NCEP/NCAR Model
     
-    'plot_2D':True,   # pcolor plot the BSR and depolarization profiles
+    'plot_2D':False,   # pcolor plot the BSR and depolarization profiles
     'show_plots':False, # show plots in a matplotlib window
     'plot_date':True,  # plot results in date time format.  Otherwise plots as hour floats
     
-    'save_plots':True, # save the plot data
+    'save_plots':False, # save the plot data
     
-    'save_data':False, # save data as netcdf
+    'save_data':True, # save data as netcdf
     
     'save_flight_folder':True, # save data/plots in folders according to flight name
     
     'time_axis_scale':5.0,  # scale for horizontal axis on pcolor plots    
     'count_mask_threshold':2.0,  # count mask threshold (combined_hi).  If set to zero, no mask applied 
     
-    'Estimate_Mol_Gain':True, # use statistics on BSR to estimate the molecular gain
+    'Estimate_Mol_Gain':False, # use statistics on BSR to estimate the molecular gain
     
     'hsrl_rb_adjust':True, # adjust for Rayleigh Brillouin Spectrum
     
     'Denoise_Mol':False, # run PTV denoising on molecular channel
+    'denoise_accel':False, # run accelerated denoising 
     
     
-    'Airspeed_Threshold':15, # threshold for determining start and end of the flight (in m/s)
+    'Airspeed_Threshold':25, # threshold for determining start and end of the flight (in m/s)
     
-    'loadQWP':'all',  # load 'fixed','rotating', or 'all' QWP data
+    'loadQWP':'fixed',  # load 'fixed','rotating', or 'all' QWP data
     
     'as_altitude':True # process in altitude centered format or range centered format
     }
@@ -103,7 +105,7 @@ settings = {
 
 PathFile = os.path.abspath(__file__+'/../')+'/gv_hsrl_socrates_paths.py'
 
-
+print('Paths stored in: ' +PathFile)
 
 # load path data for this computer
 exec(open(PathFile).read())
@@ -159,11 +161,15 @@ while run_loop:
         
     
     dp.ProcessAirborneDataChunk(time_start,time_stop,
-                             settings=settings,paths=paths,process_vars=process_vars)
+                             settings=settings,paths=paths,process_vars=process_vars,date_reference=day_start)
     
 
     time_start = time_stop
     time_stop = time_stop+time_increment
     #    time_start = time_stop #+datetime.timedelta(seconds=0.1)
-    
-plt.show()
+process_stop_time = datetime.datetime.now()
+#plt.show()
+
+print('processing began ' + process_start_time.strftime('%Y-%b-%d %H:%M'))
+print('processing completed ' + process_stop_time.strftime('%Y-%b-%d %H:%M'))
+print('processing duration %f hours' %((process_stop_time-process_start_time).total_seconds()/3600.0))

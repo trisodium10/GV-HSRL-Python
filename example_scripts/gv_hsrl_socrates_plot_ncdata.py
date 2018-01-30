@@ -26,18 +26,19 @@ import GVHSRLlib as gv
 prof_list = ['Aerosol_Backscatter_Coefficient','Aerosol_Extinction_Coefficient',
              'Particle_Depolarization','Volume_Depolarization'] #'Aerosol_Extinction_Coefficient'
 
-MaxAlt = 12e3
-MinAlt = 0
+MaxAlt = 49e3
+MinAlt = -2e3
 
 # size of each processing step
-time_increment = datetime.timedelta(hours=0,minutes=20)
+time_increment = datetime.timedelta(hours=0,minutes=5)
 # size of a processesed data set
-time_duration = datetime.timedelta(hours=1,minutes=0)
+time_duration = datetime.timedelta(hours=0,minutes=5)
 #time_duration = time_increment
 
 
 new_settings = {
             'plot_date':True,
+	    'plot_kft':True,
             'time_axis_scale':5.0,
             'alt_axis_scale':1.0,
             'save_data':True,
@@ -96,8 +97,11 @@ time_start0,time_stop0,settings,paths,process_vars = \
     ds.SelectAirborneData(settings=settings,paths=paths,process_vars=process_vars)
 
 #ncfilename = '/Users/mhayman/Documents/HSRL/GVHSRL/data/SOCRATEStf02/SOCRATEStf02_GVHSRL_20180104T1700_20180104T1800.nc'
+try:
+	day_start = process_vars['aircraft_t_ref']
+except KeyError:
+	day_start = datetime.datetime(year=time_start0.year,month=time_start0.month,day=time_start0.day)
 
-day_start = datetime.datetime(year=time_start0.year,month=time_start0.month,day=time_start0.day)
 t0 = time_start0-day_start
 
 
@@ -114,7 +118,8 @@ print('\nSaving plots to:')
 print(paths['save_plots_path']+'\n')
 
 time_start = day_start + datetime.timedelta(seconds=np.floor(t0.total_seconds()/time_increment.total_seconds())*time_increment.total_seconds())
-time_stop = day_start + datetime.timedelta(seconds=np.floor(t0.total_seconds()/time_increment.total_seconds())*time_increment.total_seconds())+time_duration
+time_stop = time_start + time_increment
+#time_stop = day_start + datetime.timedelta(seconds=np.floor(t0.total_seconds()/time_increment.total_seconds())*time_increment.total_seconds())+time_duration
 loop_data = True
 
 
@@ -126,15 +131,16 @@ while loop_data:
         filestart = datetime.datetime.strptime(nclist[ai][-30:-17],'%Y%m%dT%H%M')
         filestop = datetime.datetime.strptime(nclist[ai][-16:-3],'%Y%m%dT%H%M')
 
-        if time_start <= filestart and time_stop > filestart:
+        if time_start <= filestart and time_stop >= filestart:
             findex.extend([ai])
-        elif time_start < filestop and time_stop >= filestop:
+        elif time_start <= filestop and time_stop >= filestart:
             findex.extend([ai])
         
     
     save_plots_base = process_vars['flt']+'_GVHSRL_'+time_start.strftime('%Y%m%dT%H%M')+'_'+time_stop.strftime('%Y%m%dT%H%M')    
     tlims = [(time_start-day_start).total_seconds()/3600.0,(time_stop-day_start).total_seconds()/3600.0]
     print(time_start.strftime('%H:%M') + ' - ' + time_stop.strftime('%H:%M')+':')
+    #print('[%f,%f]'%(tlims[0],tlims[1]))
     prof_start = True
     profs = {}
     for fi in findex:
@@ -144,6 +150,8 @@ while loop_data:
         t_data0 = lp.ncvar(f,'time').astype(np.float)
         f.close()
         
+        #print(alt_data0.shape)
+        #print(t_data0.shape)
         
         
         if prof_start:
@@ -167,34 +175,42 @@ while loop_data:
         
     if len(nclist) > 0:  
         for var in prof_list:
-            
-#            profs[var] = lp.load_nc_Profile(ncfilename,var,mask=True)
-            
-        #    tlims = [profs[var].time[0]/3600.0,profs[var].time[-1]/3600.0]
-            print('   ' + var)
-            rfig = lp.pcolor_profiles([profs[var]],scale=[plot_settings[var]['scale']],
-                                              climits=[plot_settings[var]['climits']],
-                                              ylimits=[MinAlt*1e-3,MaxAlt*1e-3],
-                                              tlimits=tlims,
-                                              title_add=process_vars['proj_label'],
-                                              plot_date=settings['plot_date'],
-                                              t_axis_scale=settings['time_axis_scale'],
-                                              h_axis_scale=settings['alt_axis_scale'],
-                                              minor_ticks=5,major_ticks=1
-                                              )
-            if settings['plot_date']:
-                t1d_plt = mdates.date2num([datetime.datetime.fromordinal(profs[var].StartDate.toordinal()) \
-                            + datetime.timedelta(seconds=sec) for sec in t_data])   
-            else:
-                t1d_plt = t_data/3600.0
-        
-            for ai in range(len(rfig[1])):
-                rfig[1][ai].plot(t1d_plt,alt_data*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude     
-            if settings['save_plots']:
-                plt.savefig(paths['save_plots_path']+var+'_'+save_plots_base,dpi=300)
-                #                print('   ' + paths['save_plots_path']+var+'_'+save_plots_base)
-        plt.close('all') 
-        
+	    	try:
+		    profs[var].slice_time([tlims[0]*3600,tlims[1]*3600])
+	#            profs[var] = lp.load_nc_Profile(ncfilename,var,mask=True)
+		    
+		#    tlims = [profs[var].time[0]/3600.0,profs[var].time[-1]/3600.0]
+		    print('   ' + var + ' %d data points'%profs[var].profile.shape[0])
+		    if profs[var].time.size > 10:
+		    	rfig = lp.pcolor_profiles([profs[var]],scale=[plot_settings[var]['scale']],
+		                                      climits=[plot_settings[var]['climits']],
+		                                      ylimits=[MinAlt*1e-3,MaxAlt*1e-3],
+		                                      tlimits=tlims,
+		                                      title_add=process_vars['proj_label'],
+		                                      plot_date=settings['plot_date'],
+		                                      t_axis_scale=settings['time_axis_scale'],
+		                                      h_axis_scale=settings['alt_axis_scale'],
+		                                      minor_ticks=0,major_ticks=1.0/60.0,plt_kft=settings['plot_kft']
+		                                      )
+		    	if settings['plot_date']:
+		        	t1d_plt = mdates.date2num([datetime.datetime.fromordinal(profs[var].StartDate.toordinal()) \
+		                    	+ datetime.timedelta(seconds=sec) for sec in t_data])   
+		    	else:
+		        	t1d_plt = t_data/3600.0
+			if settings['plot_kft']:
+				range_adj = 3.28084
+			else:
+				range_adj = 1.0
+
+		    	for ai in range(len(rfig[1])):
+		        	rfig[1][ai].plot(t1d_plt,alt_data*1e-3*range_adj,color='gray',linewidth=1.2)  # add aircraft altitude     
+		    	if settings['save_plots']:
+		        	plt.savefig(paths['save_plots_path']+var+'_'+save_plots_base,dpi=300)
+		        #                print('   ' + paths['save_plots_path']+var+'_'+save_plots_base)
+		    	plt.close('all') 
+		except KeyError:
+			print('   ' + var + ' not found')
+
         
     if time_stop >= time_stop0:
         loop_data = False
