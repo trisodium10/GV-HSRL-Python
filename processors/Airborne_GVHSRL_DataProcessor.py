@@ -749,7 +749,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         
         
         
-        save_prof_list = [beta_a,dPart,dVol,BSR,beta_m]
+        save_prof_list = [beta_a,dPart,dVol,BSR,beta_m,temp,pres]
         # add all channels to list of profilse to save
         for var in profs.keys():
             save_prof_list.extend([profs[var]])
