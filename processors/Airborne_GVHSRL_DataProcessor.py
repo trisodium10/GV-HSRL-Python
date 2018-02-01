@@ -697,15 +697,15 @@ def ProcessAirborneDataChunk(time_start,time_stop,
             # based on a histogram minimum in BSR over the loaded data
             
             iUp = np.nonzero(var_post['TelescopeDirection']==1.0)[0]            
-            lp.Estimate_Mol_Gain(BSR,iKeep=iUp,mol_gain=mol_gain_up,alt_lims=[2000,4000],label='Telescope Up',plot=True)
-            if settings['save_mol_gain_plot']:
+            mol_adj_up = lp.Estimate_Mol_Gain(BSR,iKeep=iUp,mol_gain=mol_gain_up,alt_lims=[2000,4000],label='Telescope Up',plot=True)
+            if settings['save_mol_gain_plot'] and mol_adj_up != 1.0:
                 # double zero at beginning of filename just to put plots at the front of a sorted list of profiles
                 plt.savefig(save_plots_path+'00_Molecular_Gain_Up_'+save_plots_base,dpi=300)
             
             
             iDown = np.nonzero(var_post['TelescopeDirection']==0.0)[0]
-            lp.Estimate_Mol_Gain(BSR,iKeep=iDown,mol_gain=mol_gain_down,alt_lims=[2000,4000],label='Telescope Down',plot=True)
-            if settings['save_mol_gain_plot']:
+            mol_adj_down = lp.Estimate_Mol_Gain(BSR,iKeep=iDown,mol_gain=mol_gain_down,alt_lims=[2000,4000],label='Telescope Down',plot=True)
+            if settings['save_mol_gain_plot'] and mol_adj_down != 1.0:
                 # double zero at beginning of filename just to put plots at the front of a sorted list of profiles
                 plt.savefig(save_plots_path+'00_Molecular_Gain_Down_'+save_plots_base,dpi=300)
             
