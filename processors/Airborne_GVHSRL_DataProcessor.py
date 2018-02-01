@@ -107,6 +107,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         'd_part_res_lim':0.25,  # resolution limit to decide where to mask particle depolarization data
         
         'Estimate_Mol_Gain':True, # use statistics on BSR to estimate the molecular gain
+        'save_mol_gain_plot':False, # save the results of the molecular gain estimate
         
         'hsrl_rb_adjust':True, # adjust for Rayleigh Brillouin Spectrum
         
@@ -697,10 +698,16 @@ def ProcessAirborneDataChunk(time_start,time_stop,
             
             iUp = np.nonzero(var_post['TelescopeDirection']==1.0)[0]            
             lp.Estimate_Mol_Gain(BSR,iKeep=iUp,mol_gain=mol_gain_up,alt_lims=[2000,4000],label='Telescope Up',plot=True)
+            if settings['save_mol_gain_plot']:
+                # double zero at beginning of filename just to put plots at the front of a sorted list of profiles
+                plt.savefig(save_plots_path+'00_Molecular_Gain_Up_'+save_plots_base,dpi=300)
             
             
             iDown = np.nonzero(var_post['TelescopeDirection']==0.0)[0]
             lp.Estimate_Mol_Gain(BSR,iKeep=iDown,mol_gain=mol_gain_down,alt_lims=[2000,4000],label='Telescope Down',plot=True)
+            if settings['save_mol_gain_plot']:
+                # double zero at beginning of filename just to put plots at the front of a sorted list of profiles
+                plt.savefig(save_plots_path+'00_Molecular_Gain_Down_'+save_plots_base,dpi=300)
             
         
         
