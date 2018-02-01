@@ -225,7 +225,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
             print('  No save path (save_data_path) is provided')
             settings['save_data'] = False
     
-    if settings['save_plots']:
+    if settings['save_plots'] or settings['save_mol_gain_plot']:
         try:
             save_plots_path = paths['save_plots_path']
             save_plots_base = flt+'_GVHSRL_'+time_start.strftime('%Y%m%dT%H%M')+'_'+time_stop.strftime('%Y%m%dT%H%M')
