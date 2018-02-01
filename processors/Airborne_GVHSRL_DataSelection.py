@@ -92,6 +92,8 @@ def SelectAirborneData(settings={},paths={},process_vars={}):
         
         'save_flight_folder':False, # save data/plots in folders according to flight name
         
+        'save_mol_gain_plot':False, # save plots from molecular gain estimate
+        
 #        'time_axis_scale':5.0,  # scale for horizontal axis on pcolor plots
 #        'count_mask_threshold':2.0,  # count mask threshold (combined_hi).  If set to zero, no mask applied  
 #        'd_part_res_lim':0.25,  # resolution limit to decide where to mask particle depolarization data
@@ -294,7 +296,8 @@ def SelectAirborneData(settings={},paths={},process_vars={}):
     # set the save paths based on the flight name if 
     # save_flight_folder is enabled    
     
-    if settings['save_data'] and settings['save_flight_folder']:
+    # unecessary condition?  and settings['save_flight_folder']
+    if settings['save_data']:
         try:
             flt_save_path = paths['save_data_path']+process_vars['flt']+'/'
             if not os.path.exists(flt_save_path):
@@ -304,8 +307,9 @@ def SelectAirborneData(settings={},paths={},process_vars={}):
             print('Save data is disabled')
             print('  No save path (save_data_path) is provided')
             settings['save_data'] = False
-    
-    if settings['save_plots'] and settings['save_flight_folder']:
+            
+    # unnecessary condition ?  and settings['save_flight_folder']
+    if settings['save_plots'] or settings['save_mol_gain_plot']:
         try:
             flt_plot_path = paths['save_plots_path']+process_vars['flt']+'/'
             if not os.path.exists(flt_plot_path):
