@@ -565,14 +565,14 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                 
             print('Denoising Molecular Channel')
             MolDenoise,tune_list = gv.DenoiseMolecular(MolRaw,beta_m_sonde=beta_m_ext.copy(), \
-                                    MaxAlt=range_trim,accel = settings['denoise_accel'],tv_lim =[1.5, 2.8],N_tv_pts=59, \
+                                    MaxAlt=range_trim,accel = settings['denoise_accel'],tv_lim =[1.5, 2.2],N_tv_pts=21, \
                                     bg_index=-10,n=1,geo_data=geo_denoise,geo_key='geo_mol',verbose=False, \
-                                    plot_result=settings['denoise_debug_plots'],eps_opt=settings['denoise_eps']) # dict(geo_prof=np.array([2e14])), geo_data=geo_data,geo_key='geo_mol'
+                                    plot_result=settings['denoise_debug_plots'],eps_opt=settings['denoise_eps']) # dict(geo_prof=np.array([2e14])), geo_data=geo_data,geo_key='geo_mol'  #tv_lim =[1.5, 2.8],N_tv_pts=59
 #            # testing and debugging
-            MolRaw.bg_subtract(-10)
-            lp.plotprofiles([MolRaw,MolDenoise],time=22.12*3600)
-            lp.plotprofiles([MolRaw,MolDenoise],time=22.04*3600)
-            plt.show()
+#            MolRaw.bg_subtract(-10)
+#            lp.plotprofiles([MolRaw,MolDenoise],time=22.12*3600)
+#            lp.plotprofiles([MolRaw,MolDenoise],time=22.04*3600)
+#            plt.show()
             
             MolDenoise.slice_range(range_lim=[0,range_trim])
 
