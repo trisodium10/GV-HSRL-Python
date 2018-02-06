@@ -326,19 +326,71 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         if tres > 0.5:
             master_time = np.arange(sec_start-tres/2,sec_stop+tres/2,tres)
             time_1d,var_1d = gv.var_time_resample(master_time,time_sec,var_1d_data,average=True)
+            # estimate the cal grid points that need to be removed in the new time resolution.
+            cal_ind_tres = np.unique(np.digitize(profs['combined_hi'].time[cal_indices],master_time))
         else:
             time_1d = time_sec.copy()
             var_1d = var_1d_data.copy()
+            cal_ind_tres = cal_indices.copy()
+#        print('Time Axes')
+#        print(time_1d.shape)
+#        print(time_1d[0]/3600.0)
+#        print(time_1d[-1]/3600.0)
+#        print(time_sec[0]/3600.0)
+#        print(time_sec[-1]/3600.0)
+#        print(time_sec.shape)
+#        print(master_time[0]/3600.0)
+#        print(master_time[-1]/3600.0)
+#        print(master_time.shape)
+#        print(air_data['Time'][0]/3600.0)
+#        print(air_data['Time'][-1]/3600.0)
+#        print(air_data['Time'].shape)
+        
+        
+        
+        
+        air_data_t = gv.interp_aircraft_data(time_1d,air_data)
         
         if settings['RemoveCals']:
             time_1d = np.delete(time_1d,cal_indices)
-            var_1d = gv.delete_indices(var_1d,cal_indices)
+            var_1d = gv.delete_indices(var_1d,cal_ind_tres)
+            air_data_t = gv.delete_indices(air_data_t,cal_ind_tres)
+        
+        # if there is no valid data don't process this chunk
+        if time_1d.size == 0:
+            print('No atmospheric data, skipping this data set')
+            run_processing = False
+            break
+#        print(time_1d.size)
+#        print(time_1d[0]/3600.0)
+#        print(time_1d[-1]/3600.0)
         
         if settings['as_altitude']:
             master_alt = np.arange(MinAlt,MaxAlt+zres,zres)
         
+#        print(air_data_t['Time'][0]/3600.0)
+#        print(air_data_t['Time'][-1]/3600.0)
+#        print(air_data_t['Time'].shape)
+#        print(np.max(air_data_t['GGALT']))
+#        print(np.min(air_data_t['GGALT']))
+#        print(air_data_t['Time'].shape)
         
-        air_data_t = gv.interp_aircraft_data(time_1d,air_data)
+#        # find instances in raw data where I2 cell is removed
+#        if 'RemoveLongI2Cell' in var_1d_data.keys():
+#            cal_indices = np.nonzero(var_1d_data['RemoveLongI2Cell'] < 50)[0]
+#        else:
+#            cal_indices = []
+#        
+#        # find instances where the lidar is not transmitting
+#        if settings['Remove_Off_Data']:
+#            _,off_indices = profs['combined_hi'].trim_to_on(ret_index=True,delete=False,SNRlim=settings['SNRlimit'])
+#            cal_indices = np.unique(np.concatenate((off_indices,cal_indices)))
+#        
+#        if settings['RemoveCals']:
+#            time_1d = np.delete(time_1d,cal_indices)
+#            var_1d = gv.delete_indices(var_1d,cal_indices)
+                
+        
         
         # time resolution after range to altitude conversion
         if tres_post > 0:
