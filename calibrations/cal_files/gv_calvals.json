@@ -87,7 +87,8 @@
            {"date": "25-Jan-2018 0:0","Project":"SOCRATES","Flight Number": 5,"Flight Designation": "rf"},
            {"date": "28-Jan-2018 0:0","Project":"SOCRATES","Flight Number": 6,"Flight Designation": "rf"},
            {"date": "30-Jan-2018 0:0","Project":"SOCRATES","Flight Number": 7,"Flight Designation": "rf"},
-           {"date": "3-Feb-2018 0:0","Project":"SOCRATES","Flight Number": 8,"Flight Designation": "rf"}
+           {"date": "3-Feb-2018 0:0","Project":"SOCRATES","Flight Number": 8,"Flight Designation": "rf"},
+           {"date": "4-Feb-2018 0:0","Project":"SOCRATES","Flight Number": 9,"Flight Designation": "rf"}
 	],
 
 	"Comments": [
