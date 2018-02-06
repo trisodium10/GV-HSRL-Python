@@ -345,6 +345,7 @@ def interp_aircraft_data(master_time,aircraft_data):
     for var in aircraft_data.keys():
         if var != 'Time':
             air_data_new[var] = np.interp(master_time,aircraft_data['Time'],aircraft_data[var])
+    air_data_new['Time'] = master_time.copy()  # update the time variable
     return air_data_new
 
 def var_time_resample(tedges,var_time,varlist,average=True,remainder=False):
@@ -630,7 +631,7 @@ def DenoiseMolecular(MolRaw,beta_m_sonde=np.array([np.nan]),
                     MaxAlt=np.nan,n=1,start_time=0,end_time=np.nan,
                     verbose=False,accel = False,tv_lim =[0.4, 1.8],N_tv_pts=48,
                     bg_index = -50,geo_key='geo_prof',MolGain_Adj = 0.75,
-                    plot_result=False,eps_opt = 1e-5):
+                    plot_result=False,eps_opt = 1e-5,tv_bound=True):
     """
     Use Willem Marais' functions to denoise the molecular signal in an 
     HSRL signal.
@@ -654,6 +655,8 @@ def DenoiseMolecular(MolRaw,beta_m_sonde=np.array([np.nan]),
         between estimated backscatter and observed.
     plot_result - plot results of each iteration (for debugging only)
     eps_opt - optimization precision.
+    tv_bound - bound optimization limits to those given in tv_lim.  Only used
+        if accel = True.  Otherwise the accelerated tv_lims are unbounded.
     """
     
 #    bg_index = -50    
@@ -690,7 +693,16 @@ def DenoiseMolecular(MolRaw,beta_m_sonde=np.array([np.nan]),
     fit_range_array = MolRaw.range_array.copy()
     fit_range_array[np.nonzero(fit_range_array==0)] = 1
     
+    percent_index = 0
+    percent_array = np.arange(0,110,5)
+    
     for i_prof in range(np.ceil(MolRaw.time.size*1.0/n).astype(np.int)):
+        
+        percent_complete = 100.0*i_prof/np.ceil(MolRaw.time.size*1.0/n)
+        if percent_complete >= percent_array[percent_index]:
+            percent_index = percent_index+1
+            print('%d %% complete'%percent_complete)
+        
     
         istart = i_prof*n
         iend = np.min(np.array([istart + n,MolRaw.time.size]))
@@ -780,8 +792,13 @@ def DenoiseMolecular(MolRaw,beta_m_sonde=np.array([np.nan]),
             # Use for 1D denoising:  
             # Defaults: log10_reg_lst = [-2, 2], nr_reg_int = 48
         
-            if accel and i_prof > 0:        
-                tv_reg = [log_tune[np.argmin(valid_val)]*0.8, log_tune[np.argmin(valid_val)]*1.2]  # log of range of TV values to test
+            if accel and i_prof > 0:
+                if tv_bound:
+                    tv_min = np.max([log_tune[np.argmin(valid_val)]*0.8,tv_lim[0]])
+                    tv_max = np.min([log_tune[np.argmin(valid_val)]*1.2,tv_lim[1]])
+                    tv_reg = [tv_min, log_tune[np.argmin(valid_val)]*1.2]
+                else:
+                    tv_reg = [log_tune[np.argmin(valid_val)]*0.8, tv_max]  # log of range of TV values to test
                 nr_int = 5  # number of TV values to test
             else:
                 tv_reg = tv_lim  # log of range of TV values to test
