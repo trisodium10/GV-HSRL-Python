@@ -894,3 +894,60 @@ def merge_hi_lo(hi_prof,lo_prof,lo_gain=0,plot_res=False):
         plt.ylabel('High Gain/Merged')
         
     return combined,lo_gain
+    
+    
+    
+def AerosolBackscatter(MolProf,CombProf,CrossProf,Sonde,negfilter=True,eta_am=0.0,eta_ac=1.0,eta_mm=1.0,eta_mc=1.0,eta_x=0.0,gm=1.0):
+    """
+    Calculate the Aerosol Backscatter Coeffcient LidarProfiles: Molecular and Combined Channels
+    Expects a 2d sonde profile that has the same dimensions as the Molecular and combined channels
+    MolProf - molecular lidar profile (parallel polarized)
+    CombProf - combined lidar profile (parallel polarized)
+    CrossProf - cross polarized combined lidar profile
+    Sonde - backscatter coefficient of molecular returns
+    eta_am - transmission efficiency of aerosols into molecular channel (cross talk)
+    eta_ac - transmission efficiency of aerosols into the combined channel
+    eta_mm - transmission efficiency of molecules into the molecular channel (Rayleigh-Brillioun correction)
+    eta_mc - transmission efficiency of molecules into the combined channel (Rayleigh-Brillioun correction)
+    eta_x - parallel polarized cross talk into the cross polarized channel
+    gm - molecular gain.  Set to 1.0 if adjusted prior to this function.
+    Set negfilter = False to avoid filtering out negative values
+    """
+    
+    ## Account for cross talk errors and Rayleigh-Brillioun efficiency effects
+    # to obtain polarized molecular and aerosol backscatter signals
+    dm = 0.00727345  # a priori known molecular depolarization
+    mol = (MolProf*eta_ac-gm*CombProf*eta_am)/((dm-1)*gm*(eta_am*eta_mc-eta_ac*eta_mm))
+    aer_par = (MolProf*eta_mc - gm*CombProf*eta_mm)/(gm*eta_am*eta_mc - gm*eta_ac*eta_mm)
+    aer_per = (dm*MolProf*eta_ac*eta_mc+(CrossProf-CombProf*eta_x)*(gm*(eta_am*eta_mc-eta_ac*eta_mm))+dm*gm*(CrossProf*(-eta_am*eta_mc+eta_ac*eta_mm)+CombProf*eta_am*eta_mc*(-1+eta_x)-CombProf*eta_ac*eta_mm*eta_x))/((-1+dm)*gm*eta_ac*(-eta_am*eta_mc+eta_ac*eta_mm))
+      
+    Beta_AerBS = MolProf.copy()
+
+    # calculate backscatter ratio
+    BSR = (aer_par+aer_per+mol)/mol
+    BSR.descript = 'Ratio of combined to molecular backscatter'
+    BSR.label = 'Backscatter Ratio'
+    BSR.profile_type = 'unitless'
+    
+#    Beta_AerBS.profile = (BSR-1)*beta_m_sonde[np.newaxis,:]    # only aerosol backscatter
+    Beta_AerBS = (BSR-1)
+#    Beta_AerBS.profile_variance = MolProf.profile_variance*(CombProf.profile)**2/(MolProf.profile)**4+CombProf.profile_variance*1/(MolProf.profile)**2  
+    Beta_AerBS.multiply_prof(Sonde)  
+    
+    Beta_AerBS.descript = 'Calibrated Measurement of Aerosol Backscatter Coefficient in m^-1 sr^-1'
+    Beta_AerBS.label = 'Aerosol Backscatter Coefficient'
+    Beta_AerBS.profile_type = '$m^{-1}sr^{-1}$'
+    
+    dPart = aer_per/(aer_per+aer_par)
+    dPart.descript = 'Propensity of Particles to depolarize (d).  This is not identical to the depolarization ratio.  See Gimmestad: 10.1364/AO.47.003795 or Hayman and Thayer: 10.1364/JOSAA.29.000400'
+    dPart.label = 'Particle Depolarization'
+    dPart.profile_type = 'unitless'
+    
+    
+    if negfilter:
+        Beta_AerBS.profile[np.nonzero(Beta_AerBS.profile <= 0)] = 1e-10;
+    
+    return Beta_AerBS,dPart,BSR
+
+
+

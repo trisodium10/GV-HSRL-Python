@@ -643,26 +643,33 @@ def ProcessAirborneDataChunk(time_start,time_stop,
             nu_max = 10e9 # max frequency relative to line center
             nu = np.arange(-nu_max,nu_max,dnu)
             Ti2 = np.interp(nu,i2_data['freq']*1e9,i2_data['mol_scan'])  # molecular transmission
+            Tam = np.interp(0,i2_data['freq']*1e9,i2_data['mol_scan'])  # aersol transmission into molecular channel
             
             Tc2 = np.interp(nu,i2_data['freq']*1e9,i2_data['combined_scan'])  # combined transmission
+            Tac = np.interp(0,i2_data['freq']*1e9,i2_data['combined_scan'])  # aersol transmission into combined channel
             
             [eta_i2,eta_c] = lp.RB_Efficiency([Ti2,Tc2],temp.profile.flatten(),pres.profile.flatten()*9.86923e-6,profs['molecular'].wavelength,nu=nu,norm=True,max_size=10000)
             
         #    beta_mol_norm = lp.RB_Spectrum(temp.profile.flatten(),pres.profile.flatten()*9.86923e-6,profs['molecular'].wavelength,nu=nu,norm=True)
         #    eta_i2 = np.sum(Ti2[:,np.newaxis]*beta_mol_norm,axis=0)
             eta_i2 = eta_i2.reshape(temp.profile.shape)
-            profs['molecular'].multiply_piecewise(1.0/eta_i2)
-        
+            
             profs['molecular'].gain_scale(mol_gain,gain_var = (mol_gain*0.05)**2)
         
                 
         #    eta_c = np.sum(Tc2[:,np.newaxis]*beta_mol_norm,axis=0)
             eta_c = eta_c.reshape(temp.profile.shape)
-            profs['combined'].multiply_piecewise(1.0/eta_c)
-            profs['cross'].multiply_piecewise(1.0/eta_c)
+            
+            beta_a,dPart,BSR = gv.AerosolBackscatter(profs['molecular'],profs['combined'],profs['cross'],beta_m, \
+                eta_am=Tam,eta_ac=Tac,eta_mm=eta_i2,eta_mc=eta_c,eta_x=0.0,gm=1.0)            
+            
+            
+#            profs['molecular'].multiply_piecewise(1.0/eta_i2)
+#            profs['combined'].multiply_piecewise(1.0/eta_c)
+#            profs['cross'].multiply_piecewise(1.0/eta_c)
             
             if settings['Denoise_Mol']:
-                MolDenoise.multiply_piecewise(1.0/eta_i2)
+#                MolDenoise.multiply_piecewise(1.0/eta_i2)
                 MolDenoise.gain_scale(mol_gain,gain_var = (mol_gain*0.05)**2)
                 
             if settings['get_extinction'] and settings['as_altitude']:
@@ -677,8 +684,10 @@ def ProcessAirborneDataChunk(time_start,time_stop,
             if settings['Denoise_Mol']:
                 MolDenoise.gain_scale(mol_gain,gain_var = (mol_gain*0.05)**2)
         
-        beta_a = lp.AerosolBackscatter(profs['molecular'],(profs['combined']+profs['cross']),beta_m)
+#        beta_a = lp.AerosolBackscatter(profs['molecular'],(profs['combined']+profs['cross']),beta_m)
         if settings['Denoise_Mol']:
+            beta_a_denoise,dPart_denoise,BSR_denoise = gv.AerosolBackscatter(MolDenoise,profs['combined'],profs['cross'],beta_m, \
+                eta_am=Tam,eta_ac=Tac,eta_mm=eta_i2,eta_mc=eta_c,eta_x=0.0,gm=1.0)    
             beta_a_denoise = lp.AerosolBackscatter(MolDenoise,(profs['combined']+profs['cross']),beta_m)
             beta_a_denoise.descript = 'Poisson total variation denoised calibrated measurement of Aerosol Backscatter Coefficient in m^-1 sr^-1'
             beta_a_denoise.label = 'Denoised Aerosol Backscatter Coefficient'
@@ -714,10 +723,10 @@ def ProcessAirborneDataChunk(time_start,time_stop,
             alpha_a.label = 'Aerosol Extinction Coefficient'
             alpha_a.profile_type = '$m^{-1}$'
         
-        BSR = (profs['combined']+profs['cross'])/profs['molecular']
-        BSR.descript = 'Ratio of combined to molecular backscatter'
-        BSR.label = 'Backscatter Ratio'
-        BSR.profile_type = 'unitless'
+#        BSR = (profs['combined']+profs['cross'])/profs['molecular']
+#        BSR.descript = 'Ratio of combined to molecular backscatter'
+#        BSR.label = 'Backscatter Ratio'
+#        BSR.profile_type = 'unitless'
         
         #BSR_mask = (BSR.profile-1)/np.sqrt(BSR.profile_variance) < 5.0
         #BSR_mask = BSR.profile < 2.0
@@ -728,19 +737,21 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         #BSR2.label = 'Backscatter Ratio'
         #BSR2.profile_type = 'unitless'
         
+#        d_mol = 2*0.000365/(1+0.000365) # molecular depolarization        
+#        dVol = beta_a*dPart+beta_m*d_mol
         dVol = profs['cross']/(profs['combined']+profs['cross'])
         #dVol = profs['combined_hi'].copy()
         dVol.descript = 'Propensity of Volume to depolarize (d).  This is not identical to the depolarization ratio.  See Gimmestad: 10.1364/AO.47.003795 or Hayman and Thayer: 10.1364/JOSAA.29.000400'
         dVol.label = 'Volume Depolarization'
         dVol.profile_type = 'unitless'
         
-        d_mol = 2*0.000365/(1+0.000365) # molecular depolarization
+#        d_mol = 2*0.000365/(1+0.000365) # molecular depolarization
         
-        #Particle Depolarization = dVol/(1.0-1.0/BSR) - d_mol/(BSR-1)
-        dPart = (BSR*dVol-d_mol)/(BSR-1)
-        dPart.descript = 'Propensity of Particles to depolarize (d).  This is not identical to the depolarization ratio.  See Gimmestad: 10.1364/AO.47.003795 or Hayman and Thayer: 10.1364/JOSAA.29.000400'
-        dPart.label = 'Particle Depolarization'
-        dPart.profile_type = 'unitless'
+#        #Particle Depolarization = dVol/(1.0-1.0/BSR) - d_mol/(BSR-1)
+#        dPart = (BSR*dVol-d_mol)/(BSR-1)
+#        dPart.descript = 'Propensity of Particles to depolarize (d).  This is not identical to the depolarization ratio.  See Gimmestad: 10.1364/AO.47.003795 or Hayman and Thayer: 10.1364/JOSAA.29.000400'
+#        dPart.label = 'Particle Depolarization'
+#        dPart.profile_type = 'unitless'
         
         
         
@@ -789,6 +800,10 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         dPart.mask(np.isnan(dPart.profile))
         dVol.mask(np.isnan(dVol.profile))
         
+#        beta_a_gv.mask(np.isnan(beta_a_gv.profile))
+#        dPart_gv.mask(np.isnan(dPart_gv.profile))
+#        dPart_gv.mask(dPart.profile.mask)
+        
         if settings['Denoise_Mol']:
             beta_a_denoise.mask(np.isnan(beta_a_denoise.profile))
         
@@ -799,6 +814,9 @@ def ProcessAirborneDataChunk(time_start,time_stop,
             dVol.mask(count_mask)
             profs['combined'].mask(count_mask)
             
+#            beta_a_gv.mask(count_mask)
+#            dPart_gv.mask(count_mask)
+            
             if settings['Denoise_Mol']:
                 beta_a_denoise.mask(count_mask)
             
@@ -808,7 +826,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         
         
         
-        save_prof_list = [beta_a,dPart,dVol,BSR,beta_m,temp,pres]
+        save_prof_list = [beta_a,dPart,dVol,BSR,beta_m,temp,pres] # test profiles: beta_a_gv,dPart_gv
         # add all channels to list of profilse to save
         for var in profs.keys():
             save_prof_list.extend([profs[var]])
@@ -964,7 +982,41 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                         rfig[1][ai].plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude      
                 if settings['save_plots']:
                     plt.savefig(save_plots_path+'Compare_Denoised_Aerosol_Backscatter_'+save_plots_base,dpi=300)
-                
+                    
+                    
+            """
+            Test new retrieval algorithm (cross talk accounting)
+            """
+                    
+                    
+#            rfig = lp.pcolor_profiles([beta_a,beta_a_gv],scale=['log','log'],
+#                                      climits=[[1e-8,1e-3],[1e-8,1e-3]],
+#                                      ylimits=[MinAlt*1e-3,MaxAlt*1e-3],
+#                                      tlimits=tlims,
+#                                      title_add=proj_label,
+#                                      plot_date=settings['plot_date'],
+#                                      t_axis_scale=settings['time_axis_scale'],
+#                                      h_axis_scale=settings['alt_axis_scale'],
+#                                      minor_ticks=5,major_ticks=1)
+#            if settings['as_altitude']:
+#                for ai in range(len(rfig[1])):
+#                    rfig[1][ai].plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude      
+#            if settings['save_plots']:
+#                plt.savefig(save_plots_path+'Aerosol_Backscatter_'+save_plots_base,dpi=300)
+#            
+#            rfig = lp.pcolor_profiles([dPart,dPart_gv],scale=['linear','linear'],
+#                                      climits=[[0,1.0],[0,1.0]],
+#                                      ylimits=[MinAlt*1e-3,MaxAlt*1e-3],tlimits=tlims,
+#                                      title_add=proj_label,
+#                                      plot_date=settings['plot_date'],
+#                                      t_axis_scale=settings['time_axis_scale'],
+#                                      h_axis_scale=settings['alt_axis_scale'],
+#                                      minor_ticks=5,major_ticks=1)
+#            if settings['as_altitude']:
+#                for ai in range(len(rfig[1])):
+#                    rfig[1][ai].plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude      
+#            if settings['save_plots']:
+#                plt.savefig(save_plots_path+'Aerosol_Depolarization_'+save_plots_base,dpi=300)        
                 
             #lp.plotprofiles(profs)
             #dPart.mask(dPartMask)
