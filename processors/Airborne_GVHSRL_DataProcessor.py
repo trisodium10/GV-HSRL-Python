@@ -846,7 +846,9 @@ def ProcessAirborneDataChunk(time_start,time_stop,
             print(save_data_file)
             for var in save_air_post.keys():
                 lp.write_var2nc(air_data_post[var],str(var),save_data_file,description=save_air_post[var]['description'],units=save_air_post[var]['units'])
-        
+        else:
+            print('save_data setting is False.  This data will not be saved.')
+            
         if settings['plot_2D']:
             if settings['plot_date']:
                 t1d_plt = mdates.date2num([datetime.datetime.fromordinal(BSR.StartDate.toordinal()) \
