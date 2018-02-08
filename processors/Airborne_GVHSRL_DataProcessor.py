@@ -832,15 +832,18 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                          'ATX': {'description':'ambiant temperature', 'units':'C'}}
         
         if settings['save_data']:
-            print('saving profiles')
+            print('saving profiles to')
+            print(save_data_file)
             for ai in range(len(save_prof_list)):
                 save_prof_list[ai].write2nc(save_data_file) #,name_override=True,tag=var_name)
                 
-            print('saving lidar status data')
+            print('saving lidar status data to')
+            print(save_data_file)
             for var in save_var1d_post.keys():
                 lp.write_var2nc(var_post[var],str(var),save_data_file,description=save_var1d_post[var]['description'],units=save_var1d_post[var]['units'])
             
-            print('saving aircraft variables')    
+            print('saving aircraft variables to')
+            print(save_data_file)
             for var in save_air_post.keys():
                 lp.write_var2nc(air_data_post[var],str(var),save_data_file,description=save_air_post[var]['description'],units=save_air_post[var]['units'])
         
