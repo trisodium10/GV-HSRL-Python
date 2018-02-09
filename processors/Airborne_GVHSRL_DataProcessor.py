@@ -783,11 +783,13 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         count_mask = profs['combined_hi'].profile < settings['count_mask_threshold']
         
         #dPartMask = dPart.profile_variance > 1.0
-        dPartMask = dPart.profile_variance > settings['d_part_res_lim']**2
+#        dPartMask = dPart.profile_variance > settings['d_part_res_lim']**2
         #dPart.mask(dPartMask)
-        dPart.mask(dPart.profile_variance > settings['d_part_res_lim']**2)
-        dPart.mask(dPart.profile > 1.0)
+#        dPart.mask(dPart.profile_variance > settings['d_part_res_lim']**2)
+        
+        dPart.mask(dPart.profile > 1.1)
         dPart.mask(dPart.profile < -0.1)
+        
         
         try:
             proj_label = process_vars['proj_label']
@@ -822,9 +824,12 @@ def ProcessAirborneDataChunk(time_start,time_stop,
             
             if settings['get_extinction']:
                 alpha_a.mask(count_mask)
-                alpha_a.mask(dPart.profile.mask)
+#                alpha_a.mask(dPart.profile.mask)
         
-        
+        ParticleMask = np.logical_and(beta_a.profile < 1e-4,beta_a.SNR() < 1.0)
+        dPart.mask(ParticleMask)      
+        if settings['get_extinction']:
+            alpha_a.mask(dPart.profile.mask)
         
         save_prof_list = [beta_a,dPart,dVol,BSR,beta_m,temp,pres] # test profiles: beta_a_gv,dPart_gv
         # add all channels to list of profilse to save
