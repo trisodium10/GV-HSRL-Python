@@ -234,6 +234,8 @@ def ProcessAirborneDataChunk(time_start,time_stop,
             print('  No save path (save_plots_path) is provided')
             settings['save_plots'] = False
     
+    print('1.) save_data is set to %r'%settings['save_data'])
+    
     # grab raw data from netcdf files
     time_list,var_1d_data, profs = gv.load_raw_data(time_start,time_stop,var_2d_list,var_1d_list,basepath=basepath,verbose=True,as_prof=True,loadQWP=settings['loadQWP'],date_reference=date_reference)
     
@@ -248,6 +250,8 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         time_dt = time_list[1]
         time_sec = time_list[2]
     
+        print('2.) save_data is set to %r'%settings['save_data'])
+        
         # find instances in raw data where I2 cell is removed
         if 'RemoveLongI2Cell' in var_1d_data.keys():
             cal_indices = np.nonzero(var_1d_data['RemoveLongI2Cell'] < 50)[0]
@@ -347,7 +351,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
 #        print(air_data['Time'].shape)
         
         
-        
+        print('3.) save_data is set to %r'%settings['save_data'])
         
         air_data_t = gv.interp_aircraft_data(time_1d,air_data)
         
@@ -427,6 +431,8 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                 diff_data[var][np.nonzero(var_1d['TelescopeDirection']==1.0)[0],:] = diff_data_up[var]
                 diff_data[var][np.nonzero(var_1d['TelescopeDirection']==0.0)[0],:] = diff_data_down[var]
         
+        print('4.) save_data is set to %r'%settings['save_data'])        
+        
         # setup variable geo overlap (up vs down pointing) if supplied
         if settings['get_extinction']:
             if len(geo_file_down) > 0:
@@ -480,6 +486,8 @@ def ProcessAirborneDataChunk(time_start,time_stop,
 #                    p_after = profs[var].copy()
 #                    lp.plotprofiles([p_before,p_after],varplot=True,time=18.3*3600)
 #                    lp.plotprofiles([p_after],varplot=True,time=18.1*3600)
+            
+            print('5.) save_data is set to %r'%settings['save_data'])            
             
             if var == 'molecular' and settings['Denoise_Mol']:
                 MolRaw = profs['molecular'].copy()    
@@ -544,7 +552,9 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                 int_profs[var].time_integrate()
         if not run_processing:
             break
-
+        
+        print('5.) save_data is set to %r'%settings['save_data'])
+        
         # merge high and low gain combined profiles if option is true
         if settings['merge_hi_lo']:
             profs['combined'],_ = gv.merge_hi_lo(profs['combined_hi'],profs['combined_lo'],plot_res=False)
@@ -577,6 +587,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         #if load_reanalysis:
         #    pres,temp = ex.load_fixed_point_NCEP_TandP(profs['molecular'],lidar_location,reanalysis_path)
         
+        print('6.) save_data is set to %r'%settings['save_data'])
         
         lp.plotprofiles(profs)
         if settings['as_altitude']:
@@ -636,6 +647,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
             
 #            if tres_post > 0 or tres <= 0.5:
 #                MolDenoise.time_resample(tedges=master_time_post,update=True,remainder=False)
+        print('7.) save_data is set to %r'%settings['save_data'])
         
         if settings['hsrl_rb_adjust']:
             print('Obtaining Rayleigh-Brillouin Correction')
@@ -684,6 +696,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
             if settings['Denoise_Mol']:
                 MolDenoise.gain_scale(mol_gain,gain_var = (mol_gain*0.05)**2)
         
+        print('8.) save_data is set to %r'%settings['save_data'])
 #        beta_a = lp.AerosolBackscatter(profs['molecular'],(profs['combined']+profs['cross']),beta_m)
         if settings['Denoise_Mol']:
             beta_a_denoise,dPart_denoise,BSR_denoise = gv.AerosolBackscatter(MolDenoise,profs['combined'],profs['cross'],beta_m, \
@@ -754,7 +767,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
 #        dPart.profile_type = 'unitless'
         
         
-        
+        print('9.) save_data is set to %r'%settings['save_data'])
         if settings['Estimate_Mol_Gain']:
             # This segment estimates what the molecular gain should be 
             # based on a histogram minimum in BSR over the loaded data
@@ -773,7 +786,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                 plt.savefig(save_plots_path+'00_Molecular_Gain_Down_'+save_plots_base,dpi=300)
             
         
-        
+        print('10.) save_data is set to %r'%settings['save_data'])
         
         # add a diagnostic for counts/backscatter coeff
         
@@ -853,7 +866,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                          'ROLL': {'description':'aircraft roll angle','units':'degrees'},
                          'GGLON': {'description':'longitude','units':'degrees'},
                          'ATX': {'description':'ambiant temperature', 'units':'C'}}
-        
+        print('11.) save_data is set to %r'%settings['save_data'])
         if settings['save_data']:
             print('saving profiles to')
             print(save_data_file)
