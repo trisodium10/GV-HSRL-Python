@@ -132,12 +132,12 @@ def ProcessAirborneDataChunk(time_start,time_stop,
     # check if any settings have been defined.  If not, define it as an empty dict.
     try: settings
     except NameError: settings = {}
-        
+    print('-1.) save_data is set to %r'%settings['save_data'])    
     # If a paremeter isn't supplied, use the default setting
     for param in default_settings.keys():
         if not param in settings.keys():
             settings[param] = default_settings[param]    
-        
+    
     tres = settings['tres']
     tres_post = settings['tres_post']
     zres = settings['zres']
@@ -160,7 +160,8 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         paths['basepath'] = basepath
     #basepath = '/scr/eldora1/HSRL_data/'  # old path - still works with link from HSRL_data to /hsrl/raw/
     #basepath = '/Users/mhayman/Documents/HSRL/GVHSRL_data/'  # local computer data path
-     
+    
+    print('0.) save_data is set to %r'%settings['save_data'])
            
     #default_aircraft_basepath = {
     #    'CSET':'/scr/raf_data/CSET/24_Mar_17_BU/',
