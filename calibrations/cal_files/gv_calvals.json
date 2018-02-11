@@ -23,7 +23,7 @@
            {"date": "15-Jan-2018 23:00","value": 0.63, "down_gain":0.65, "diff_geo": "diff_geo_GVHSRL20171220.npz", "change_type": "gradual", "RB_Corrected":"True","down_diff":"diff_geo_GVHSRL20180102.npz"},
            {"date": "28-Jan-2018 22:00","value": 0.668, "down_gain":0.67, "diff_geo": "diff_geo_GVHSRL20171220.npz", "change_type": "gradual", "RB_Corrected":"True","down_diff":"diff_geo_GVHSRL20180102.npz"},
            {"date": "2-Feb-2018 22:00","value": 0.60, "down_gain":0.642866, "diff_geo": "diff_geo_GVHSRL20171220.npz", "change_type": "gradual", "RB_Corrected":"True","down_diff":"diff_geo_GVHSRL20180102.npz"},
-           {"date": "2-Feb-2018 22:00","value": 0.60, "down_gain":0.66, "diff_geo": "diff_geo_GVHSRL20171220.npz", "change_type": "gradual", "RB_Corrected":"True","down_diff":"diff_geo_GVHSRL20180102.npz"}
+           {"date": "4-Feb-2018 22:00","value": 0.60, "down_gain":0.66, "diff_geo": "diff_geo_GVHSRL20171220.npz", "change_type": "gradual", "RB_Corrected":"True","down_diff":"diff_geo_GVHSRL20180102.npz"}
 	],
 	"Baseline_File": [
 		{"date": "12-Oct-2017 0:0","value": "baseline_20171019T2000.npz", "change_type": "abrupt"}
