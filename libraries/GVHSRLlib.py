@@ -247,6 +247,34 @@ def load_raw_data(start_time,stop_time,var_2d_list,var_1d_list,basepath = '/scr/
         
         time_dt = np.array(time_dt)
         
+        # trim the data to match the requested times
+        ifirst = np.nonzero(time_dt < start_time)[0]
+        if len(ifirst) == 0:
+            ifirst = 0
+        else:
+            ifirst = ifirst[-1]
+        
+        
+        ilast = np.nonzero(time_dt > stop_time)[0]
+        if len(ilast) == 0:
+            ilast = -1
+        else:
+            ilast = ilast[0]
+            
+        # trim 2d data
+        for var in var_2d_data.keys():
+            var_2d_data[var] = var_2d_data[var][ifirst:ilast,:]
+            
+        # trim 1d data
+        for var in var_1d_data.keys():
+            var_1d_data[var] = var_1d_data[var][ifirst:ilast]
+            
+        # trim time arrays
+        timeD = timeD[ifirst:ilast,:]
+        time_dt = time_dt[ifirst:ilast]
+        time_sec = time_sec[ifirst:ilast]
+        
+        
         time_list = [timeD,time_dt,time_sec]
     
     
@@ -843,7 +871,203 @@ def DenoiseMolecular(MolRaw,beta_m_sonde=np.array([np.nan]),
     MolDenoise.ProcessingStatus.extend(['Applied range PTV denoising'])
     
     return MolDenoise,tune_list
+
+
+
+
+def DenoiseTime(ProfRaw,MinAlt=0,MaxAlt=1e8,n=1,start_time=-1,end_time=1e16,
+                    verbose=False,accel = False,tv_lim =[0.4, 3.0],N_tv_pts=48,
+                    eps_opt = 1e-5,plot_result=False):
+    """
+    Use Willem Marais' functions to denoise the molecular signal in an 
+    HSRL signal.
+    MolRaw - raw profile
+    beta_m_sonde - estimated molecular backscatter coefficient.  Not used if
+                not provided.
+    geo_data - geometric overlap function.  Not used if not provided
+    MaxAlt - maximum altitude in meters to fit.  Defaults to full profile.
+    MinAlt - minimum altitude in meters to fit.  Defaults to first gate.
+    n = number of time profiles to process at a time
+    start_time - the profile time to start on.  Defaults to first profile.
+    end_time - the profile time to end on.  Defaults to last profile
+    verbose - set to True to have text output from optimizer routine
+    accel - attempt to accelerate by using previous TV results
+    tv_lim - limits for the tv search space.  default of [0.4, 3.0] are obtained
+        for the WV-DIAL  other settings may be desirable for other lidar
+    N_tv_pts - number of tv points to evalute in the tv_lim space.  Defaults
+        to 48 used in WV-DIAL
+    """ 
+
+    ProfDenoise = ProfRaw.copy()
+#    ProfDenoise.slice_time([start_time,end_time])
+#    ProfDenoise.slice_range(range_lim=[0,MaxAlt]) 
+    range_index_end = np.argmin(np.abs(MaxAlt-ProfDenoise.range_array))
+#    range_index_end = np.ceil(range_index_end-range_index_start*1.0/n).astype(np.int)
+    range_index_start = np.argmin(np.abs(MinAlt-ProfDenoise.range_array))
+    ProfDenoise.label = 'Denoised ' + ProfRaw.label
+    ProfDenoise.descript = 'Total Variation Denoised in Time\n' + ProfRaw.descript
+#    MolDenoise.profile_type = '$m^{-3}$'
         
+    # check if background has been subtracted.  If so we need to add it back in
+    # before denoising.
+    if any('Background Subtracted' in s for s in ProfRaw.ProcessingStatus):
+        BG_Sub_Flag = True
+        ProfDenoise.profile = ProfDenoise.profile+ProfDenoise.bg[:,np.newaxis]
+    else:
+        BG_Sub_Flag = False
+    
+    if n  > ProfRaw.range_array.size:
+        n = ProfRaw.range_array.size
+        
+    tune_list = []
+    
+    report_percents = np.arange(0,105,5)
+    report_index = 0    
+    
+    for i_prof in range(range_index_start,range_index_end+n,n):
+#    for i_prof in range(np.ceil(ProfDenoise.range_array.size*1.0/n).astype(np.int)):
+    
+#        istart = i_prof*n
+#        iend = np.min(np.array([istart + n,ProfRaw.range_array.size]))
+        istart = i_prof
+        iend = np.min(np.array([istart + n,ProfRaw.range_array.size]))
+        
+        percent_complete = (i_prof-range_index_start)*100.0/(range_index_end-range_index_start)
+#        print('%f%% complete'%percent_complete)
+        if percent_complete >= report_percents[report_index]:
+            print('%f%% complete'%percent_complete)
+            report_index = report_index + 1
+        
+
+#        if BG_Sub_Flag:
+#            ProfFit = ((ProfRaw.profile[:,istart:iend]+ProfRaw.bg[:,np.newaxis])*ProfRaw.NumProfList[:,np.newaxis]).astype (np.int)
+#        else:
+#            ProfFit = (ProfRaw.profile[:,istart:iend]*ProfRaw.NumProfList[:,np.newaxis]).astype (np.int)
+        if hasattr(ProfDenoise.profile,'mask'):
+            ProfFit = (ProfDenoise.profile.data[:,istart:iend]*ProfDenoise.NumProfList[:,np.newaxis]).astype (np.int)
+        else:
+            ProfFit = (ProfDenoise.profile[:,istart:iend]*ProfDenoise.NumProfList[:,np.newaxis]).astype (np.int)
+        NumProf = ProfDenoise.NumProfList[:,np.newaxis]
+#        NumProf = ProfDenoise.NumProfList[istart:iend,np.newaxis]
+
+        ProfFit[np.nonzero(ProfFit < 0)] = 0  # don't allow negative numbers
+
+        
+        # Create the Poisson thin object so that we can do cross-validation
+        poisson_thn_obj = denoise.poissonthin (ProfFit, p_trn_flt = 0.5, p_vld_flt = 0.5)
+        
+        # define coefficients in fit
+        A_arr = NumProf.astype(np.double) #ProfFit.astype(np.double) #NumProf
+        A_arr[np.nonzero(A_arr==0)] = 1e-20
+        A_arr[np.nonzero(np.isnan(A_arr))] = 1e-20
+        A_arr[np.nonzero(np.isinf(A_arr))] = 1e-20
+
+        sparsa_cfg_obj = denoise.sparsaconf (eps_flt = eps_opt, verbose_int = 1e6)
+        
+        # check if the fit data is 1D or 2D.  1D can be run faster.
+        if ProfFit.shape[1] == 1:
+            # Use for 1D denoising
+            est_obj = poissonmodel0 (poisson_thn_obj, A_arr = A_arr, log_model_bl = True, penalty_str = 'condatTV', 
+                sparsaconf_obj = sparsa_cfg_obj)    # b_arr=Mol_BG[np.newaxis]
+        else:
+            # Use for 2D denoising
+            est_obj = poissonmodel0 (poisson_thn_obj, A_arr = A_arr, log_model_bl = True, penalty_str = 'TV', 
+                sparsaconf_obj = sparsa_cfg_obj)    #, b_arr=Mol_BG[np.newaxis]
+                
+        # while loop for accelerated denoising -
+        # if end points are the selected values, adjust the limits and try again
+        try_denoise = True
+        accel_iter = 0  # number of times through the accelerated denoising loop
+        max_iter = 10  # maximum number of iterations allowed through the denoising loop
+        while try_denoise:        
+            
+            # Create the denoiser object
+            if ProfFit.shape[1] == 1:
+                # Use for 1D denoising:  
+                # Defaults: log10_reg_lst = [-2, 2], nr_reg_int = 48
+            
+                if accel and i_prof > range_index_start:      
+                    if verbose:
+                        print('iteration: %d'%accel_iter)
+                    
+                    tv_reg = [log_tune[np.argmin(valid_val)]*0.8, log_tune[np.argmin(valid_val)]*1.2]  # log of range of TV values to test
+                    nr_int = 5  # number of TV values to test
+                    adapt_adj = True
+                    accel_iter = accel_iter + 1                    
+                else:
+                    tv_reg = tv_lim  # log of range of TV values to test
+                    nr_int = N_tv_pts   # number of TV values to test
+                    adapt_adj = False
+                    try_denoise = False
+                    
+                denoise_cnf_obj = denoise.denoiseconf (log10_reg_lst = tv_reg, nr_reg_int =nr_int, 
+                    pen_type_str = 'condatTV', verbose_bl = verbose)
+            else:
+                # Use for 2D denoising
+                denoise_cnf_obj = denoise.denoiseconf (log10_reg_lst = [-2, 2], nr_reg_int = 48, 
+                    pen_type_str = 'TV', verbose_bl = verbose)
+                adapt_adj = False
+                try_denoise = False
+                
+            denoiser_obj = denoise.denoisepoisson (est_obj, denoise_cnf_obj)
+            # Start the denoising
+            denoiser_obj.denoise ()
+            
+            log_tune,valid_val = denoiser_obj.get_validation_loss()
+
+            if accel and adapt_adj:
+                index_min = np.argmin(valid_val)
+                if verbose:
+                    print('min index: %d'%index_min)
+                # check if the optimiser chose end points
+                # if so, adjust the tv values to test
+                if accel_iter > max_iter:
+                    # maximum number of iterations exceeded
+                    try_denoise = False
+                elif index_min == 0:
+                    # reduce the range because the lowest tv penalty was chosen                
+                    tv_reg[0] = tv_reg[0]*0.8
+                    tv_reg[1] = tv_reg[0]*1.2
+                    # check if the lowest range is below the tv lower limit
+                    # if so, stop the loop
+                    if tv_reg[0] < tv_lim[0]:
+                        try_denoise=False
+                elif index_min == len(log_tune)-1:
+                    # increase the range because the greatest tv penalty was chosen                
+                    tv_reg[0] = tv_reg[1]*0.8
+                    tv_reg[1] = tv_reg[1]*1.2
+                    # check if the range exceeds the predefined tv limits.
+                    # if so, stop the loop here                
+                    if tv_reg[1] > tv_lim[1]:
+                        try_denoise=False
+                
+                else:
+                    # a minimum was found that wasn't an end point.  Stop the loop
+                    try_denoise = False
+        
+        ProfDenoise.profile[:,istart:iend] = denoiser_obj.getdenoised()/NumProf      
+        
+        
+        tune_list.extend([[log_tune,valid_val]])  # store the results from the tuning parameters
+        if plot_result:   
+            plt.figure()
+            plt.semilogy(ProfFit.flatten())
+            plt.semilogy(denoiser_obj.getdenoised().flatten(),'--',linewidth=2)
+            plt.title('Range Bins %d-%d'%(istart,iend))
+            
+            plt.figure()
+            plt.plot(log_tune,valid_val)
+            plt.title('Range Bins %d-%d'%(istart,iend))
+            plt.show()
+    
+    
+    if BG_Sub_Flag:
+#        ProfDenoise.bg = ProfDenoise.bg
+        ProfDenoise.profile = ProfDenoise.profile-ProfDenoise.bg[:,np.newaxis]
+    
+    ProfDenoise.ProcessingStatus.extend(['Applied time PTV denoising up to %.1f km'%(MaxAlt/1e3)])
+    
+    return ProfDenoise,tune_list        
 
 def merge_hi_lo(hi_prof,lo_prof,lo_gain=0,plot_res=False):
     """

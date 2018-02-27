@@ -114,7 +114,14 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         'Denoise_Mol':False, # run PTV denoising on molecular channel
         'denoise_accel':True, # run accelerated denoising (reduced scan region)
         'denoise_debug_plots':False, # plot denoising results (use only for debugging.  Slows processing down.)
-        'denoise_eps':1e-7,  # eps float precision for optimization.  Smaller numbers are slower but provide more accurate denoising    
+        'denoise_eps':1e-7,  # eps float precision for optimization.  Smaller numbers are slower but provide more accurate denoising 
+        
+        'time_denoise':False,  # run horizontal (time) denoising on profiles
+        'time_denoise_accel':True, # run accelerated denoising (reduced scan region)
+        'time_denoise_debug_plots':False, # plot denoising results (use only for debugging.  Slows processing down.)
+        'time_denoise_eps':1e-5,  # eps float precision for optimization.  Smaller numbers are slower but provide more accurate denoising 
+        'time_denoise_verbose':False,  # output optimizor status at each step
+        
         
         'Airspeed_Threshold':15, # threshold for determining start and end of the flight (in m/s)
         
@@ -325,7 +332,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         sec_stop = (time_stop-date_reference).total_seconds()
         print('found data for')
         print('   %f h-UTC to'%(sec_start/3600.0))
-        print('   %f h-UTC to'%(sec_stop/3600.0))
+        print('   %f h-UTC'%(sec_stop/3600.0))
         if tres > 0.5:
             master_time = np.arange(sec_start-tres/2,sec_stop+tres/2,tres)
             time_1d,var_1d = gv.var_time_resample(master_time,time_sec,var_1d_data,average=True)
@@ -460,6 +467,8 @@ def ProcessAirborneDataChunk(time_start,time_stop,
             range_trim = MaxAlt
         
         int_profs = {}  # obtain time integrated profiles
+        save_profs = {}
+        tv_denoise = {}
         for var in profs.keys():
             if settings['RemoveCals']:
                 # remove instances where the I2 cell is removed
@@ -483,7 +492,15 @@ def ProcessAirborneDataChunk(time_start,time_stop,
 #                    p_after = profs[var].copy()
 #                    lp.plotprofiles([p_before,p_after],varplot=True,time=18.3*3600)
 #                    lp.plotprofiles([p_after],varplot=True,time=18.1*3600)
-                      
+            if settings['time_denoise'] and var != 'combined_lo':
+                print('Running temporal denoising on '+var)
+                save_profs[var] = profs[var].copy()
+
+                profs[var],tv_denoise[var] = gv.DenoiseTime(profs[var],MaxAlt=range_trim,n=1,
+                    verbose=settings['time_denoise_verbose'],accel = settings['time_denoise_accel'],tv_lim =[0.10, 2.0],N_tv_pts=24,
+                    eps_opt=settings['time_denoise_eps'],plot_result=settings['time_denoise_debug_plots'],
+                    MinAlt=300)  # 300.0
+
             
             if var == 'molecular' and settings['Denoise_Mol']:
                 MolRaw = profs['molecular'].copy()    
@@ -537,6 +554,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                 profs[var].time_resample(tedges=master_time_post,update=True,remainder=False)
             if profs[var].profile.size == 0:
                 run_processing = False
+                print('Processing will terminate.  Profile of ' +var+ ' is empty')
 #                print('  -- Now --')
 #                print('  [start,end] = [%f,%f]'%(profs[var].time[0]/3600.0,profs[var].time[-1]/3600.0))
 #                print('  resolution = %f sec'%profs[var].mean_dt)
@@ -547,6 +565,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                 int_profs[var] = profs[var].copy()
                 int_profs[var].time_integrate()
         if not run_processing:
+            print('Terminating processing due to empty profiles')
             break
         
 
