@@ -253,8 +253,12 @@ def SelectAirborneData(settings={},paths={},process_vars={}):
         
     
     if settings['full_flight']:
-        time_start = flight_date[usr_flt]+datetime.timedelta(seconds=np.int(air_data['Time'][it0]))
-        time_stop = flight_date[usr_flt]+datetime.timedelta(seconds=np.int(air_data['Time'][it1]))
+        if settings['use_aircraft_tref']:
+            time_start = aircraft_t_ref
+            time_stop = time_start+datetime.timedelta(seconds=np.int(air_data['Time'][it1]))
+        else:
+            time_start = flight_date[usr_flt]+datetime.timedelta(seconds=np.int(air_data['Time'][it0]))
+            time_stop = flight_date[usr_flt]+datetime.timedelta(seconds=np.int(air_data['Time'][it1]))
         
     else:
         try: 
