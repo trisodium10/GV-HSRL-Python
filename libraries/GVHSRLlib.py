@@ -1100,9 +1100,14 @@ def merge_hi_lo(hi_prof,lo_prof,lo_gain=0,plot_res=False):
     
     
     combined = hi_prof.copy()
-    combined_to_lo = np.nonzero(np.logical_or( 
-        hi_prof.profile_variance > lo_prof.profile_variance,
-        np.isnan(hi_prof.profile)))
+    # use low gain channel conditions
+    combined_to_lo_prof = hi_prof.profile_variance > lo_prof.profile_variance  # variance of lo profile is lower
+    combined_to_lo_prof = np.logical_or(combined_to_lo_prof,np.isnan(hi_prof.profile))  # OR combined_hi is nan
+    combined_to_lo_prof = np.logical_and(combined_to_lo_prof,lo_prof.profile > 10)  # AND only use data point of combined_lo is significantly large
+#    combined_to_lo = np.nonzero(np.logical_or( 
+#        hi_prof.profile_variance > lo_prof.profile_variance,
+#        np.isnan(hi_prof.profile)))
+    combined_to_lo = np.nonzero(combined_to_lo_prof)
     combined.profile[combined_to_lo]= lo_prof.profile[combined_to_lo]
     combined.profile_variance[combined_to_lo]= lo_prof.profile_variance[combined_to_lo]
     combined.descript = 'Merged hi/lo gain combined channel'
@@ -1144,7 +1149,27 @@ def AerosolBackscatter(MolProf,CombProf,CrossProf,Sonde,negfilter=True,eta_am=0.
     mol = (MolProf*eta_ac-gm*CombProf*eta_am)/((dm-1)*gm*(eta_am*eta_mc-eta_ac*eta_mm))
     aer_par = (MolProf*eta_mc - gm*CombProf*eta_mm)/(gm*eta_am*eta_mc - gm*eta_ac*eta_mm)
     aer_per = (dm*MolProf*eta_ac*eta_mc+(CrossProf-CombProf*eta_x)*(gm*(eta_am*eta_mc-eta_ac*eta_mm))+dm*gm*(CrossProf*(-eta_am*eta_mc+eta_ac*eta_mm)+CombProf*eta_am*eta_mc*(-1+eta_x)-CombProf*eta_ac*eta_mm*eta_x))/((-1+dm)*gm*eta_ac*(-eta_am*eta_mc+eta_ac*eta_mm))
-      
+    
+    comb_par = (MolProf*(eta_ac+(-1+dm)*eta_mc)-gm*CombProf*(eta_am+(-1+dm)*eta_mm))/((dm-1)*gm*(eta_am*eta_mc-eta_ac*eta_mm))
+    
+    mol.label = 'Molecular Signal'  
+    mol.descript = 'Molecular signal estimated by inverting the cross coupling matrix'
+    mol.profile_type = 'photon counts'
+    
+    aer_par.label = 'Parallel Aerosol Signal'  
+    aer_par.descript = 'Parallel polarized aerosol signal estimated by inverting the cross coupling matrix'
+    aer_par.profile_type = 'photon counts'
+    
+    aer_per.label = 'Perpendicular Aerosol Signal'  
+    aer_per.descript = 'Perpendicular polarized aerosol signal estimated by inverting the cross coupling matrix'
+    aer_per.profile_type = 'photon counts'
+    
+    comb_par.label = 'Combined Aerosol/Molecular Signal'  
+    comb_par.descript = 'Parallel polarized combined aerosol and molecular signal estimated by inverting the cross coupling matrix'
+    comb_par.profile_type = 'photon counts'
+    
+    param_profs= {'mol':mol,'aer_par':aer_par,'aer_per':aer_per,'comb_par':comb_par}
+    
     Beta_AerBS = MolProf.copy()
 
     # calculate backscatter ratio
@@ -1171,7 +1196,7 @@ def AerosolBackscatter(MolProf,CombProf,CrossProf,Sonde,negfilter=True,eta_am=0.
     if negfilter:
         Beta_AerBS.profile[np.nonzero(Beta_AerBS.profile <= 0)] = 1e-10;
     
-    return Beta_AerBS,dPart,BSR
+    return Beta_AerBS,dPart,BSR,param_profs
 
 
 

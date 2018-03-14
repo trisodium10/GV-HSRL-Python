@@ -494,13 +494,17 @@ def ProcessAirborneDataChunk(time_start,time_stop,
 #                    lp.plotprofiles([p_after],varplot=True,time=18.1*3600)
             if settings['time_denoise'] and var != 'combined_lo':
                 print('Running temporal denoising on '+var)
-                save_profs[var] = profs[var].copy()
+                #save_profs[var] = profs[var].copy()
+                # save the profile before it is denoised
+                profs[var+'_raw'] = profs[var].copy()
 
                 profs[var],tv_denoise[var] = gv.DenoiseTime(profs[var],MaxAlt=range_trim,n=1,
                     verbose=settings['time_denoise_verbose'],accel = settings['time_denoise_accel'],tv_lim =[0.10, 2.0],N_tv_pts=24,
                     eps_opt=settings['time_denoise_eps'],plot_result=settings['time_denoise_debug_plots'],
                     MinAlt=300)  # 300.0
-
+                
+                # save the denoised profile
+                profs[var+'_denoise'] = profs[var].copy()
             
             if var == 'molecular' and settings['Denoise_Mol']:
                 MolRaw = profs['molecular'].copy()    
@@ -514,6 +518,10 @@ def ProcessAirborneDataChunk(time_start,time_stop,
             
             # background subtract the profile
             profs[var].bg_subtract(BGIndex)
+#            if settings['time_denoise'] and var != 'combined_lo':
+#                [log_tune,valid_val] = mle.DenoiseBG(profs[var],BGIndex,verbose=False,plot_sol = False, tv_lim =[0.10, 2.0],N_tv_pts=24)
+#            else:
+#                profs[var].bg_subtract(BGIndex)
             
             # profile specific processing routines
             if var == 'combined_hi' and settings['diff_geo_correct']:
@@ -685,7 +693,19 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         #    eta_c = np.sum(Tc2[:,np.newaxis]*beta_mol_norm,axis=0)
             eta_c = eta_c.reshape(temp.profile.shape)
             
-            beta_a,dPart,BSR = gv.AerosolBackscatter(profs['molecular'],profs['combined'],profs['cross'],beta_m, \
+#            print('Tam = %f'%Tam)
+#            print('Tac = %f'%Tac)
+#            plt.figure()
+#            plt.pcolor(eta_i2)
+#            plt.colorbar()
+#            plt.title('\eta_mm')
+#            plt.figure()
+#            plt.pcolor(eta_c)
+#            plt.colorbar()
+#            plt.title('\eta_mc')
+#            plt.show()
+            
+            beta_a,dPart,BSR,param_profs = gv.AerosolBackscatter(profs['molecular'],profs['combined'],profs['cross'],beta_m, \
                 eta_am=Tam,eta_ac=Tac,eta_mm=eta_i2,eta_mc=eta_c,eta_x=0.0,gm=1.0)            
             
             
@@ -711,9 +731,9 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         
 #        beta_a = lp.AerosolBackscatter(profs['molecular'],(profs['combined']+profs['cross']),beta_m)
         if settings['Denoise_Mol']:
-            beta_a_denoise,dPart_denoise,BSR_denoise = gv.AerosolBackscatter(MolDenoise,profs['combined'],profs['cross'],beta_m, \
+            beta_a_denoise,dPart_denoise,BSR_denoise,param_profs_denoise = gv.AerosolBackscatter(MolDenoise,profs['combined'],profs['cross'],beta_m, \
                 eta_am=Tam,eta_ac=Tac,eta_mm=eta_i2,eta_mc=eta_c,eta_x=0.0,gm=1.0)    
-            beta_a_denoise = lp.AerosolBackscatter(MolDenoise,(profs['combined']+profs['cross']),beta_m)
+#            beta_a_denoise = lp.AerosolBackscatter(MolDenoise,(profs['combined']+profs['cross']),beta_m)
             beta_a_denoise.descript = 'Poisson total variation denoised calibrated measurement of Aerosol Backscatter Coefficient in m^-1 sr^-1'
             beta_a_denoise.label = 'Denoised Aerosol Backscatter Coefficient'
         
@@ -855,6 +875,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
             alpha_a.mask(dPart.profile.mask)
         
         save_prof_list = [beta_a,dPart,dVol,BSR,beta_m,temp,pres] # test profiles: beta_a_gv,dPart_gv
+        return_prof_list = [beta_a,dPart,dVol,BSR,beta_m,temp,pres,profs,param_profs]
         # add all channels to list of profilse to save
         for var in profs.keys():
             save_prof_list.extend([profs[var]])
@@ -1053,7 +1074,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         if settings['show_plots']:
             plt.show()
             
-        return save_prof_list
+        return return_prof_list
     else:
         # no data was loaded
         return 0
