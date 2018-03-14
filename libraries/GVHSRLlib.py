@@ -913,8 +913,10 @@ def DenoiseTime(ProfRaw,MinAlt=0,MaxAlt=1e8,n=1,start_time=-1,end_time=1e16,
     if any('Background Subtracted' in s for s in ProfRaw.ProcessingStatus):
         BG_Sub_Flag = True
         ProfDenoise.profile = ProfDenoise.profile+ProfDenoise.bg[:,np.newaxis]
+        ProfBG = ProfDenoise.bg[:,np.newaxis]
     else:
         BG_Sub_Flag = False
+        ProfBG = np.mean(ProfDenoise.profile[:,-200:],axis=1)[:,np.newaxis]
     
     if n  > ProfRaw.range_array.size:
         n = ProfRaw.range_array.size
@@ -967,7 +969,7 @@ def DenoiseTime(ProfRaw,MinAlt=0,MaxAlt=1e8,n=1,start_time=-1,end_time=1e16,
         # check if the fit data is 1D or 2D.  1D can be run faster.
         if ProfFit.shape[1] == 1:
             # Use for 1D denoising
-            est_obj = poissonmodel0 (poisson_thn_obj, A_arr = A_arr, log_model_bl = True, penalty_str = 'condatTV', 
+            est_obj = poissonmodel0 (poisson_thn_obj, A_arr = A_arr, b_arr=ProfBG, log_model_bl = True, penalty_str = 'condatTV', 
                 sparsaconf_obj = sparsa_cfg_obj)    # b_arr=Mol_BG[np.newaxis]
         else:
             # Use for 2D denoising
