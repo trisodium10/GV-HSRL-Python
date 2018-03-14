@@ -107,6 +107,8 @@ def SelectAirborneData(settings={},paths={},process_vars={}):
         
         'Airspeed_Threshold':25, # threshold for determining start and end of the flight (in m/s)
         
+        'use_aircraft_tref':True, # use the start time of the aircraft netcdf as the date reference
+        
 #        'loadQWP':'fixed',  # load 'fixed','rotating', or 'all' QWP data
         
 #        'as_altitude':False, # process in altitude centered format or range centered format
