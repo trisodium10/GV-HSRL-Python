@@ -790,6 +790,16 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         dVol.label = 'Volume Depolarization'
         dVol.profile_type = 'unitless'
         
+        deltaLVol = dVol/(2-dVol)  
+        deltaLVol.descript = 'Theoretically determined linear depolarization of the volume.  Depolarization is measured using circular polarizations assuming the volume consists of randomly oriented particles.'
+        deltaLVol.label = 'Volume Linear Depolarization Ratio'
+        deltaLVol.profile_type = 'unitless'
+        
+        deltaLPart = dPart/(2-dPart)  
+        deltaLPart.descript = 'Theoretically determined linear depolarization of particles (molecular removed).  Depolarization is measured using circular polarizations assuming the volume consists of randomly oriented particles.'
+        deltaLPart.label = 'Particle Linear Depolarization Ratio'
+        deltaLPart.profile_type = 'unitless'
+        
 #        d_mol = 2*0.000365/(1+0.000365) # molecular depolarization
         
 #        #Particle Depolarization = dVol/(1.0-1.0/BSR) - d_mol/(BSR-1)
@@ -874,7 +884,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         if settings['get_extinction']:
             alpha_a.mask(dPart.profile.mask)
         
-        save_prof_list = [beta_a,dPart,dVol,BSR,beta_m,temp,pres] # test profiles: beta_a_gv,dPart_gv
+        save_prof_list = [beta_a,dPart,dVol,BSR,beta_m,temp,pres,deltaLPart,deltaLVol] # test profiles: beta_a_gv,dPart_gv
         return_prof_list = [beta_a,dPart,dVol,BSR,beta_m,temp,pres,profs,param_profs]
         # add all channels to list of profilse to save
         for var in profs.keys():
