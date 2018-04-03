@@ -114,7 +114,7 @@ def fit_high_range(profile,profile_var,i_min,i_max,order=1):
     return profile_out
     
     
-def load_raw_data(start_time,stop_time,var_2d_list,var_1d_list,basepath = '/scr/eldora1/rsfdata/hsrl/raw/',verbose=True,as_prof=True,loadQWP='fixed',date_reference=0):
+def load_raw_data(start_time,stop_time,var_2d_list,var_1d_list,basepath = '/scr/eldora1/rsfdata/hsrl/raw/',verbose=True,as_prof=True,loadQWP='fixed',date_reference=0,time_shift=0,bin0=37):
     """
     loads GVHSRL raw data from netcdf files stored in basepath
     accepts a list of the variables to be loaded (their netcdf names)
@@ -135,6 +135,11 @@ def load_raw_data(start_time,stop_time,var_2d_list,var_1d_list,basepath = '/scr/
     
     date_reference - datetime object reference for time axis.  this is needed when processing
         flights in chunks across midnight
+        
+    time_shift - time (in seconds) that the HSRL time data should be delayed to align with the
+        aircraft data
+    
+    bin0 - MCS bin where time/range = 0
     """
     
     var_1d_data = dict(zip(var_1d_list,[np.array([])]*len(var_1d_list)))
@@ -241,7 +246,7 @@ def load_raw_data(start_time,stop_time,var_2d_list,var_1d_list,basepath = '/scr/
     if len(timeD) > 0:
         #timeD = timeD[:,:8]
         timeD[:,6] = timeD[:,6]*1e3+timeD[:,7]
-        time_dt = [datetime.datetime(*x) for x in timeD[:,:7]]
+        time_dt = [datetime.datetime(*x)-datetime.timedelta(seconds=time_shift) for x in timeD[:,:7]]
         time_dt0 = start_date #datetime.datetime(time_dt[0].year,time_dt[0].month,time_dt[0].day)
         time_sec = np.array([(x-time_dt0).total_seconds() for x in time_dt])
         
@@ -305,7 +310,7 @@ def load_raw_data(start_time,stop_time,var_2d_list,var_1d_list,basepath = '/scr/
                 prof_list = prof_list+[lp.LidarProfile(var_2d_data[var],\
                     time_sec,label=plabel,\
                     descript = pdescript,\
-                    bin0=37,lidar='GV-HSRL',StartDate=start_time.date())]
+                    bin0=bin0,lidar='GV-HSRL',StartDate=start_time.date())]
                 prof_names = prof_names + [var]
                 
             profs_2d = dict(zip(prof_names,prof_list))
@@ -913,10 +918,15 @@ def DenoiseTime(ProfRaw,MinAlt=0,MaxAlt=1e8,n=1,start_time=-1,end_time=1e16,
     if any('Background Subtracted' in s for s in ProfRaw.ProcessingStatus):
         BG_Sub_Flag = True
         ProfDenoise.profile = ProfDenoise.profile+ProfDenoise.bg[:,np.newaxis]
-        ProfBG = ProfDenoise.bg[:,np.newaxis]
+        ProfBG = ProfDenoise.bg[:,np.newaxis]*ProfDenoise.NumProfList[:,np.newaxis]
     else:
         BG_Sub_Flag = False
-        ProfBG = np.mean(ProfDenoise.profile[:,-200:],axis=1)[:,np.newaxis]
+        ProfBG = np.mean(ProfDenoise.profile[:,-200:],axis=1)[:,np.newaxis]*ProfDenoise.NumProfList[:,np.newaxis]
+    
+    
+    ProfBG[np.nonzero(ProfBG<=0)] = 1e-20
+    ProfBG[np.nonzero(np.isnan(ProfBG))] = 1e-20
+    ProfBG[np.nonzero(np.isinf(ProfBG))] = 1e-20
     
     if n  > ProfRaw.range_array.size:
         n = ProfRaw.range_array.size
@@ -946,9 +956,11 @@ def DenoiseTime(ProfRaw,MinAlt=0,MaxAlt=1e8,n=1,start_time=-1,end_time=1e16,
 #        else:
 #            ProfFit = (ProfRaw.profile[:,istart:iend]*ProfRaw.NumProfList[:,np.newaxis]).astype (np.int)
         if hasattr(ProfDenoise.profile,'mask'):
-            ProfFit = (ProfDenoise.profile.data[:,istart:iend]*ProfDenoise.NumProfList[:,np.newaxis]).astype (np.int)
+            ProfFit = ProfDenoise.profile.data[:,istart:iend]*ProfDenoise.NumProfList[:,np.newaxis]
+#            ProfFit = (ProfDenoise.profile.data[:,istart:iend]*ProfDenoise.NumProfList[:,np.newaxis]).astype (np.int)
         else:
-            ProfFit = (ProfDenoise.profile[:,istart:iend]*ProfDenoise.NumProfList[:,np.newaxis]).astype (np.int)
+            ProfFit = ProfDenoise.profile[:,istart:iend]*ProfDenoise.NumProfList[:,np.newaxis]
+#            ProfFit = (ProfDenoise.profile[:,istart:iend]*ProfDenoise.NumProfList[:,np.newaxis]).astype (np.int)
         NumProf = ProfDenoise.NumProfList[:,np.newaxis]
 #        NumProf = ProfDenoise.NumProfList[istart:iend,np.newaxis]
 
@@ -960,7 +972,7 @@ def DenoiseTime(ProfRaw,MinAlt=0,MaxAlt=1e8,n=1,start_time=-1,end_time=1e16,
         
         # define coefficients in fit
         A_arr = NumProf.astype(np.double) #ProfFit.astype(np.double) #NumProf
-        A_arr[np.nonzero(A_arr==0)] = 1e-20
+        A_arr[np.nonzero(A_arr<=0)] = 1e-20
         A_arr[np.nonzero(np.isnan(A_arr))] = 1e-20
         A_arr[np.nonzero(np.isinf(A_arr))] = 1e-20
 
@@ -990,7 +1002,9 @@ def DenoiseTime(ProfRaw,MinAlt=0,MaxAlt=1e8,n=1,start_time=-1,end_time=1e16,
             
                 if accel and i_prof > range_index_start:      
                     if verbose:
-                        print('iteration: %d'%accel_iter)
+                        print('iteration: %d at'%accel_iter)
+                        print('   index: %d'%i_prof)
+                        print('   range: %f m'%ProfRaw.range_array[i_prof])
                     
                     tv_reg = [log_tune[np.argmin(valid_val)]*0.8, log_tune[np.argmin(valid_val)]*1.2]  # log of range of TV values to test
                     nr_int = 5  # number of TV values to test
