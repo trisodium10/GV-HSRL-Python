@@ -11,6 +11,10 @@
            {"date":"18-Jan-2012 0:0","combined_hi":27.9e-9,"combined_lo":21.3e-9,"cross":32e-9,"molecular":26.0e-9},
            {"date":"3-Mar-2016 0:0","combined_hi":27.9e-9,"combined_lo":21.3e-9,"cross":32e-9,"molecular":28.4e-9}
      ],
+     "Bin_Zero":  [
+           {"date":"1-Dec-2008 0:0","value":37.0},
+           {"date":"1-Dec-2017 0:0","value":35.42}
+     ],
 
 	"Molecular_Gain": [
            {"date": "29-Jul-2015 16:31","value": 1.0347, "down_gain":1.0347, "diff_geo": "diff_geo_GVHSRL20120201.npz", "change_type": "gradual", "RB_Corrected":"False","down_diff":""},
