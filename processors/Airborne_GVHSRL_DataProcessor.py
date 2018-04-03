@@ -62,6 +62,12 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         'tres_post':1*60, # resolution after altitude correction -  set to zero to not use
         'zres':7.5,  # altitude resolution in meters (7.5 m minimum)
         
+        'mol_smooth':False, # smooth molecular profile
+        't_mol_smooth':0.0, # smoothing in time of molecular profile
+        'z_mol_smooth':30.0, # smoothing in range of molecular profile
+
+        'range_min':150.0,  # closest range in m where data is treated as valid
+        
         #mol_gain = 1.133915#1.0728915  # gain adjustment to molecular channel
         
         # index for where to treat the profile as background only
@@ -133,8 +139,10 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                          # used to filter instances where the shutter is closed
                          # toggle this with 'Remove_Off_Data'
         
-        'use_aircraft_tref':True  # set the time reference based on aircraft data
+        'use_aircraft_tref':True,  # set the time reference based on aircraft data
+        'aircraft_time_shift':0.75  # shift in aircraft time needed to align to HSRL time 0.75
         }
+        
     
     # check if any settings have been defined.  If not, define it as an empty dict.
     try: settings
@@ -203,11 +211,13 @@ def ProcessAirborneDataChunk(time_start,time_stop,
     with open(cal_file,"r") as f:
         cal_json = json.loads(f.read())
     f.close()
+    bin0 = lp.get_calval(time_start,cal_json,"Bin Zero")[0]  # bin number where t/range = 0
     
        
     filePathAircraft = paths['filePathAircraft']
     #  load aircraft data    
     air_data,aircraft_t_ref = gv.load_aircraft_data(filePathAircraft,var_aircraft)
+#    air_data['Time'] = air_data['Time']+settings['aircraft_time_shift']
 
     print('Processing: ')
     print('   '+time_start.strftime('%H:%M %d-%b, %Y to'))
@@ -244,11 +254,35 @@ def ProcessAirborneDataChunk(time_start,time_stop,
 
     
     # grab raw data from netcdf files
-    time_list,var_1d_data, profs = gv.load_raw_data(time_start,time_stop,var_2d_list,var_1d_list,basepath=basepath,verbose=True,as_prof=True,loadQWP=settings['loadQWP'],date_reference=date_reference)
+    time_list,var_1d_data, profs = gv.load_raw_data(time_start,time_stop,var_2d_list,var_1d_list,basepath=basepath,verbose=True,as_prof=True,loadQWP=settings['loadQWP'],date_reference=date_reference,time_shift=settings['aircraft_time_shift'],bin0=bin0)
     
+    run_processing = len(profs) > 0  
     
+    if run_processing:
+        # plot raw profiles
+        lp.plotprofiles(profs)
+        # estimate where bin0 ()
+        pbin0 = np.sum(profs['molecular'].profile,axis=0)
+        try:
+            
+            ipbin0 = np.nonzero(pbin0 > 4*pbin0[0])[0][0] # locate intial outgoing pulse
+            ipbin1 = ipbin0 + np.nonzero(np.diff(pbin0[ipbin0:]) < 0)[0][0] # locate zero crossing after the pulse
+    #        print('start index: %d'%ipbin0)
+            # interp expects xp to be monotonically increasing.
+            # by negating the xp term in the function, we assume a negative slope
+            est_bin0 = np.interp(np.zeros(1),-np.diff(pbin0[ipbin0:ipbin1+2]),np.arange(ipbin0,ipbin1+1)+0.5) 
+            print('')
+            print('Estimated bin0: %f'%est_bin0)
+            print('Current bin0: %f'%bin0)
+            print('')
+    #        plt.figure()
+    #        plt.plot(np.arange(ipbin0,ipbin0+30)+0.5,np.diff(pbin0[ipbin0:ipbin0+31]))
+    #        plt.plot(np.arange(ipbin0,ipbin0+30),pbin0[ipbin0:ipbin0+30])
+    #        plt.plot(np.arange(ipbin0,ipbin1+1)+0.5,np.diff(pbin0[ipbin0:ipbin1+2]))
+    #        plt.show()
+        except IndexError:
+            print('No bin0 estimate')
     
-    run_processing = len(profs) > 0    
     
     while run_processing:
         #execute processing if data was found
@@ -548,7 +582,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                     mol_ext.time_resample(tedges=master_time_post,update=True,remainder=False)
                 
                 
-            profs[var].slice_range(range_lim=[0,range_trim])
+            profs[var].slice_range(range_lim=[settings['range_min'],range_trim])
           
             if settings['as_altitude']:
                 profs[var].range2alt(master_alt,air_data_t,telescope_direction=var_1d['TelescopeDirection'])
@@ -584,6 +618,9 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         else:
             # if merging is not enabled, use combined high for all calculations
             profs['combined'] = profs['combined_hi']
+        
+        if settings['mol_smooth']:
+            profs['molecular'].conv(settings['t_mol_smooth']/profs['molecular'].dt,settings['z_mol_smooth']/profs['molecular'].mean_dR)
         
         # reformulate the master time based on the time that appears in the profiles
         # after processing
@@ -945,7 +982,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                                       plot_date=settings['plot_date'],
                                       t_axis_scale=settings['time_axis_scale'],
                                       h_axis_scale=settings['alt_axis_scale'],
-                                      minor_ticks=5,major_ticks=1)
+                                      minor_ticks=5,major_ticks=1,cmap=['viridis'])
             if settings['as_altitude']:
                 for ai in range(len(rfig[1])):
                     rfig[1][ai].plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude      
