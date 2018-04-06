@@ -127,6 +127,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         'time_denoise_debug_plots':False, # plot denoising results (use only for debugging.  Slows processing down.)
         'time_denoise_eps':1e-5,  # eps float precision for optimization.  Smaller numbers are slower but provide more accurate denoising 
         'time_denoise_verbose':False,  # output optimizor status at each step
+        'time_denoise_max_range':10e3,  # maximum range to which denoising occurs
         
         
         'Airspeed_Threshold':15, # threshold for determining start and end of the flight (in m/s)
@@ -140,7 +141,8 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                          # toggle this with 'Remove_Off_Data'
         
         'use_aircraft_tref':True,  # set the time reference based on aircraft data
-        'aircraft_time_shift':0.75  # shift in aircraft time needed to align to HSRL time 0.75
+        'aircraft_time_shift':0.75,  # shift in aircraft time needed to align to HSRL time 0.75
+        'Estimate Time Shift':True   # estimate the time shift between aircraft and HSRL data systems based on roll and pitch manuevers
         }
         
     
@@ -260,7 +262,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
     
     if run_processing:
         # plot raw profiles
-        lp.plotprofiles(profs)
+#        lp.plotprofiles(profs)
         # estimate where bin0 ()
         pbin0 = np.sum(profs['molecular'].profile,axis=0)
         try:
@@ -526,13 +528,14 @@ def ProcessAirborneDataChunk(time_start,time_stop,
 #                    p_after = profs[var].copy()
 #                    lp.plotprofiles([p_before,p_after],varplot=True,time=18.3*3600)
 #                    lp.plotprofiles([p_after],varplot=True,time=18.1*3600)
-            if settings['time_denoise'] and var != 'combined_lo':
+#            if settings['time_denoise'] and var != 'combined_lo':
+            if settings['time_denoise'] and var == 'molecular':
                 print('Running temporal denoising on '+var)
                 #save_profs[var] = profs[var].copy()
                 # save the profile before it is denoised
                 profs[var+'_raw'] = profs[var].copy()
 
-                profs[var],tv_denoise[var] = gv.DenoiseTime(profs[var],MaxAlt=range_trim,n=1,
+                profs[var],tv_denoise[var] = gv.DenoiseTime(profs[var],MaxAlt=min([range_trim,settings['time_denoise_max_range']]),n=1,
                     verbose=settings['time_denoise_verbose'],accel = settings['time_denoise_accel'],tv_lim =[0.10, 2.0],N_tv_pts=24,
                     eps_opt=settings['time_denoise_eps'],plot_result=settings['time_denoise_debug_plots'],
                     MinAlt=300)  # 300.0
@@ -559,6 +562,134 @@ def ProcessAirborneDataChunk(time_start,time_stop,
             
             # profile specific processing routines
             if var == 'combined_hi' and settings['diff_geo_correct']:
+                if settings['Estimate Time Shift']:
+                    print('Estimate Time Shift enabled')
+                    # if the software settings state we are supposed to check for time shift, look to see if there are any
+                    # roll or pitch manuevers that will help us do that.
+                    # this is determined by looking at the derivative signals over a long strech of time
+                    weights = np.convolve(np.ones(2000)*0.5e-3,np.concatenate((np.zeros(1),np.diff(air_data_t['ROLL'])**2+np.diff(air_data_t['PITCH'])**2)),'same')
+#                    print(weights.max())
+#                    plt.figure()
+#                    plt.plot(weights)
+#                    plt.show()
+                    if (weights > 0.02).any():
+                        print('    Manuevers found')
+                        print('    Estimating time shift between aircraft and HSRL time')
+                        
+                        t_dir_set = np.sign(var_1d['TelescopeDirection']-0.5)
+                        # calculate the expected location of the sea surface
+                        Rg_exp = air_data_t['GGALT']/(np.cos((air_data_t['ROLL']-4.0*t_dir_set)*np.pi/180)*np.cos((air_data_t['PITCH'])*np.pi/180))
+                        # and the corresponding profile index of that expected sea surface location
+                        iRg_exp = np.argmin(np.abs(Rg_exp[:,np.newaxis]-profs['combined_hi'].range_array[np.newaxis,:]),axis=1).astype(np.int)                
+                        
+                        # define a range around the expected sea surface location to look for a ground return
+                        iRg_min = iRg_exp - 80
+                        iRg_min[np.nonzero(iRg_min < 0)] = 0
+                        iRg_max = iRg_exp + 80
+                        iRg_max[np.nonzero(iRg_max >= profs['combined_hi'].range_array.size)] = profs['combined_hi'].range_array.size -1
+
+                        iRg = np.zeros(iRg_exp.size,dtype=np.int)
+                        Rg_SNR = np.zeros(iRg_exp.size)
+                        Rg_count = np.zeros(iRg_exp.size)
+#                        Rg_weight = np.exp(-(np.arange(iRg_exp.size)-20)**2/20**2)
+                        for ri in range(iRg_exp.size):
+                            Rg_weight = np.exp(-(np.arange(iRg_min[ri],iRg_max[ri])-iRg_exp[ri])**2/40**2)
+                            # find the sea return by just looking for the largest backscatter signal in the specified range
+                            iRg[ri] = np.int(np.argmax(Rg_weight*profs['combined_hi'].profile[ri,iRg_min[ri]:iRg_max[ri]])+iRg_min[ri])
+                            if var_1d['TelescopeDirection'][ri] <= 0:
+                                # if the telescope is pointing up, treat the estimate as valid
+                                # and estimate the signal to noise from it
+                                Rg_std = np.sqrt(np.var(profs['combined_hi'].profile[ri,iRg_min[ri]:iRg[ri]])+np.var(profs['combined_hi'].profile[ri,iRg[ri]+1:iRg_max[ri]]))
+                                Rg_SNR[ri] = profs['combined_hi'].profile[ri,iRg[ri]]/Rg_std #np.std(profs['combined_hi'].profile[ri,iRg_min[ri]:iRg_max[ri]])
+                                Rg_count[ri] = profs['combined_hi'].profile[ri,iRg[ri]]
+                        
+                        # get the ranges associated with the sea returns
+                        Rg = profs['combined_hi'].range_array[iRg]
+                        # remove data points with low SNR
+                        Rg_filt = Rg.copy()
+                        Rg_out = np.nonzero(Rg_SNR < 7.0)
+                        Rg_keep = np.nonzero(Rg_SNR >=7.0)
+                        Rg_filt[Rg_out] = np.nan
+#                        Rg_interp = np.interp(np.arange(Rg.size),Rg_keep[0],Rg_filt[Rg_keep])
+                        
+                        
+                        # estimate the time offset by shifting the data in time and calculating the
+                        # mean squared error
+                        # weight the error by the amount of manuevers taking place in that time period
+                        i_offset = np.arange(-10,10,0.25)
+                        Rg_corr1 = np.zeros(i_offset.size)
+                        Rg_corr2 = np.zeros(i_offset.size)
+                        
+                        for ri in range(i_offset.size):
+        
+                            i0 = np.ceil(np.abs(i_offset[ri]))
+        
+                            
+                            if i_offset[ri] < 0:
+                                xinterp = np.arange(Rg_exp.size-i0)
+                                Rg1 = np.interp(xinterp,np.arange(Rg_exp.size)-i_offset[ri],Rg_exp)
+                                weights_Rg1 = np.interp(xinterp,np.arange(Rg_exp.size)-i_offset[ri],weights)
+                                Rg2 = Rg_filt.flatten()[:-1*i0]
+                            else:
+                                xinterp = np.arange(Rg_exp.size-i0)+i0
+                                Rg1 = np.interp(xinterp,np.arange(Rg_exp.size)-i_offset[ri],Rg_exp)
+                                weights_Rg1 = np.interp(xinterp,np.arange(Rg_exp.size)-i_offset[ri],weights)
+                                Rg2 = Rg_filt.flatten()[i0:]
+
+                            Rg_corr1[ri] = np.nanmean(weights_Rg1 * (Rg1-Rg2)**2)
+                            Rg_corr2[ri] = np.nanstd(Rg1-Rg2)
+                        x_0x = 0.5*(i_offset[:-1]+i_offset[1:])
+                        i_t_off = np.interp(np.zeros(1),np.diff(Rg_corr1),x_0x)
+                        print('')
+                        print('Current time offset: %f'%settings['aircraft_time_shift'])
+                        print('Estimated time offset: %f s'%(i_t_off*profs['combined_hi'].mean_dt+settings['aircraft_time_shift']))
+                        print('')
+#                    Rg_corr1[ri] = np.nanmean((Rg1-Rmean)*(Rg2-Rmean))
+                    
+                        textstr = 'Current time offset: %f s\n'%settings['aircraft_time_shift'] + \
+                            'Estimated time offset: %f s\n'%(i_t_off*profs['combined_hi'].mean_dt) + \
+                            'New Range Std: %f m\n'%Rg_corr2.min()
+                        # piggy back on save_mol_gain_plot setting
+                            
+
+                        plt.figure()
+                        plt.plot(-1*i_offset,np.sqrt(Rg_corr1),label='Weighted Error')
+#                        plt.plot(-1*i_offset,Rg_corr2,label='Total RMS Error')
+                        plt.xlabel('Aircraft Time shift [s]')
+                        plt.ylabel('RMS Error [m]')
+                        plt.grid(b=True)
+                        plt.text(np.mean(i_offset),np.mean(np.sqrt(Rg_corr1)),textstr,verticalalignment='center',horizontalalignment='center')
+    #                        plt.text(0.95*(np.max(bbsr)-np.min(bbsr))+np.min(bbsr),0.95*(np.max(balt)-np.min(balt))+np.min(balt),text_str,color='white',fontsize=8,verticalalignment='top',horizontalalignment='right')
+                        if settings['save_mol_gain_plot']:
+                            # double zero at beginning of filename just to put plots at the front of a sorted list of profiles
+                            plt.savefig(save_plots_path+'01_Time_Delay_Estimate_'+save_plots_base,dpi=300)
+            #                plt.plot(Rg_corr2)
+                            
+                            
+        #                Rg_filt[np.nonzero(Rg_count < 50)] = np.nan
+                        plt.figure()
+                        plt.plot(air_data_t['Time']/3600.0,Rg_exp,label='aircraft data estimate')
+#                        plt.plot(air_data_t['Time']/3600.0,Rg,label='ground return (unfiltered)')
+#                        plt.plot(Rg_interp,'--',label='From Ground Return')
+                        plt.plot(air_data_t['Time']/3600.0,Rg_filt,'r.-',label='ground return (filtered)')
+                        plt.xlabel('Flight Time [h]')
+                        plt.ylabel('Range to Surface [m]')
+                        plt.grid(b=True)
+                        plt.legend()
+                        if settings['save_mol_gain_plot']:
+                            plt.savefig(save_plots_path+'02_Range_to_Surface_'+save_plots_base,dpi=300)
+#                        plt.figure()
+#                        plt.plot(Rg_SNR)
+#                        plt.plot(Rg_count)
+#                        plt.show()
+                        
+#                        plt.figure()
+#                        plt.plot(profs['combined_hi'].profile[325,iRg_min[325]:iRg_max[325]])
+#                        plt.figure()
+#                        plt.plot(weights*Rg_exp)
+#                        plt.show()
+                
+                
                 profs[var].diff_geo_overlap_correct(diff_data['hi_diff_geo'],geo_reference='molecular')
             elif var == 'combined_lo' and settings['diff_geo_correct']:
                 profs[var].diff_geo_overlap_correct(diff_data['lo_diff_geo'],geo_reference='molecular')
