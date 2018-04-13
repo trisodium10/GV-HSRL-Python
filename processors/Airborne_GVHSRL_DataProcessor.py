@@ -150,6 +150,8 @@ def ProcessAirborneDataChunk(time_start,time_stop,
     try: settings
     except NameError: settings = {}
    
+    save_other_data = {}  # dict containing extra variables to be saved to the netcdf file   
+   
     # If a paremeter isn't supplied, use the default setting
     for param in default_settings.keys():
         if not param in settings.keys():
@@ -277,6 +279,9 @@ def ProcessAirborneDataChunk(time_start,time_stop,
             print('Estimated bin0: %f'%est_bin0)
             print('Current bin0: %f'%bin0)
             print('')
+            save_other_data['est_bin0']={'data':est_bin0,'description':'estimated MCS bin corresponding to t=0 on the lidar pulse','units':'MCS bin number'}
+            save_other_data['bin0'] = {'data':bin0,'description':'actual MCS bin corresponding to t=0 on the lidar pulse used in this processing','units':'MCS bin number'}
+            
     #        plt.figure()
     #        plt.plot(np.arange(ipbin0,ipbin0+30)+0.5,np.diff(pbin0[ipbin0:ipbin0+31]))
     #        plt.plot(np.arange(ipbin0,ipbin0+30),pbin0[ipbin0:ipbin0+30])
@@ -608,7 +613,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                         # remove data points with low SNR
                         Rg_filt = Rg.copy()
                         Rg_out = np.nonzero(Rg_SNR < 7.0)
-                        Rg_keep = np.nonzero(Rg_SNR >=7.0)
+#                        Rg_keep = np.nonzero(Rg_SNR >=7.0)
                         Rg_filt[Rg_out] = np.nan
 #                        Rg_interp = np.interp(np.arange(Rg.size),Rg_keep[0],Rg_filt[Rg_keep])
                         
@@ -619,75 +624,133 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                         i_offset = np.arange(-10,10,0.25)
                         Rg_corr1 = np.zeros(i_offset.size)
                         Rg_corr2 = np.zeros(i_offset.size)
+                        Rg_corr3 = np.zeros(i_offset.size)
+                        try:
+                            for ri in range(i_offset.size):
+            
+                                i0 = np.ceil(np.abs(i_offset[ri]))
+            
+                                
+                                if i_offset[ri] < 0:
+                                    xinterp = np.arange(Rg_exp.size-i0)
+                                    Rg1 = np.interp(xinterp,np.arange(Rg_exp.size)-i_offset[ri],Rg_exp)
+                                    weights_Rg1 = np.interp(xinterp,np.arange(Rg_exp.size)-i_offset[ri],weights)
+                                    Rg2 = Rg_filt.flatten()[:-1*i0]
+                                else:
+                                    xinterp = np.arange(Rg_exp.size-i0)+i0
+                                    Rg1 = np.interp(xinterp,np.arange(Rg_exp.size)-i_offset[ri],Rg_exp)
+                                    weights_Rg1 = np.interp(xinterp,np.arange(Rg_exp.size)-i_offset[ri],weights)
+                                    Rg2 = Rg_filt.flatten()[i0:]
+    
+                                Rg_corr1[ri] = np.nanmean(weights_Rg1 * (Rg1-Rg2)**2)
+                                Rg_corr2[ri] = np.nanstd(Rg1-Rg2)
+    #                            Rg_corr3[ri] = np.nanmean(((Rg1-np.nanmean(Rg1))*np.nanstd(Rg1)*(Rg2-np.nanmean(Rg2))*np.nanstd(Rg2)))
+    #                            Rg_corr3[ri] = np.nanmean(np.diff(Rg1)*np.diff(Rg2))
+                                Rg_corr3[ri] = np.nanmean((np.diff(Rg1)-np.diff(Rg2))**2/profs['combined_hi'].mean_dt**2)
+                                
+                            Rg_tot = Rg_corr3/np.nanmean(Rg_corr3)+Rg_corr1/np.nanmean(Rg_corr1)/4
+                            i_min_tot = np.argmin(Rg_tot)
+    #                        x_0x = 0.5*(i_offset[:-1]+i_offset[1:])
+    #                        i_t_off = np.interp(np.zeros(1),np.diff(Rg_corr1),x_0x)
+                            x_0x = 0.5*(i_offset[i_min_tot-1:i_min_tot+1]+i_offset[i_min_tot:i_min_tot+2])
+                            i_t_off_tot = np.interp(np.zeros(1),np.diff(Rg_tot)[i_min_tot-1:i_min_tot+1],x_0x)  # mimimum of total error function
+                            
+                            i_min_lms = np.argmin(Rg_corr1)
+                            x_0x = 0.5*(i_offset[i_min_lms-1:i_min_lms+1]+i_offset[i_min_lms:i_min_lms+2])
+                            i_t_off_lms = np.interp(np.zeros(1),np.diff(Rg_tot)[i_min_lms-1:i_min_lms+1],x_0x)  # minimum of lms error
+                            
+                            i_min_deriv = np.argmin(Rg_corr3)
+                            x_0x = 0.5*(i_offset[i_min_deriv-1:i_min_deriv+1]+i_offset[i_min_deriv:i_min_deriv+2])
+                            i_t_off_deriv = np.interp(np.zeros(1),np.diff(Rg_tot)[i_min_deriv-1:i_min_deriv+1],x_0x)  # minimum from derivative lms
+                            
+                            print('')
+                            print('Current time offset: %f'%settings['aircraft_time_shift'])
+                            print('Estimated time offset (total): %f s'%(i_t_off_tot*profs['combined_hi'].mean_dt+settings['aircraft_time_shift']))
+                            print('Estimated time offset (attitude fit): %f s'%(i_t_off_lms*profs['combined_hi'].mean_dt+settings['aircraft_time_shift']))
+                            print('Estimated time offset (derivative attitude fit): %f s'%(i_t_off_deriv*profs['combined_hi'].mean_dt+settings['aircraft_time_shift']))
+                            print('')
+                            save_other_data['time_offset_total']={'data':i_t_off_tot*profs['combined_hi'].mean_dt+settings['aircraft_time_shift'],'description':'estimated time offset between aircraft and HSRL data systems based on combined aircraft attitude and derivative of aircraft attitude signals','units':'seconds'}
+                            save_other_data['time_offset_lms']={'data':i_t_off_lms*profs['combined_hi'].mean_dt+settings['aircraft_time_shift'],'description':'estimated time offset between aircraft and HSRL data systems based on combined aircraft attitude signal','units':'seconds'}
+                            save_other_data['time_offset_deriv']={'data':i_t_off_deriv*profs['combined_hi'].mean_dt+settings['aircraft_time_shift'],'description':'estimated time offset between aircraft and HSRL data systems based on derivative of aircraft attitude signal','units':'seconds'}
+                            save_other_data['time_offset']={'data':settings['aircraft_time_shift'],'description':'time offset between aircraft and HSRL data systems used in processing this dataset','units':'seconds'}
+    #                    Rg_corr1[ri] = np.nanmean((Rg1-Rmean)*(Rg2-Rmean))
                         
-                        for ri in range(i_offset.size):
-        
-                            i0 = np.ceil(np.abs(i_offset[ri]))
-        
+                            textstr = 'Current time offset: %f s\n'%settings['aircraft_time_shift'] + \
+                                'Estimated time offset (total): %f s\n'%(i_t_off_tot*profs['combined_hi'].mean_dt + settings['aircraft_time_shift'])  + \
+                                'Estimated time offset (lms): %f s\n'%(i_t_off_lms*profs['combined_hi'].mean_dt + settings['aircraft_time_shift'])  + \
+                                'Estimated time offset (derivative lms): %f s\n'%(i_t_off_deriv*profs['combined_hi'].mean_dt + settings['aircraft_time_shift'])
+    #                            'New Range Std: %f m\n'%Rg_corr2.min()
+                            # piggy back on save_mol_gain_plot setting
                             
-                            if i_offset[ri] < 0:
-                                xinterp = np.arange(Rg_exp.size-i0)
-                                Rg1 = np.interp(xinterp,np.arange(Rg_exp.size)-i_offset[ri],Rg_exp)
-                                weights_Rg1 = np.interp(xinterp,np.arange(Rg_exp.size)-i_offset[ri],weights)
-                                Rg2 = Rg_filt.flatten()[:-1*i0]
-                            else:
-                                xinterp = np.arange(Rg_exp.size-i0)+i0
-                                Rg1 = np.interp(xinterp,np.arange(Rg_exp.size)-i_offset[ri],Rg_exp)
-                                weights_Rg1 = np.interp(xinterp,np.arange(Rg_exp.size)-i_offset[ri],weights)
-                                Rg2 = Rg_filt.flatten()[i0:]
-
-                            Rg_corr1[ri] = np.nanmean(weights_Rg1 * (Rg1-Rg2)**2)
-                            Rg_corr2[ri] = np.nanstd(Rg1-Rg2)
-                        x_0x = 0.5*(i_offset[:-1]+i_offset[1:])
-                        i_t_off = np.interp(np.zeros(1),np.diff(Rg_corr1),x_0x)
-                        print('')
-                        print('Current time offset: %f'%settings['aircraft_time_shift'])
-                        print('Estimated time offset: %f s'%(i_t_off*profs['combined_hi'].mean_dt+settings['aircraft_time_shift']))
-                        print('')
-#                    Rg_corr1[ri] = np.nanmean((Rg1-Rmean)*(Rg2-Rmean))
-                    
-                        textstr = 'Current time offset: %f s\n'%settings['aircraft_time_shift'] + \
-                            'Estimated time offset: %f s\n'%(i_t_off*profs['combined_hi'].mean_dt) + \
-                            'New Range Std: %f m\n'%Rg_corr2.min()
-                        # piggy back on save_mol_gain_plot setting
+                            plt.figure()
+                            plt.subplot(211)
+                            plt.plot(-1*i_offset,np.sqrt(Rg_tot),label='Total Error')
+                            plt.plot(-1*i_offset,np.sqrt(Rg_corr3/np.nanmean(Rg_corr3)),label='Derivative Error')
+                            plt.plot(-1*i_offset,np.sqrt(Rg_corr1/np.nanmean(Rg_corr1)),label='Weighted Error')
+                            plt.plot(-1*i_offset[i_min_tot],np.sqrt(Rg_tot[i_min_tot]),'k.')
+                            plt.plot(-1*i_offset[i_min_lms],np.sqrt(Rg_corr1[i_min_lms]/np.nanmean(Rg_corr1)),'k.')
+                            plt.plot(-1*i_offset[i_min_deriv],np.sqrt(Rg_corr3[i_min_deriv]/np.nanmean(Rg_corr3)),'k.')
+                            plt.grid(b=True)
+                            plt.text(np.mean(i_offset),np.mean(plt.ylim()),textstr,verticalalignment='center',horizontalalignment='center',size=9)
+                            plt.xlabel('Aircraft Time shift [s]')
+                            plt.ylabel('Weighted RMS Error')
+                            plt.legend(fontsize=9)
+    
+    ##                        plt.figure()
+    #                        fig,ax1 = plt.subplots()
+    #                        ax1.plot(-1*i_offset,np.sqrt(Rg_corr3),label='Derivative Error',color='b')
+    #                        ax1.plot(-1*i_offset[i_min],np.sqrt(Rg_corr3[i_min]),'kx')
+    #                        ax2=ax1.twinx()
+    #                        ax2.plot(-1*i_offset,np.sqrt(Rg_corr1),label='Weighted Error',color='r')
+    #                        ax1.set_xlabel('Aircraft Time shift [s]')
+    #                        ax1.set_ylabel('RMS Time Derivative Error [m/s]',color='b')
+    #                        ax2.set_ylabel('RMS Error [m]',color='r')
+    #                        plt.grid(b=True)
+    #                        plt.text(np.mean(i_offset),np.mean(np.sqrt(Rg_corr1)),textstr,verticalalignment='center',horizontalalignment='center')
+        #                        plt.text(0.95*(np.max(bbsr)-np.min(bbsr))+np.min(bbsr),0.95*(np.max(balt)-np.min(balt))+np.min(balt),text_str,color='white',fontsize=8,verticalalignment='top',horizontalalignment='right')
+    
+#                            if settings['save_mol_gain_plot']:
+#                                # double zero at beginning of filename just to put plots at the front of a sorted list of profiles
+#                                plt.savefig(save_plots_path+'01_Time_Delay_Estimate_'+save_plots_base,dpi=300)
+                                
+                                
+                #                plt.plot(Rg_corr2)
+    #                        plt.figure()
+    #                        plt.plot(-1*i_offset,np.sqrt(Rg_corr3),label='Cross Correlation')
+    #                        plt.title('Cross Correlation')
+                                
+            #                Rg_filt[np.nonzero(Rg_count < 50)] = np.nan
+#                            plt.figure()
+                            plt.subplot(212)
+                            plt.plot(air_data_t['Time']/3600.0,Rg_exp,label='aircraft data estimate')
+    #                        plt.plot(air_data_t['Time']/3600.0,Rg,label='ground return (unfiltered)')
+    #                        plt.plot(Rg_interp,'--',label='From Ground Return')
+                            plt.plot(air_data_t['Time']/3600.0,Rg_filt,'r.-',label='ground return (filtered)')
+                            plt.xlabel('Flight Time [h]')
+                            plt.ylabel('Range to Surface [m]')
+                            plt.grid(b=True)
+                            plt.legend(fontsize=9)
+#                            if settings['save_mol_gain_plot']:
+#                                plt.savefig(save_plots_path+'02_Range_to_Surface_'+save_plots_base,dpi=300)
+                                
+                            if settings['save_mol_gain_plot']:
+                                # double zero at beginning of filename just to put plots at the front of a sorted list of profiles
+                                plt.savefig(save_plots_path+'01_Time_Delay_Estimate_'+save_plots_base,dpi=300)
+                                
+    #                        plt.figure()
+    #                        plt.plot(Rg_SNR)
+    #                        plt.plot(Rg_count)
+    #                        plt.show()
                             
-
-                        plt.figure()
-                        plt.plot(-1*i_offset,np.sqrt(Rg_corr1),label='Weighted Error')
-#                        plt.plot(-1*i_offset,Rg_corr2,label='Total RMS Error')
-                        plt.xlabel('Aircraft Time shift [s]')
-                        plt.ylabel('RMS Error [m]')
-                        plt.grid(b=True)
-                        plt.text(np.mean(i_offset),np.mean(np.sqrt(Rg_corr1)),textstr,verticalalignment='center',horizontalalignment='center')
-    #                        plt.text(0.95*(np.max(bbsr)-np.min(bbsr))+np.min(bbsr),0.95*(np.max(balt)-np.min(balt))+np.min(balt),text_str,color='white',fontsize=8,verticalalignment='top',horizontalalignment='right')
-                        if settings['save_mol_gain_plot']:
-                            # double zero at beginning of filename just to put plots at the front of a sorted list of profiles
-                            plt.savefig(save_plots_path+'01_Time_Delay_Estimate_'+save_plots_base,dpi=300)
-            #                plt.plot(Rg_corr2)
-                            
-                            
-        #                Rg_filt[np.nonzero(Rg_count < 50)] = np.nan
-                        plt.figure()
-                        plt.plot(air_data_t['Time']/3600.0,Rg_exp,label='aircraft data estimate')
-#                        plt.plot(air_data_t['Time']/3600.0,Rg,label='ground return (unfiltered)')
-#                        plt.plot(Rg_interp,'--',label='From Ground Return')
-                        plt.plot(air_data_t['Time']/3600.0,Rg_filt,'r.-',label='ground return (filtered)')
-                        plt.xlabel('Flight Time [h]')
-                        plt.ylabel('Range to Surface [m]')
-                        plt.grid(b=True)
-                        plt.legend()
-                        if settings['save_mol_gain_plot']:
-                            plt.savefig(save_plots_path+'02_Range_to_Surface_'+save_plots_base,dpi=300)
-#                        plt.figure()
-#                        plt.plot(Rg_SNR)
-#                        plt.plot(Rg_count)
-#                        plt.show()
-                        
-#                        plt.figure()
-#                        plt.plot(profs['combined_hi'].profile[325,iRg_min[325]:iRg_max[325]])
-#                        plt.figure()
-#                        plt.plot(weights*Rg_exp)
-#                        plt.show()
+    #                        plt.figure()
+    #                        plt.plot(profs['combined_hi'].profile[325,iRg_min[325]:iRg_max[325]])
+    #                        plt.figure()
+    #                        plt.plot(weights*Rg_exp)
+    #                        plt.show()
+                        except:
+                            print('   Skipping due to data alignment error (probably not enough valid ground returns)')
+                    else:
+                        print('  Manuevers not found')
                 
                 
                 profs[var].diff_geo_overlap_correct(diff_data['hi_diff_geo'],geo_reference='molecular')
@@ -1091,6 +1154,11 @@ def ProcessAirborneDataChunk(time_start,time_stop,
             print(save_data_file)
             for var in save_air_post.keys():
                 lp.write_var2nc(air_data_post[var],str(var),save_data_file,description=save_air_post[var]['description'],units=save_air_post[var]['units'])
+            
+            print('saving additional variables to')
+            print(save_data_file)
+            for var in save_other_data.keys():
+                lp.write_var2nc(save_other_data[var]['data'],str(var),save_data_file,description=save_other_data[var]['description'],units=save_other_data[var]['units'])
         else:
             print('save_data setting is False.  This data will not be saved.')
             
