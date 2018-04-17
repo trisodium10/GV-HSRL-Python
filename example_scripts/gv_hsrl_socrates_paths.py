@@ -12,32 +12,36 @@ import os
 #basepath = '/scr/eldora1/HSRL_data/'  # old path - still works with link from HSRL_data to /hsrl/raw/
 #basepath = '/scr/eldora1/rsfdata/hsrl/raw/'  # new absolute path
 
-basepath = '/Users/mhayman/Documents/HSRL/GVHSRL_data/'  # local computer data path
-#basepath = '/scr/rain1/rsfdata/projects/socrates/hsrl/raw/' #SOCRATES basepath
+#basepath = '/Users/mhayman/Documents/HSRL/GVHSRL_data/'  # local computer data path
+basepath = '/scr/rain1/rsfdata/projects/socrates/hsrl/raw/' #SOCRATES basepath
 
 # Server path (FL)
-#aircraft_basepath = {
-#    'CSET':'/scr/raf_data/CSET/24_Mar_17_BU/',
-#    'SOCRATES':'/scr/raf_data/SOCRATES/' #SOCRATEStf01.nc       
-#    } 
+aircraft_basepath = {
+    'CSET':'/scr/raf_data/CSET/24_Mar_17_BU/',
+    'SOCRATES':'/scr/raf_data/SOCRATES/' #SOCRATEStf01.nc       
+    } 
     
 # Local Paths
-aircraft_basepath = {
-    'CSET':'/Users/mhayman/Documents/HSRL/aircraft_data/',
-    'SOCRATES':'/Users/mhayman/Documents/HSRL/aircraft_data/' #SOCRATEStf01.nc       
-    } 
+#aircraft_basepath = {
+#    'CSET':'/Users/mhayman/Documents/HSRL/aircraft_data/',
+#    'SOCRATES':'/Users/mhayman/Documents/HSRL/aircraft_data/' #SOCRATEStf01.nc       
+#    } 
 
-save_data_path = os.environ['HOME'] + '/Documents/HSRL/GVHSRL/data/'
-save_plots_path = os.environ['HOME'] + '/Documents/HSRL/GVHSRL/plots/'
+#save_data_path = os.environ['HOME'] + '/HSRL/GVHSRL/data/SOCRATES/'
+#save_plots_path = os.environ['HOME'] + '/HSRL/GVHSRL/plots/SOCRATES/'
 
-software_path = os.environ['HOME']+'/Documents/Python/Lidar/GV-HSRL-Python/'
+#FTP paths
+save_plots_path = '/net/ftp/pub/temp/users/mhayman/SOCRATES/plots/'
+save_data_path = '/net/ftp/pub/temp/users/mhayman/SOCRATES/data/'
+
+software_path = os.environ['HOME']+'/PythonScripts/HSRL_Processing/GV-HSRL-Python/'
 
 paths = {
-        'basepath':basepath,
-        'aircraft_basepath':aircraft_basepath,
-        'save_data_path':save_data_path,
-        'save_plots_path':save_plots_path,
-        'software_path':software_path
-        }
+	'basepath':basepath,
+	'aircraft_basepath':aircraft_basepath,
+	'save_data_path':save_data_path,
+	'save_plots_path':save_plots_path,
+	'software_path':software_path
+	}
 
 #Processor = os.environ['HOME']+'/Documents/Python/Lidar/GV-HSRL-Python/processors/Airborne_Processor_GVHSRL.py'
