@@ -649,6 +649,30 @@ def get_TP_from_aircraft(air_data,profile,telescope_direction=[],lidar_tilt=[0,4
     
     return temp, pres
     
+def lidar_pointing_vector(air_vars,telescope_direction,lidar_tilt=4.0):
+    """
+    Estimate lidar pointing direction in 3D space in a global coordinate frame
+    where 
+        n_lidar[0] = x points N
+        n_lidar[1] = y points E
+        n_lidar[2] = z points toward Earth
+    lidar tilt is in degrees and in the roll direction
+    """
+    t_dir = -1.0*np.sign(telescope_direction-0.5)  # change telescope direction so -1 = up, 1 = down
+    l_tilt = lidar_tilt*np.pi/180.0  # use tilt angle in radians
+    n_lidar = np.zeros((3,telescope_direction.size))
+    roll = air_vars['ROLL']*np.pi/180.0
+    pitch = air_vars['PITCH']*np.pi/180.0
+    thdg = air_vars['THDG']*np.pi/180.0
+    
+    n_lidar[0,:] = np.sin(l_tilt)*(np.cos(roll)*np.sin(thdg)-np.cos(thdg)*np.sin(pitch)*np.sin(roll)) \
+        +t_dir*np.cos(l_tilt)*(np.cos(roll)*np.cos(thdg)*np.sin(pitch)+np.sin(roll)*np.sin(thdg))
+    n_lidar[1,:] = t_dir*np.cos(l_tilt)*(np.cos(roll)*np.sin(pitch)*np.sin(thdg)-np.cos(thdg)*np.sin(roll)) \
+        -np.sin(l_tilt)*(np.cos(roll)*np.cos(thdg)+np.sin(roll)*np.sin(pitch)*np.sin(thdg))   
+    n_lidar[2,:] = t_dir*np.cos(pitch)*np.cos(t_dir*l_tilt+roll)
+    
+    return n_lidar
+    
 def delete_indices(in_dict,indices):
     """
     deletes the indices of all elements of the dictionary

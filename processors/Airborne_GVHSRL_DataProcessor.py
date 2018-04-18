@@ -767,7 +767,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                     profs[var].diff_geo_overlap_correct(diff_data['hi_diff_geo'],geo_reference='molecular')  
                 else:
                     profs[var].diff_geo_overlap_correct(diff_data['hi_diff_geo'],geo_reference='molecular')
-            elif var == 'molecular' and settings['get_extinction']:
+            elif var == 'molecular' and settings['get_extinction'] and settings['as_altitude']:
                 # if retrieving extinction, use a range centered profile to obtain it
                 mol_ext = profs['molecular'].copy()
                 mol_ext.multiply_piecewise(geo_data['geo_mol'])
@@ -849,6 +849,22 @@ def ProcessAirborneDataChunk(time_start,time_stop,
             temp,pres = gv.get_TP_from_aircraft(air_data,profs['molecular'],telescope_direction=var_post['TelescopeDirection'])
         beta_m = lp.get_beta_m(temp,pres,profs['molecular'].wavelength)
         
+        nLidar = gv.lidar_pointing_vector(air_data_post,var_post['TelescopeDirection'],lidar_tilt=4.0)
+        # plots for evaluating lidar pointing direction
+#        plt.figure() 
+#        plt.subplot(211)
+#        plt.plot(nLidar.T)
+#        plt.plot(np.sqrt(np.sum(nLidar**2,axis=0)),'k')
+#        plt.subplot(212)
+#        plt.plot(air_data_post['ROLL'])
+#        plt.plot(air_data_post['PITCH'])
+#        plt.plot(air_data_post['THDG'])
+#        plt.figure()
+#        plt.scatter(air_data_post['ROLL'],air_data_post['THDG'],c=np.sqrt(np.sum(nLidar**2,axis=0))-1)
+#        plt.colorbar()
+#        plt.show()
+
+        save_other_data['lidar_pointing']={'data':nLidar,'description':'Lidar pointing vector in global coordinate frame. index 0 = North, index 1 = East, index 2 = Down','units':'none'}
         
         if (settings['get_extinction']  or settings['Denoise_Mol']) and settings['as_altitude']:
 #            print(var_post['TelescopeDirection'].size)
@@ -947,12 +963,19 @@ def ProcessAirborneDataChunk(time_start,time_stop,
             if settings['Denoise_Mol']:
 #                MolDenoise.multiply_piecewise(1.0/eta_i2)
                 MolDenoise.gain_scale(mol_gain,gain_var = (mol_gain*0.05)**2)
+            if settings['get_extinction']:    
+                if not settings['as_altitude']:
+                    mol_ext = profs['molecular'].copy()
+                    eta_i2_ext = eta_i2
+                else:
+                    [eta_i2_ext] = lp.RB_Efficiency([Ti2],temp_ext.profile.flatten(),pres_ext.profile.flatten()*9.86923e-6,profs['molecular'].wavelength,nu=nu,norm=True,max_size=10000)
+                    eta_i2_ext = eta_i2_ext.reshape(temp_ext.profile.shape)
                 
-            if settings['get_extinction'] and settings['as_altitude']:
-                [eta_i2_ext] = lp.RB_Efficiency([Ti2],temp_ext.profile.flatten(),pres_ext.profile.flatten()*9.86923e-6,profs['molecular'].wavelength,nu=nu,norm=True,max_size=10000)
-                eta_i2_ext = eta_i2_ext.reshape(temp_ext.profile.shape)
                 mol_ext.multiply_piecewise(1.0/eta_i2_ext)
                 mol_ext.range_correct()
+#            else:
+#                mol_ext = profs['molecular'].copy()
+
                 
         else:
             # Rescale molecular channel to match combined channel gain
