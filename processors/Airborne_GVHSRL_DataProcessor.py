@@ -1204,7 +1204,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                                       plot_date=settings['plot_date'],
                                       t_axis_scale=settings['time_axis_scale'],
                                       h_axis_scale=settings['alt_axis_scale'],
-                                      minor_ticks=5,major_ticks=1,cmap=['viridis'])
+                                      minor_ticks=5,major_ticks=1,cmap=['jet'])
             if settings['as_altitude']:
                 for ai in range(len(rfig[1])):
                     rfig[1][ai].plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude      
