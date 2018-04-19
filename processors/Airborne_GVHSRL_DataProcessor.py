@@ -1009,7 +1009,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
             OD.profile_type = 'unitless'
             alpha_a = OD.copy()
             OD.profile_variance = OD.profile_variance/OD.profile**2
-            OD.profile = np.log(OD.profile)-np.log(OD.profile[:,5])
+            OD.profile = np.log(OD.profile)-np.nanmean(np.log(OD.profile[:,0:3]),axis=1)[:,np.newaxis]
             
             for ai in range(alpha_a.profile.shape[0]):
                 alpha_a.profile[ai,:] = -0.5*gv.savitzky_golay(np.log(alpha_a.profile[ai,:].flatten()), ext_sg_wid, ext_sg_order, deriv=1)
@@ -1319,7 +1319,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                                           title_add=proj_label,
                                           t_axis_scale=settings['time_axis_scale'],
                                           h_axis_scale=settings['alt_axis_scale'],
-                                          cmap=['jet'])
+                                          cmap='jet')
                 rfig.plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude  
                 
                 if settings['save_plots']:
