@@ -25,6 +25,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 import LidarProfileFunctions as lp
+import LidarPlotFunctions as lplt
 import datetime
 #import glob
 
@@ -1006,10 +1007,12 @@ def ProcessAirborneDataChunk(time_start,time_stop,
             OD.descript = 'Total optical depth from aircraft altitude'
             OD.label = 'Optical Depth'
             OD.profile_type = 'unitless'
-            
             alpha_a = OD.copy()
+            OD.profile_variance = OD.profile_variance/OD.profile**2
+            OD.profile = np.log(OD.profile)-np.log(OD.profile[:,5])
+            
             for ai in range(alpha_a.profile.shape[0]):
-                alpha_a.profile[ai,:] = -2*gv.savitzky_golay(np.log(alpha_a.profile[ai,:].flatten()), ext_sg_wid, ext_sg_order, deriv=1)
+                alpha_a.profile[ai,:] = -0.5*gv.savitzky_golay(np.log(alpha_a.profile[ai,:].flatten()), ext_sg_wid, ext_sg_order, deriv=1)
             alpha_a = alpha_a/alpha_a.mean_dR # not sure this is the right scaling factor
             alpha_a = alpha_a - beta_m_ext*(8*np.pi/3)  # remove molecular extinction
             if settings['as_altitude']:
@@ -1146,6 +1149,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         if settings['get_extinction']:
             # add extinction to list of profilse to save
             save_prof_list.extend([alpha_a])
+            save_prof_list.extend([OD])
         if settings['Denoise_Mol']:
             # add denoised molecular observations to list of profilse to save
             save_prof_list.extend([MolDenoise])
@@ -1186,77 +1190,48 @@ def ProcessAirborneDataChunk(time_start,time_stop,
             print('save_data setting is False.  This data will not be saved.')
             
         if settings['plot_2D']:
-            if settings['plot_date']:
-                t1d_plt = mdates.date2num([datetime.datetime.fromordinal(BSR.StartDate.toordinal()) \
-                            + datetime.timedelta(seconds=sec) for sec in time_1d])   
-            else:
-                t1d_plt = time_1d/3600.0
-            
-            tlims = [(time_start-flight_date[usr_flt]).total_seconds()/3600.0,
-                      (time_stop-flight_date[usr_flt]).total_seconds()/3600.0]
-    #        tlims = [time_post[0]/3600.0, time_post[-1]/3600.0]
-        #    rfig = lp.pcolor_profiles([BSR,dPart],scale=['log','linear'],climits=[[1,1e2],[0,0.7]],ylimits=[MinAlt*1e-3,MaxAlt*1e-3],title_add=proj_label,plot_date=plot_date)
-            rfig = lp.pcolor_profiles([beta_a],scale=['log'],
-                                      climits=[[1e-8,1e-3]],
-                                      ylimits=[MinAlt*1e-3,MaxAlt*1e-3],
-                                      tlimits=tlims,
-                                      title_add=proj_label,
-                                      plot_date=settings['plot_date'],
-                                      t_axis_scale=settings['time_axis_scale'],
-                                      h_axis_scale=settings['alt_axis_scale'],
-                                      minor_ticks=5,major_ticks=1,cmap=['jet'])
             if settings['as_altitude']:
-                for ai in range(len(rfig[1])):
-                    rfig[1][ai].plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude      
-            if settings['save_plots']:
-                plt.savefig(save_plots_path+'Aerosol_Backscatter_'+save_plots_base,dpi=300)
-            
-            rfig = lp.pcolor_profiles([dPart],scale=['linear'],
-                                      climits=[[0,1.0]],
-                                      ylimits=[MinAlt*1e-3,MaxAlt*1e-3],tlimits=tlims,
-                                      title_add=proj_label,
-                                      plot_date=settings['plot_date'],
-                                      t_axis_scale=settings['time_axis_scale'],
-                                      h_axis_scale=settings['alt_axis_scale'],
-                                      minor_ticks=5,major_ticks=1)
-            if settings['as_altitude']:
-                for ai in range(len(rfig[1])):
-                    rfig[1][ai].plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude      
-            if settings['save_plots']:
-                plt.savefig(save_plots_path+'Aerosol_Depolarization_'+save_plots_base,dpi=300)        
-            
-            rfig = lp.pcolor_profiles([profs['combined']],scale=['log'],
-                                      climits=[[1e-1,1e4]],
-                                      ylimits=[MinAlt*1e-3,MaxAlt*1e-3],tlimits=tlims,
-                                      title_add=proj_label,
-                                      plot_date=settings['plot_date'],
-                                      t_axis_scale=settings['time_axis_scale'],
-                                      h_axis_scale=settings['alt_axis_scale'],
-                                      minor_ticks=5,major_ticks=1)
-            if settings['as_altitude']:
-                for ai in range(len(rfig[1])):
-                    rfig[1][ai].plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude
-            if settings['save_plots']:
-                plt.savefig(save_plots_path+'AttenuatedBackscatter_'+save_plots_base,dpi=300)
-            
-            rfig = lp.pcolor_profiles([dVol],scale=['linear'],
-                                      climits=[[0,1.0]],
-                                      ylimits=[MinAlt*1e-3,MaxAlt*1e-3],tlimits=tlims,
-                                      title_add=proj_label,
-                                      plot_date=settings['plot_date'],
-                                      t_axis_scale=settings['time_axis_scale'],
-                                      h_axis_scale=settings['alt_axis_scale'],
-                                      minor_ticks=5,major_ticks=1)
-            if settings['as_altitude']:
-                for ai in range(len(rfig[1])):
-                    rfig[1][ai].plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude
-            if settings['save_plots']:
-                plt.savefig(save_plots_path+'Volume_Depolarization_'+save_plots_base,dpi=300)
-                    
-            
-            if settings['get_extinction']:
-                rfig = lp.pcolor_profiles([alpha_a],scale=['log'],
-                                          climits=[[1e-5,1e-2]],
+                if settings['plot_date']:
+                    t1d_plt = mdates.date2num([datetime.datetime.fromordinal(BSR.StartDate.toordinal()) \
+                                + datetime.timedelta(seconds=sec) for sec in time_1d])   
+                else:
+                    t1d_plt = time_1d/3600.0
+                
+                tlims = [(time_start-flight_date[usr_flt]).total_seconds()/3600.0,
+                          (time_stop-flight_date[usr_flt]).total_seconds()/3600.0]
+        #        tlims = [time_post[0]/3600.0, time_post[-1]/3600.0]
+            #    rfig = lp.pcolor_profiles([BSR,dPart],scale=['log','linear'],climits=[[1,1e2],[0,0.7]],ylimits=[MinAlt*1e-3,MaxAlt*1e-3],title_add=proj_label,plot_date=plot_date)
+                rfig = lp.pcolor_profiles([beta_a],scale=['log'],
+                                          climits=[[1e-8,1e-3]],
+                                          ylimits=[MinAlt*1e-3,MaxAlt*1e-3],
+                                          tlimits=tlims,
+                                          title_add=proj_label,
+                                          plot_date=settings['plot_date'],
+                                          t_axis_scale=settings['time_axis_scale'],
+                                          h_axis_scale=settings['alt_axis_scale'],
+                                          minor_ticks=5,major_ticks=1,cmap=['jet'])
+                if settings['as_altitude']:
+                    for ai in range(len(rfig[1])):
+                        rfig[1][ai].plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude      
+                if settings['save_plots']:
+                    plt.savefig(save_plots_path+'Aerosol_Backscatter_'+save_plots_base,dpi=300)
+                
+                rfig = lp.pcolor_profiles([dPart],scale=['linear'],
+                                          climits=[[0,1.0]],
+                                          ylimits=[MinAlt*1e-3,MaxAlt*1e-3],tlimits=tlims,
+                                          title_add=proj_label,
+                                          plot_date=settings['plot_date'],
+                                          t_axis_scale=settings['time_axis_scale'],
+                                          h_axis_scale=settings['alt_axis_scale'],
+                                          minor_ticks=5,major_ticks=1)
+                if settings['as_altitude']:
+                    for ai in range(len(rfig[1])):
+                        rfig[1][ai].plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude      
+                if settings['save_plots']:
+                    plt.savefig(save_plots_path+'Aerosol_Depolarization_'+save_plots_base,dpi=300)        
+                
+                rfig = lp.pcolor_profiles([profs['combined']],scale=['log'],
+                                          climits=[[1e-1,1e4]],
                                           ylimits=[MinAlt*1e-3,MaxAlt*1e-3],tlimits=tlims,
                                           title_add=proj_label,
                                           plot_date=settings['plot_date'],
@@ -1267,79 +1242,159 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                     for ai in range(len(rfig[1])):
                         rfig[1][ai].plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude
                 if settings['save_plots']:
-                    plt.savefig(save_plots_path+'Extinction_'+save_plots_base,dpi=300)
-                    
-            if settings['Denoise_Mol']:
-                rfig = lp.pcolor_profiles([beta_a_denoise],scale=['log'],
-                                      climits=[[1e-8,1e-3]],
-                                      ylimits=[MinAlt*1e-3,MaxAlt*1e-3],
-                                      tlimits=tlims,
-                                      title_add=proj_label,
-                                      plot_date=settings['plot_date'],
-                                      t_axis_scale=settings['time_axis_scale'],
-                                      h_axis_scale=settings['alt_axis_scale'],
-                                      minor_ticks=5,major_ticks=1)
+                    plt.savefig(save_plots_path+'AttenuatedBackscatter_'+save_plots_base,dpi=300)
+                
+                rfig = lp.pcolor_profiles([dVol],scale=['linear'],
+                                          climits=[[0,1.0]],
+                                          ylimits=[MinAlt*1e-3,MaxAlt*1e-3],tlimits=tlims,
+                                          title_add=proj_label,
+                                          plot_date=settings['plot_date'],
+                                          t_axis_scale=settings['time_axis_scale'],
+                                          h_axis_scale=settings['alt_axis_scale'],
+                                          minor_ticks=5,major_ticks=1)
                 if settings['as_altitude']:
                     for ai in range(len(rfig[1])):
-                        rfig[1][ai].plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude      
+                        rfig[1][ai].plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude
                 if settings['save_plots']:
-                    plt.savefig(save_plots_path+'Denoised_Aerosol_Backscatter_'+save_plots_base,dpi=300)
+                    plt.savefig(save_plots_path+'Volume_Depolarization_'+save_plots_base,dpi=300)
+                        
                 
+                if settings['get_extinction']:
+                    rfig = lp.pcolor_profiles([alpha_a],scale=['log'],
+                                              climits=[[1e-5,1e-2]],
+                                              ylimits=[MinAlt*1e-3,MaxAlt*1e-3],tlimits=tlims,
+                                              title_add=proj_label,
+                                              plot_date=settings['plot_date'],
+                                              t_axis_scale=settings['time_axis_scale'],
+                                              h_axis_scale=settings['alt_axis_scale'],
+                                              minor_ticks=5,major_ticks=1)
+                    if settings['as_altitude']:
+                        for ai in range(len(rfig[1])):
+                            rfig[1][ai].plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude
+                    if settings['save_plots']:
+                        plt.savefig(save_plots_path+'Extinction_'+save_plots_base,dpi=300)
+                        
+                if settings['Denoise_Mol']:
+                    rfig = lp.pcolor_profiles([beta_a_denoise],scale=['log'],
+                                          climits=[[1e-8,1e-3]],
+                                          ylimits=[MinAlt*1e-3,MaxAlt*1e-3],
+                                          tlimits=tlims,
+                                          title_add=proj_label,
+                                          plot_date=settings['plot_date'],
+                                          t_axis_scale=settings['time_axis_scale'],
+                                          h_axis_scale=settings['alt_axis_scale'],
+                                          minor_ticks=5,major_ticks=1)
+                    if settings['as_altitude']:
+                        for ai in range(len(rfig[1])):
+                            rfig[1][ai].plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude      
+                    if settings['save_plots']:
+                        plt.savefig(save_plots_path+'Denoised_Aerosol_Backscatter_'+save_plots_base,dpi=300)
+                    
+                    
+                    rfig = lp.pcolor_profiles([beta_a,beta_a_denoise],scale=['log','log'],
+                                          climits=[[1e-8,1e-3],[1e-8,1e-3]],
+                                          ylimits=[MinAlt*1e-3,MaxAlt*1e-3],
+                                          tlimits=tlims,
+                                          title_add=proj_label,
+                                          plot_date=settings['plot_date'],
+                                          t_axis_scale=settings['time_axis_scale'],
+                                          h_axis_scale=settings['alt_axis_scale'],
+                                          minor_ticks=5,major_ticks=1)
+                    if settings['as_altitude']:
+                        for ai in range(len(rfig[1])):
+                            rfig[1][ai].plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude      
+                    if settings['save_plots']:
+                        plt.savefig(save_plots_path+'Compare_Denoised_Aerosol_Backscatter_'+save_plots_base,dpi=300)
+            else:
+                t1d_plt = time_1d/3600.0
                 
-                rfig = lp.pcolor_profiles([beta_a,beta_a_denoise],scale=['log','log'],
-                                      climits=[[1e-8,1e-3],[1e-8,1e-3]],
-                                      ylimits=[MinAlt*1e-3,MaxAlt*1e-3],
-                                      tlimits=tlims,
-                                      title_add=proj_label,
-                                      plot_date=settings['plot_date'],
-                                      t_axis_scale=settings['time_axis_scale'],
-                                      h_axis_scale=settings['alt_axis_scale'],
-                                      minor_ticks=5,major_ticks=1)
-                if settings['as_altitude']:
-                    for ai in range(len(rfig[1])):
-                        rfig[1][ai].plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude      
+                tlims = [(time_start-flight_date[usr_flt]).total_seconds()/3600.0,
+                          (time_stop-flight_date[usr_flt]).total_seconds()/3600.0]
+        #        tlims = [time_post[0]/3600.0, time_post[-1]/3600.0]
+            #    rfig = lp.pcolor_profiles([BSR,dPart],scale=['log','linear'],climits=[[1,1e2],[0,0.7]],ylimits=[MinAlt*1e-3,MaxAlt*1e-3],title_add=proj_label,plot_date=plot_date)
+                rfig = lplt.scatter_z(beta_a,scale=['log'],
+                                          climits=[[1e-8,1e-3]],
+                                          ylimits=[MinAlt*1e-3,MaxAlt*1e-3],
+                                          tlimits=tlims,
+                                          title_add=proj_label,
+                                          t_axis_scale=settings['time_axis_scale'],
+                                          h_axis_scale=settings['alt_axis_scale'],
+                                          cmap=['jet'])
+                rfig.plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude  
+                
                 if settings['save_plots']:
-                    plt.savefig(save_plots_path+'Compare_Denoised_Aerosol_Backscatter_'+save_plots_base,dpi=300)
-                    
-                    
-            """
-            Test new retrieval algorithm (cross talk accounting)
-            """
-                    
-                    
-#            rfig = lp.pcolor_profiles([beta_a,beta_a_gv],scale=['log','log'],
-#                                      climits=[[1e-8,1e-3],[1e-8,1e-3]],
-#                                      ylimits=[MinAlt*1e-3,MaxAlt*1e-3],
-#                                      tlimits=tlims,
-#                                      title_add=proj_label,
-#                                      plot_date=settings['plot_date'],
-#                                      t_axis_scale=settings['time_axis_scale'],
-#                                      h_axis_scale=settings['alt_axis_scale'],
-#                                      minor_ticks=5,major_ticks=1)
-#            if settings['as_altitude']:
-#                for ai in range(len(rfig[1])):
-#                    rfig[1][ai].plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude      
-#            if settings['save_plots']:
-#                plt.savefig(save_plots_path+'Aerosol_Backscatter_'+save_plots_base,dpi=300)
-#            
-#            rfig = lp.pcolor_profiles([dPart,dPart_gv],scale=['linear','linear'],
-#                                      climits=[[0,1.0],[0,1.0]],
-#                                      ylimits=[MinAlt*1e-3,MaxAlt*1e-3],tlimits=tlims,
-#                                      title_add=proj_label,
-#                                      plot_date=settings['plot_date'],
-#                                      t_axis_scale=settings['time_axis_scale'],
-#                                      h_axis_scale=settings['alt_axis_scale'],
-#                                      minor_ticks=5,major_ticks=1)
-#            if settings['as_altitude']:
-#                for ai in range(len(rfig[1])):
-#                    rfig[1][ai].plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude      
-#            if settings['save_plots']:
-#                plt.savefig(save_plots_path+'Aerosol_Depolarization_'+save_plots_base,dpi=300)        
+                    plt.savefig(save_plots_path+'Aerosol_Backscatter_'+save_plots_base,dpi=300)
                 
-            #lp.plotprofiles(profs)
-            #dPart.mask(dPartMask)
-            #lp.pcolor_profiles([BSR,dVol],scale=['log','linear'],climits=[[1,5e2],[0,1.0]])
-            #lp.pcolor_profiles([dVol],scale=['linear'],climits=[[0,1]])
+                rfig = lplt.scatter_z(dPart,scale=['linear'],
+                                          climits=[[0,1.0]],
+                                          ylimits=[MinAlt*1e-3,MaxAlt*1e-3],tlimits=tlims,
+                                          title_add=proj_label,
+                                          t_axis_scale=settings['time_axis_scale'],
+                                          h_axis_scale=settings['alt_axis_scale'])
+                
+                rfig.plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude        
+                if settings['save_plots']:
+                    plt.savefig(save_plots_path+'Aerosol_Depolarization_'+save_plots_base,dpi=300)        
+                
+                rfig = lplt.scatter_z(profs['combined'],scale=['log'],
+                                          climits=[[1e-1,1e4]],
+                                          ylimits=[MinAlt*1e-3,MaxAlt*1e-3],tlimits=tlims,
+                                          title_add=proj_label,
+                                          t_axis_scale=settings['time_axis_scale'],
+                                          h_axis_scale=settings['alt_axis_scale'])
+                rfig.plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude  
+                if settings['save_plots']:
+                    plt.savefig(save_plots_path+'AttenuatedBackscatter_'+save_plots_base,dpi=300)
+                
+                rfig = lplt.scatter_z(dVol,scale=['linear'],
+                                          climits=[[0,1.0]],
+                                          ylimits=[MinAlt*1e-3,MaxAlt*1e-3],tlimits=tlims,
+                                          title_add=proj_label,
+                                          t_axis_scale=settings['time_axis_scale'],
+                                          h_axis_scale=settings['alt_axis_scale'])
+                rfig.plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude  
+                if settings['save_plots']:
+                    plt.savefig(save_plots_path+'Volume_Depolarization_'+save_plots_base,dpi=300)
+                        
+                
+                if settings['get_extinction']:
+                    rfig = lplt.scatter_z(alpha_a,scale='log',
+                                              climits=[1e-5,1e-2],
+                                              ylimits=[MinAlt*1e-3,MaxAlt*1e-3],tlimits=tlims,
+                                              title_add=proj_label,
+                                              t_axis_scale=settings['time_axis_scale'],
+                                              h_axis_scale=settings['alt_axis_scale'])
+                    rfig.plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude  
+                    if settings['save_plots']:
+                        plt.savefig(save_plots_path+'Extinction_'+save_plots_base,dpi=300)
+                        
+                if settings['Denoise_Mol']:
+                    rfig = lplt.scatter_z(beta_a_denoise,scale='log',
+                                          climits=[[1e-8,1e-3]],
+                                          ylimits=[MinAlt*1e-3,MaxAlt*1e-3],
+                                          tlimits=tlims,
+                                          title_add=proj_label,
+                                          plot_date=settings['plot_date'],
+                                          t_axis_scale=settings['time_axis_scale'],
+                                          h_axis_scale=settings['alt_axis_scale'])
+                    rfig.plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude     
+                    if settings['save_plots']:
+                        plt.savefig(save_plots_path+'Denoised_Aerosol_Backscatter_'+save_plots_base,dpi=300)
+                    
+                    
+                    rfig = lp.pcolor_profiles([beta_a,beta_a_denoise],scale=['log','log'],
+                                          climits=[[1e-8,1e-3],[1e-8,1e-3]],
+                                          ylimits=[MinAlt*1e-3,MaxAlt*1e-3],
+                                          tlimits=tlims,
+                                          title_add=proj_label,
+                                          t_axis_scale=settings['time_axis_scale'],
+                                          h_axis_scale=settings['alt_axis_scale'])
+                    rfig.plot(t1d_plt,air_data_t['GGALT']*1e-3,color='gray',linewidth=1.2)  # add aircraft altitude       
+                    if settings['save_plots']:
+                        plt.savefig(save_plots_path+'Compare_Denoised_Aerosol_Backscatter_'+save_plots_base,dpi=300)
+                    
+                    
+           
         if settings['show_plots']:
             plt.show()
             
