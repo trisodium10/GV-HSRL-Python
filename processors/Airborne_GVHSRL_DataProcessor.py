@@ -1001,15 +1001,19 @@ def ProcessAirborneDataChunk(time_start,time_stop,
 #            ext_sg_order = 4
 #            ext_tres = 20  # extinction time resolution in seconds
 #            ext_zres = 15   # extinction range resolution in meters
-            mol_ext.conv(ext_tres/mol_ext.mean_dt,ext_zres/mol_ext.mean_dR)
-            beta_m_ext.conv(ext_tres/beta_m_ext.mean_dt,ext_zres/beta_m_ext.mean_dR)
+            
+#            mol_ext.conv(ext_tres/mol_ext.mean_dt,ext_zres/mol_ext.mean_dR)
+#            beta_m_ext.conv(ext_tres/beta_m_ext.mean_dt,ext_zres/beta_m_ext.mean_dR)
+#            print(mol_ext.profile.shape)
+#            print(beta_m_ext.profile.shape)
             OD = mol_ext/beta_m_ext
+            OD.conv(ext_tres/OD.mean_dt,ext_zres/OD.mean_dR)
             OD.descript = 'Total optical depth from aircraft altitude'
             OD.label = 'Optical Depth'
             OD.profile_type = 'unitless'
             alpha_a = OD.copy()
             OD.profile_variance = OD.profile_variance/OD.profile**2
-            OD.profile = np.log(OD.profile)-np.nanmean(np.log(OD.profile[:,0:3]),axis=1)[:,np.newaxis]
+            OD.profile = -0.5*(np.log(OD.profile)-np.nanmean(np.log(OD.profile[:,0:3]),axis=1)[:,np.newaxis])
             
             for ai in range(alpha_a.profile.shape[0]):
                 alpha_a.profile[ai,:] = -0.5*gv.savitzky_golay(np.log(alpha_a.profile[ai,:].flatten()), ext_sg_wid, ext_sg_order, deriv=1)
