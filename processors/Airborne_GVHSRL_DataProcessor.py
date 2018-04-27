@@ -107,6 +107,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         'save_plots':False, # save the plot data
         
         'save_data':False, # save data as netcdf
+        'save_raw':True,    # save raw profiles (with matching time axes to processed data)
         
         'time_axis_scale':5.0,  # scale for horizontal axis on pcolor plots
         'alt_axis_scale':1.0,   # scale for vertical axis on pcolor plots
@@ -509,8 +510,9 @@ def ProcessAirborneDataChunk(time_start,time_stop,
             range_trim = MaxAlt
         
         int_profs = {}  # obtain time integrated profiles
-        save_profs = {}
+#        save_profs = {}
         tv_denoise = {}
+        raw_profs = {}
         for var in profs.keys():
             if settings['RemoveCals']:
                 # remove instances where the I2 cell is removed
@@ -530,6 +532,9 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                     # number of laser shots is based on an assumption that there is one 0.5 second profile per time bin
                     profs[var].nonlinear_correct(dead_time[var],laser_shot_count=2000,std_deadtime=5e-9)
 
+            if settings['save_raw']:
+                raw_profs[var]=profs[var].copy()
+                raw_profs[var].label = 'Raw '+raw_profs[var].label
 #                if var == 'combined_hi':
 #                    p_after = profs[var].copy()
 #                    lp.plotprofiles([p_before,p_after],varplot=True,time=18.3*3600)
@@ -781,6 +786,8 @@ def ProcessAirborneDataChunk(time_start,time_stop,
           
             if settings['as_altitude']:
                 profs[var].range2alt(master_alt,air_data_t,telescope_direction=var_1d['TelescopeDirection'])
+                if settings['save_raw']:
+                    raw_profs[var].range2alt(master_alt,air_data_t,telescope_direction=var_1d['TelescopeDirection'])
                
             
             if tres_post > 0 or tres <= 0.5:
@@ -789,6 +796,8 @@ def ProcessAirborneDataChunk(time_start,time_stop,
 #                print('  resolution = %f sec'%profs[var].mean_dt)
 #                print('  %d data points'%profs[var].profile.shape[0])
                 profs[var].time_resample(tedges=master_time_post,update=True,remainder=False)
+                if settings['save_raw']:
+                    raw_profs[var].time_resample(tedges=master_time_post,update=True,remainder=False)
             if profs[var].profile.size == 0:
                 run_processing = False
                 print('Processing will terminate.  Profile of ' +var+ ' is empty')
@@ -1150,6 +1159,9 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         # add all channels to list of profilse to save
         for var in profs.keys():
             save_prof_list.extend([profs[var]])
+            if settings['save_raw'] and var in raw_profs.keys():
+                save_prof_list.extend([raw_profs[var]])
+                
         if settings['get_extinction']:
             # add extinction to list of profilse to save
             save_prof_list.extend([alpha_a])
@@ -1159,7 +1171,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
             save_prof_list.extend([MolDenoise])
             save_prof_list.extend([beta_a_denoise])
         save_var1d_post = {'TelescopeDirection':{'description':'1-Lidar Pointing Up, 0-Lidar Pointing Down','units':'none'},
-                           'polarization':{'description':'System Quarter Waveplate orientation','units':'degrees'}}
+                           'polarization':{'description':'System Quarter Waveplate orientation','units':'radians'}}
         save_air_post = {'THDG': {'description':'aircraft heading','units':'degrees'},
                          'TASX': {'description':'airspeed','units':'meters/second'},
                          'GGLAT': {'description':'latitude','units':'degrees'},
