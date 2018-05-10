@@ -81,7 +81,7 @@ plot_settings = {
 	'colormap':'jet'
         },
     'Lidar_Ratio':{
-        'climits':[10,50],
+        'climits':[15,30],
         'scale':'linear',
 	'colormap':'viridis'
         },
@@ -520,6 +520,23 @@ for piT in range(l_time.shape[0]-1):
         ConstTerms[var]['mult'][piT,range_offset[piT]:range_offset[piT]+rlen]=ConstTerms0[var]['mult'][piT,:]
         ConstTerms[var]['mol'][piT,range_offset[piT]:range_offset[piT]+rlen]=ConstTerms0[var]['mol'][piT,:]
 
+
+#%% Aerosol signal thresholding
+
+dR = profs['Aerosol_Backscatter_Coefficient'].mean_dR
+
+AerBS0 = profs2D['Aerosol_Backscatter_Coefficient'].profile.copy()
+MolCnts = profs2D['Raw_Molecular_Backscatter_Channel'].profile-ConstTerms['Raw_Molecular_Backscatter_Channel']['bg']
+ODest = np.cumsum(18*dR*profs2D['Aerosol_Backscatter_Coefficient'].profile,axis=1)
+Filt = np.cumsum((MolCnts < 24)*(ODest > 0.35),axis=1)>0
+
+
+#for ai in range(Filt.shape[0]):
+#    ifilt = np.nonzero(Filt[ai,:])[0]
+#    if len(ifilt) > 1:
+#        AerBS0[ai,ifilt] = AerBS0[ai,ifilt[0]]
+
+
 #%% Denoising Script
 
 """
@@ -597,7 +614,7 @@ errRecord = []
 
 if verify:
     if np.isnan(lam_array).any():
-        lam_array = np.logspace(-3,3,100)  # 47
+        lam_array = np.logspace(-3,3,1000)  # 47
 else:
     lam_array = np.array([0])
 fitErrors = np.zeros(lam_array.size)
@@ -606,7 +623,7 @@ lam_List = []
 out_cond_array = np.zeros(lam_array.size)    
 
 lam_names = ['xB','xS','xP']  # variable names that have TV regularizer assigned to them
-
+lam_min = np.ones(4)*1e20
 lam_sets = []
 lam0 = {}
 for lvar in lam_names:
@@ -617,13 +634,16 @@ for i_lam in range(lam_array.size):
     
     if verify:
         lam = {}
-        r1 = 10**(np.random.rand()*1)
-        r2 = 10**(np.random.rand()*0.5+2)
-        for lvar in lam_names:
-            if lvar == 'xS':
-                lam[lvar] = r2
-            else:
-                lam[lvar] = r1
+        r1 = 10**(np.random.rand()*1.0+0.5)
+        r2 = 10**(np.random.rand()*2.0)
+        lam['xB'] = 10**(np.random.rand()*1.0)
+        lam['xP'] = 10**(np.random.rand()*2.0)
+        lam['xS'] = 10**(np.random.rand()*2.0)
+#        for lvar in lam_names:
+#            if lvar == 'xS':
+#                lam[lvar] = r2
+#            else:
+#                lam[lvar] = r1
                 
 #            lam[lvar] = 10**(np.random.rand()*6-3)
 #            lam[lvar] = lam_array[i_lam]
@@ -679,10 +699,10 @@ for i_lam in range(lam_array.size):
     
 #    x02D[:,:rdim] = np.log(25.0-1)  # lidar ratio
 #    x0['xS'] = np.log(np.random.rand(tdim,rdim)*30+20)  # lidar ratio
-    x0['xS'] = np.ones((tdim,rdim))*np.log(25.0-1)  # lidar ratio
+    x0['xS'] = np.ones((tdim,rdim))*np.log(35.0-1)  # lidar ratio
     x0['xS'][np.nonzero(np.isnan(x0['xS']))] = np.log(1.0)  # get rid of invalid numbers
 
-    x0['xB'] = np.log(profs2D['Aerosol_Backscatter_Coefficient'].profile)  # aerosol backscatter
+    x0['xB'] = np.log(AerBS0) #np.log(profs2D['Aerosol_Backscatter_Coefficient'].profile)  # aerosol backscatter
     x0['xB'][np.nonzero(np.isnan(x0['xB']))] = np.log(1e-12)    # get rid of invalid numbers
     x0['xB'][np.nonzero(x0['xB']<np.log(1e-12))] = np.log(1e-12)    # get rid of invalid numbers
     x0['xP'] = np.tan((0.5-profs2D['Particle_Depolarization'].profile)*np.pi)  # aerosol depolarization
@@ -712,7 +732,7 @@ for i_lam in range(lam_array.size):
     
  
     
-    sol,error_hist= mle.GVHSRL_sparsa_optimizor(FitProf,FitProfDeriv,x0,lam,sub_eps=1e-5,step_eps=1e-30,opt_cnt_max=100,cnt_alpha_max=10,sigma=1e-5,verbose=False,alpha = 1e20)
+    sol,error_hist= mle.GVHSRL_sparsa_optimizor(FitProf,FitProfDeriv,x0,lam,sub_eps=1e-5,step_eps=1e-35,opt_cnt_max=100,cnt_alpha_max=10,sigma=1e-5,verbose=False,alpha = 1e20)
     
     if not verify:
         prof_sol = mle.Build_GVHSRL_sparsa_Profiles(sol,ConstTerms,dt=rate_adj,return_params=True)
@@ -731,6 +751,8 @@ for i_lam in range(lam_array.size):
 
 ### End Optimization Routine ###
 
+isol = np.argmin(fitErrors)
+
 #plt.figure()
 #plt.semilogx(lam_array,fitErrors)
 #plt.xlabel('Regularizer')
@@ -740,13 +762,15 @@ for i_lam in range(lam_array.size):
 lam_sets = np.array(lam_sets)
 plt.figure()
 plt.scatter(lam_sets[:,0],lam_sets[:,1],c=lam_sets[:,3])
+#plt.scatter(lam_sets[isol,0],lam_sets[isol,1],marker='^')
 plt.xlabel(r'$\lambda_{\beta}$')
 plt.ylabel(r'$\lambda_{s}$')
 plt.xscale('log')
 plt.yscale('log')
 plt.colorbar()
 
-isol = np.argmin(fitErrors)
+print('lambda B, S, P')
+print('    %e | %e |  %e'%(lam_sets[isol,0],lam_sets[isol,1],lam_sets[isol,2]))
 
 plt.figure()
 plt.plot(errRecord[isol])
@@ -809,7 +833,7 @@ for piT in range(l_time.shape[0]-1):
             denoise_profs[var].profile[piT,:] = prof_sol['Backscatter_Coefficient'][piT,range_offset[piT]:range_offset[piT]+rlen]
         elif 'Extinction' in var:
             denoise_profs[var].profile[piT,:] = prof_sol['Backscatter_Coefficient'][piT,range_offset[piT]:range_offset[piT]+rlen]*prof_sol['Lidar_Ratio'][piT,range_offset[piT]:range_offset[piT]+rlen]
-        elif 'Lidar Ratio' in var:
+        elif 'Lidar_Ratio' in var:
             denoise_profs[var].profile[piT,:] = prof_sol['Lidar_Ratio'][piT,range_offset[piT]:range_offset[piT]+rlen]
         elif 'Depolarization' in var:
             denoise_profs[var].profile[piT,:] = 1-prof_sol['Polarization'][piT,range_offset[piT]:range_offset[piT]+rlen]
