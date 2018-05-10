@@ -8,6 +8,7 @@ Created on Fri Apr 27 08:20:36 2018
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.optimize
+from mpl_toolkits.mplot3d import Axes3D
 
 import LidarProfileFunctions as lp
 import LidarPlotFunctions as lplt
@@ -25,8 +26,8 @@ import json
     
     
 # path to files being analyzed
-#ncpath = '/scr/sci/mhayman/SOCRATES/range_centered/test_data/SOCRATESrf03/'
-ncpath = '/Users/mhayman/Documents/HSRL/GVHSRL/test_data/SOCRATESrf03/'
+ncpath = '/scr/sci/mhayman/SOCRATES/range_centered/test_data/SOCRATESrf03/'
+#ncpath = '/Users/mhayman/Documents/HSRL/GVHSRL/test_data/SOCRATESrf03/'
 # list of files to analyze
 nclist0 = ['SOCRATESrf03_GVHSRL_20180123T0210_20180123T0220.nc']
 
@@ -61,7 +62,7 @@ plot_settings = {
 	'colormap':'viridis'
         },
     'Particle_Depolarization':{
-        'climits':[0,0.6],
+        'climits':[0,0.7],
         'scale':'linear',
 	'colormap':'viridis'
         },
@@ -81,7 +82,7 @@ plot_settings = {
 	'colormap':'jet'
         },
     'Lidar_Ratio':{
-        'climits':[15,30],
+        'climits':[15,40],
         'scale':'linear',
 	'colormap':'viridis'
         },
@@ -223,7 +224,7 @@ t_data = profs[var].time.copy()  # store time data for 1d variables
 
 raw_range = profs[var].range_array.copy()  # used to trim the geo files later
 
-t_lim = [26*3600+13*60,26*3600+13.4*60]
+t_lim = [26*3600+13*60,26*3600+15*60] #
 r_lim = [0,2e3]
 
 # force range limits to as or more limiting than most restrictive profile
@@ -285,8 +286,8 @@ for var in profs.keys():
 Load Calibration Parameters
 """
 
-#cal_file_path = '/h/eol/mhayman/PythonScripts/HSRL_Processing/GV-HSRL-Python/calibrations/cal_files/'
-cal_file_path = '/Users/mhayman/Documents/Python/Lidar/GV-HSRL-Python/calibrations/cal_files/'
+cal_file_path = '/h/eol/mhayman/PythonScripts/HSRL_Processing/GV-HSRL-Python/calibrations/cal_files/'
+#cal_file_path = '/Users/mhayman/Documents/Python/Lidar/GV-HSRL-Python/calibrations/cal_files/'
 cal_file = cal_file_path+'gv_calvals.json'
 
 with open(cal_file,"r") as f:
@@ -520,15 +521,35 @@ for piT in range(l_time.shape[0]-1):
         ConstTerms[var]['mult'][piT,range_offset[piT]:range_offset[piT]+rlen]=ConstTerms0[var]['mult'][piT,:]
         ConstTerms[var]['mol'][piT,range_offset[piT]:range_offset[piT]+rlen]=ConstTerms0[var]['mol'][piT,:]
 
-
 #%% Aerosol signal thresholding
 
-dR = profs['Aerosol_Backscatter_Coefficient'].mean_dR
+"""
+Attempt to remove noisy observations by duplicating the next lower signal with
+a valid signal.
+"""
 
-AerBS0 = profs2D['Aerosol_Backscatter_Coefficient'].profile.copy()
-MolCnts = profs2D['Raw_Molecular_Backscatter_Channel'].profile-ConstTerms['Raw_Molecular_Backscatter_Channel']['bg']
-ODest = np.cumsum(18*dR*profs2D['Aerosol_Backscatter_Coefficient'].profile,axis=1)
-Filt = np.cumsum((MolCnts < 24)*(ODest > 0.35),axis=1)>0
+Aer_threshold = np.log(1e-8)  # backscatter coefficient threshold
+
+AerBS0 = np.log(profs2D['Aerosol_Backscatter_Coefficient'].profile.copy())
+nan_count_last = 0
+nan_count = np.sum(AerBS0 < Aer_threshold)
+while nan_count != nan_count_last:
+    inan = np.nonzero(AerBS0[:,1:] < Aer_threshold)
+    AerBS0[inan[0],inan[1]+1] = AerBS0[inan[0],inan[1]]
+    nan_count_last = nan_count
+    nan_count = np.sum(AerBS0 < Aer_threshold)
+
+"""
+# Show thresholding results
+plt.figure()
+plt.plot(AerBS0[5,:])
+plt.plot(np.log(profs2D['Aerosol_Backscatter_Coefficient'].profile[5,:]))
+"""
+
+#MolCnts = profs2D['Raw_Molecular_Backscatter_Channel'].profile-ConstTerms['Raw_Molecular_Backscatter_Channel']['bg']
+#ODest = np.cumsum(18*dR*profs2D['Aerosol_Backscatter_Coefficient'].profile,axis=1)
+#Filt = np.cumsum((MolCnts < 24)*(ODest > 0.35),axis=1)>0
+
 
 
 #for ai in range(Filt.shape[0]):
@@ -537,13 +558,14 @@ Filt = np.cumsum((MolCnts < 24)*(ODest > 0.35),axis=1)>0
 #        AerBS0[ai,ifilt] = AerBS0[ai,ifilt[0]]
 
 
+
 #%% Denoising Script
 
 """
 Denoising Main routine
 """
 verify = True
-verbose = False
+verbose = True
 
 #lam_array = np.array([10.0])
 lam_array = np.array([np.nan])
@@ -614,7 +636,7 @@ errRecord = []
 
 if verify:
     if np.isnan(lam_array).any():
-        lam_array = np.logspace(-3,3,1000)  # 47
+        lam_array = np.logspace(-1,2,100)  # 47
 else:
     lam_array = np.array([0])
 fitErrors = np.zeros(lam_array.size)
@@ -623,7 +645,7 @@ lam_List = []
 out_cond_array = np.zeros(lam_array.size)    
 
 lam_names = ['xB','xS','xP']  # variable names that have TV regularizer assigned to them
-lam_min = np.ones(4)*1e20
+
 lam_sets = []
 lam0 = {}
 for lvar in lam_names:
@@ -634,18 +656,15 @@ for i_lam in range(lam_array.size):
     
     if verify:
         lam = {}
-        r1 = 10**(np.random.rand()*1.0+0.5)
-        r2 = 10**(np.random.rand()*2.0)
-        lam['xB'] = 10**(np.random.rand()*1.0)
-        lam['xP'] = 10**(np.random.rand()*2.0)
-        lam['xS'] = 10**(np.random.rand()*2.0)
-#        for lvar in lam_names:
+#        r1 = 10**(np.random.rand()*4.0-2.0)
+#        r2 = 10**(np.random.rand()*4.0-2.0)
+        for lvar in lam_names:
 #            if lvar == 'xS':
 #                lam[lvar] = r2
 #            else:
 #                lam[lvar] = r1
                 
-#            lam[lvar] = 10**(np.random.rand()*6-3)
+            lam[lvar] = 10**(np.random.rand()*4.0-2.0)
 #            lam[lvar] = lam_array[i_lam]
 
     else:
@@ -699,10 +718,11 @@ for i_lam in range(lam_array.size):
     
 #    x02D[:,:rdim] = np.log(25.0-1)  # lidar ratio
 #    x0['xS'] = np.log(np.random.rand(tdim,rdim)*30+20)  # lidar ratio
-    x0['xS'] = np.ones((tdim,rdim))*np.log(35.0-1)  # lidar ratio
+    x0['xS'] = np.ones((tdim,rdim))*np.log(30.0-1)  # lidar ratio
     x0['xS'][np.nonzero(np.isnan(x0['xS']))] = np.log(1.0)  # get rid of invalid numbers
 
-    x0['xB'] = np.log(AerBS0) #np.log(profs2D['Aerosol_Backscatter_Coefficient'].profile)  # aerosol backscatter
+#    x0['xB'] = np.log(profs2D['Aerosol_Backscatter_Coefficient'].profile)  # aerosol backscatter
+    x0['xB'] = AerBS0  # aerosol backscatter
     x0['xB'][np.nonzero(np.isnan(x0['xB']))] = np.log(1e-12)    # get rid of invalid numbers
     x0['xB'][np.nonzero(x0['xB']<np.log(1e-12))] = np.log(1e-12)    # get rid of invalid numbers
     x0['xP'] = np.tan((0.5-profs2D['Particle_Depolarization'].profile)*np.pi)  # aerosol depolarization
@@ -732,7 +752,7 @@ for i_lam in range(lam_array.size):
     
  
     
-    sol,error_hist= mle.GVHSRL_sparsa_optimizor(FitProf,FitProfDeriv,x0,lam,sub_eps=1e-5,step_eps=1e-35,opt_cnt_max=100,cnt_alpha_max=10,sigma=1e-5,verbose=False,alpha = 1e20)
+    sol,error_hist= mle.GVHSRL_sparsa_optimizor(FitProf,FitProfDeriv,x0,lam,sub_eps=1e-5,step_eps=1e-30,opt_cnt_min=10,opt_cnt_max=10000,cnt_alpha_max=10,sigma=1e-5,verbose=False,alpha = 1e4)
     
     if not verify:
         prof_sol = mle.Build_GVHSRL_sparsa_Profiles(sol,ConstTerms,dt=rate_adj,return_params=True)
@@ -747,28 +767,46 @@ for i_lam in range(lam_array.size):
     fitErrors[i_lam] = np.nansum(ProfileLogError)
     sol_List.extend([sol.copy()])        
     if verbose:
+        print('Iteration: %d'%i_lam)
         print('Log Error: %f'%fitErrors[i_lam])
+        print('lambda B, S, P')
+        print('    %e | %e |  %e'%(lam['xB'],lam['xS'],lam['xP']))
+        print('')
 
 ### End Optimization Routine ###
 
+lam_sets = np.array(lam_sets)
+np.savez('3D_opt_results_'+datetime.datetime.now().strftime('%Y%m%dT%H%M'),lam_sets=lam_sets)
+
+## 1D regularizer
+plt.figure()
+plt.semilogx(lam_array,fitErrors)
+plt.xlabel('Regularizer')
+plt.ylabel('Fit Error')
+plt.grid(b=True)
+
+
+## 2D regularizer
+#plt.figure()
+#plt.scatter(lam_sets[:,0],lam_sets[:,1],c=lam_sets[:,3])
+#plt.xlabel(r'$\lambda_{\beta}$')
+#plt.ylabel(r'$\lambda_{s}$')
+#plt.xscale('log')
+#plt.yscale('log')
+#plt.colorbar()
+
+# 3D regularizer
+#fig = plt.figure()
+#mx = fig.add_subplot(111,projection='3d')
+#mx.set_xlabel(r'$\log_{10} \lambda_{\beta}$')
+#mx.set_ylabel(r'$\log_{10} \lambda_{s}$')
+#mx.set_zlabel(r'$\log_{10} \lambda_{p}$')
+#pdata = mx.scatter(np.log10(lam_sets[:,0]),np.log10(lam_sets[:,1]),np.log10(lam_sets[:,2]),c=lam_sets[:,3])
+
+
 isol = np.argmin(fitErrors)
 
-#plt.figure()
-#plt.semilogx(lam_array,fitErrors)
-#plt.xlabel('Regularizer')
-#plt.ylabel('Fit Error')
-#plt.grid(b=True)
-
-lam_sets = np.array(lam_sets)
-plt.figure()
-plt.scatter(lam_sets[:,0],lam_sets[:,1],c=lam_sets[:,3])
-#plt.scatter(lam_sets[isol,0],lam_sets[isol,1],marker='^')
-plt.xlabel(r'$\lambda_{\beta}$')
-plt.ylabel(r'$\lambda_{s}$')
-plt.xscale('log')
-plt.yscale('log')
-plt.colorbar()
-
+print('Solution:')
 print('lambda B, S, P')
 print('    %e | %e |  %e'%(lam_sets[isol,0],lam_sets[isol,1],lam_sets[isol,2]))
 
