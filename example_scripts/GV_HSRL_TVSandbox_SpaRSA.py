@@ -224,7 +224,7 @@ t_data = profs[var].time.copy()  # store time data for 1d variables
 
 raw_range = profs[var].range_array.copy()  # used to trim the geo files later
 
-t_lim = [26*3600+13*60,26*3600+15*60] #
+t_lim = [26*3600+13*60,26*3600+13.4*60] #
 r_lim = [0,2e3]
 
 # force range limits to as or more limiting than most restrictive profile
@@ -636,12 +636,13 @@ errRecord = []
 
 if verify:
     if np.isnan(lam_array).any():
-        lam_array = np.logspace(-1,2,100)  # 47
+        lam_array = np.logspace(-1,2,1000)  # 47
 else:
     lam_array = np.array([0])
 fitErrors = np.zeros(lam_array.size)
 sol_List = []
 lam_List = []
+tv_list = []
 out_cond_array = np.zeros(lam_array.size)    
 
 lam_names = ['xB','xS','xP']  # variable names that have TV regularizer assigned to them
@@ -764,6 +765,10 @@ for i_lam in range(lam_array.size):
     errRecord.extend([error_hist])
     lam_List.extend([lam.copy()])
     lam_sets.extend([[lam['xB'],lam['xS'],lam['xP'],ProfileLogError]])
+    tv_sublist = []
+    for xvar in ['xB','xS','xP']:
+        tv_sublist.extend([np.nansum(np.diff(sol[xvar],axis=1))+np.nansum(np.diff(sol[xvar],axis=0))])
+    tv_list.extend([tv_sublist])
     fitErrors[i_lam] = np.nansum(ProfileLogError)
     sol_List.extend([sol.copy()])        
     if verbose:
@@ -776,14 +781,15 @@ for i_lam in range(lam_array.size):
 ### End Optimization Routine ###
 
 lam_sets = np.array(lam_sets)
-np.savez('3D_opt_results_'+datetime.datetime.now().strftime('%Y%m%dT%H%M'),lam_sets=lam_sets)
+tv_list = np.array(tv_list)
+np.savez('3D_opt_results_'+datetime.datetime.now().strftime('%Y%m%dT%H%M'),lam_sets=lam_sets,tv_list=tv_list)
 
 ## 1D regularizer
-plt.figure()
-plt.semilogx(lam_array,fitErrors)
-plt.xlabel('Regularizer')
-plt.ylabel('Fit Error')
-plt.grid(b=True)
+#plt.figure()
+#plt.semilogx(lam_array,fitErrors)
+#plt.xlabel('Regularizer')
+#plt.ylabel('Fit Error')
+#plt.grid(b=True)
 
 
 ## 2D regularizer
@@ -796,12 +802,12 @@ plt.grid(b=True)
 #plt.colorbar()
 
 # 3D regularizer
-#fig = plt.figure()
-#mx = fig.add_subplot(111,projection='3d')
-#mx.set_xlabel(r'$\log_{10} \lambda_{\beta}$')
-#mx.set_ylabel(r'$\log_{10} \lambda_{s}$')
-#mx.set_zlabel(r'$\log_{10} \lambda_{p}$')
-#pdata = mx.scatter(np.log10(lam_sets[:,0]),np.log10(lam_sets[:,1]),np.log10(lam_sets[:,2]),c=lam_sets[:,3])
+fig = plt.figure()
+mx = fig.add_subplot(111,projection='3d')
+mx.set_xlabel(r'$\log_{10} \lambda_{\beta}$')
+mx.set_ylabel(r'$\log_{10} \lambda_{s}$')
+mx.set_zlabel(r'$\log_{10} \lambda_{p}$')
+pdata = mx.scatter(np.log10(lam_sets[:,0]),np.log10(lam_sets[:,1]),np.log10(lam_sets[:,2]),c=lam_sets[:,3])
 
 
 isol = np.argmin(fitErrors)
