@@ -1202,6 +1202,8 @@ def ProcessAirborneDataChunk(time_start,time_stop,
             print(save_data_file)
             for var in save_other_data.keys():
                 lp.write_var2nc(save_other_data[var]['data'],str(var),save_data_file,description=save_other_data[var]['description'],units=save_other_data[var]['units'])
+            
+            lp.write_proj2nc(save_data_file,proj_label)
         else:
             print('save_data setting is False.  This data will not be saved.')
             
