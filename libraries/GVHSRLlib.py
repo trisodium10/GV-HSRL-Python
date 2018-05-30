@@ -1477,3 +1477,104 @@ def HSRL_FormMeasMatrix(Si,Dr,varCount):
 
 
     return measM
+    
+    
+def load_GVHSRL_processed_files(nclist,prof_list,lidar_vars=['lidar_pointing'],
+                                air_vars = ['GGALT','ROLL','PITCH','GGLAT','GGLON'],
+                                load_mask = True,
+                                time_start = datetime.datetime(year=1900,month=1,day=1),
+                                time_stop = datetime.datetime(year=2100,month=1,day=1)):
+    """
+    load_GVHSRL_processed_files(nclist,prof_list,lidar_vars=['lidar_pointing'],
+                                air_vars = ['GGALT','ROLL','PITCH','GGLAT','GGLON'],
+                                load_mask = True,
+                                time_start = datetime.datetime(year=1900,month=1,day=1),
+                                time_stop = datetime.datetime(year=2100,month=1,day=1))
+    Load Processed GV-HSRL data.
+    nclist - list of netcdf files to load
+    prof_list - list of variable names of lidar profiles to load as LidarProfile class
+    lidar_vars - list of lidar variables to load as arrays
+    air_vars - list of the aircraft variables to load as arrays
+    load_mask - tells the routine if it should load the mask from netcdf
+    time_start (datetime) - allows the user to constrain the file list by a particular
+                time span.  The data will not be trimmed to that time, but
+                files that don't fall into the specified start and stop times
+                will not be loaded.
+    time_stop (datetime) - allows the user to set the stop time of the desired
+                data.  
+    
+    returns dicts of 
+    profs,lidar_data,aircraft_data
+    where the entries are the same as the passed in variable names
+    
+    """
+    
+    findex = []
+    aircraft_data = {}
+    lidar_data = {}
+    if time_start > datetime.datetime(year=1900,month=1,day=1) and time_stop < datetime.datetime(year=2100,month=1,day=1):
+        for ai in range(len(nclist)):
+            filestart = datetime.datetime.strptime(nclist[ai][-30:-17],'%Y%m%dT%H%M')
+            filestop = datetime.datetime.strptime(nclist[ai][-16:-3],'%Y%m%dT%H%M')
+    
+            if time_start <= filestart and time_stop >= filestart:
+                findex.extend([ai])
+            elif time_start <= filestop and time_stop >= filestart:
+                findex.extend([ai])
+    else:
+        findex = range(len(nclist))
+    
+#    save_plots_base = process_vars['flt']+'_GVHSRL_'+time_start.strftime('%Y%m%dT%H%M')+'_'+time_stop.strftime('%Y%m%dT%H%M')    
+#    tlims = [(time_start-day_start).total_seconds()/3600.0,(time_stop-day_start).total_seconds()/3600.0]
+    print(time_start.strftime('%H:%M') + ' - ' + time_stop.strftime('%H:%M')+':')
+    #print('[%f,%f]'%(tlims[0],tlims[1]))
+    prof_start = True
+    profs = {}
+    for fi in findex:
+        ncfilename = nclist[fi]
+        
+        for var in prof_list:
+            prof0 = lp.load_nc_Profile(ncfilename,var,mask=load_mask)
+	    # check if the load was successful
+            if hasattr(prof0,'time'):
+                if var in profs.keys():
+                    profs[var].cat_time(prof0,front=False)  
+                else:
+                    profs[var] = prof0.copy()        
+
+        
+        f = nc4.Dataset(ncfilename,'r')
+#        aircraft_data = {}
+        for a_var in air_vars:
+#            print(a_var)
+            if a_var in aircraft_data.keys():
+#                print('... concatenating')
+                aircraft_data[a_var] = np.concatenate((aircraft_data[a_var],lp.ncvar(f,a_var)))
+            else:
+#                print('... first find')
+                aircraft_data[a_var] = lp.ncvar(f,a_var)
+        
+        # load lidar variables
+        for l_var in lidar_vars:
+            new_data = lp.ncvar(f,l_var)
+            if l_var in lidar_data.keys():                
+                if new_data.ndim == 2:
+                    lidar_data[l_var] = np.hstack((lidar_data[l_var],new_data))
+                else:
+                    lidar_data[l_var] = np.concatenate((lidar_data[l_var],new_data))
+            else:
+                lidar_data[l_var] = new_data
+                
+
+        t_data0 = lp.ncvar(f,'time').astype(np.float)
+        f.close()
+        
+        
+        if prof_start:
+            t_data = t_data0.copy()
+            prof_start = False
+        else:
+            t_data = np.concatenate((t_data,t_data0))
+
+            
+    return profs,lidar_data,aircraft_data
