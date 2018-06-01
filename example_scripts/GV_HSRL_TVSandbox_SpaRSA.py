@@ -6,9 +6,9 @@ Created on Fri Apr 27 08:20:36 2018
 """
 
 import numpy as np
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 import scipy.optimize
-from mpl_toolkits.mplot3d import Axes3D
+#from mpl_toolkits.mplot3d import Axes3D
 
 import LidarProfileFunctions as lp
 import LidarPlotFunctions as lplt
@@ -21,21 +21,64 @@ import netCDF4 as nc4
 
 import json
 
+import matplotlib
 
+import os
+
+#matplotlib.use('Agg')
     
-    
-    
+import matplotlib.pyplot as plt    
+from mpl_toolkits.mplot3d import Axes3D 
+   
 # path to files being analyzed
-ncpath = '/scr/sci/mhayman/SOCRATES/range_centered/test_data/SOCRATESrf03/'
-#ncpath = '/Users/mhayman/Documents/HSRL/GVHSRL/test_data/SOCRATESrf03/'
-# list of files to analyze
-nclist0 = ['SOCRATESrf03_GVHSRL_20180123T0210_20180123T0220.nc']
+#ncpath = '/scr/sci/mhayman/SOCRATES/range_centered/test_data/SOCRATESrf03/'
+##ncpath = '/Users/mhayman/Documents/HSRL/GVHSRL/test_data/SOCRATESrf03/'
+## list of files to analyze
+   #2DC cloud profiles
+#nclist0 = ['SOCRATESrf03_GVHSRL_20180123T0210_20180123T0220.nc']
+#t_lim = [26*3600+12*60,26*3600+14*60] #
+#r_lim = [0,2e3]
+#step_eps= 1e-5#2e-5
+#max_iter = 1000
+#lam_set = {'xB':69.9,'xS':6.26e-3,'xP':4.32}
+#lam_range = {'xB':[1.5,2.5],'xS':[-2.5,1.5],'xP':[0,1.0]}
+#Num_reg_iter = 1
+
+
+# oriented ice crystal data
+ncpath = '/scr/sci/mhayman/SOCRATES/range_centered/test_data/SOCRATESrf07/'
+nclist0 = ['SOCRATESrf07_GVHSRL_20180131T0610_20180131T0630.nc']
+t_lim = [6.42*3600,6.44*3600] #
+r_lim = [1e3,5.5e3]
+step_eps= 2e-9#2e-5
+max_iter = 10000
+lam_set = {'xB':85.0,'xS':0.2,'xP':55.11} #{'xB':85.0,'xS':0.2,'xP':1.11}
+lam_range = {'xB':[1.0,2.5],'xS':[-2.5,0],'xP':[0,1.5]}
+Num_reg_iter = 1
 
 # if desired, loaded files will be constrainted by time
 time_start = datetime.datetime(year=1900,month=1,day=1)
 time_stop = datetime.datetime(year=2100,month=1,day=1)
 
 load_mask = False
+save_results = True
+
+#t_lim = [26*3600+12*60,26*3600+14*60] #
+#r_lim = [0,2e3]
+#step_eps= 1e-6#2e-5
+#max_iter = 1000
+
+
+
+#savefigpath = '/h/eol/mhayman/HSRL/Plots/PTV/20180118_26UTC_20180519/'
+#
+#savencfile='20180118_26UTC_20180519.nc'
+
+# set the variable bounds in their native space.
+# this is converted to the state variable later
+opt_bounds = {'xB':[1e-9,1e-2],
+              'xS':[1.0,100.0],
+              'xP':[0.0,1.0]}
 
 #prof_list = ['Aerosol_Backscatter_Coefficient','Aerosol_Extinction_Coefficient','Merged_Combined_Channel',
 #             'Particle_Depolarization','Volume_Depolarization','Denoised_Aerosol_Backscatter_Coefficient'] #,'Denoised_Aerosol_Backscatter_Coefficient'] #'Aerosol_Extinction_Coefficient'
@@ -167,12 +210,22 @@ for fi in findex:
                 profs[var].cat_time(prof0,front=False)
             else:
                 profs[var] = prof0.copy()
+                
+#%% configure save path and file names
+var = prof_list[0]
+if save_results:
+    save_path = profs[var].StartDate.strftime('/h/eol/mhayman/HSRL/Plots/PTV/Denoise_%Y%m%d/')
+    if not os.path.exists(save_path):
+                os.makedirs(save_path)
+    save_file = profs[var].StartDate.strftime('%Y%m%d')+'_%d_%d_UTC_'%(t_lim[0]/3600,t_lim[1]/3600)+datetime.datetime.now().strftime('%Y%m%d_%H%M')
+    savefigpath = save_path + save_file
+    savencfile = save_file +'.nc'
 #%%  Plot Sample Profile
 
-var = 'Aerosol_Backscatter_Coefficient'
-lplt.scatter_z(profs[var],lidar_pointing=lidar_data['lidar_pointing'],
-               lidar_alt=aircraft_data['GGALT'],climits=plot_settings[var]['climits'],
-               cmap=plot_settings[var]['colormap'],scale=plot_settings[var]['scale'],s=2,t_axis_scale=5.0)
+#var = 'Aerosol_Backscatter_Coefficient'
+#lplt.scatter_z(profs[var],lidar_pointing=lidar_data['lidar_pointing'],
+#               lidar_alt=aircraft_data['GGALT'],climits=plot_settings[var]['climits'],
+#               cmap=plot_settings[var]['colormap'],scale=plot_settings[var]['scale'],s=2,t_axis_scale=5.0)
 
 #%%  Trim and prep data for processing
 
@@ -224,8 +277,8 @@ t_data = profs[var].time.copy()  # store time data for 1d variables
 
 raw_range = profs[var].range_array.copy()  # used to trim the geo files later
 
-t_lim = [26*3600+13*60,26*3600+13.4*60] #
-r_lim = [0,2e3]
+#t_lim = [26*3600+12*60,26*3600+14*60] #
+#r_lim = [0,2e3]
 
 # force range limits to as or more limiting than most restrictive profile
 for var in profs.keys():
@@ -528,6 +581,33 @@ Attempt to remove noisy observations by duplicating the next lower signal with
 a valid signal.
 """
 
+## nan only thresholding
+#AerBS0 = np.log(profs2D['Aerosol_Backscatter_Coefficient'].profile.copy())
+#nan_count_last = 0
+#nan_count = np.sum(np.isnan(AerBS0))
+#while nan_count != nan_count_last:
+#    inan = np.nonzero(np.isnan(AerBS0))
+#    AerBS0[inan[0],inan[1]+1] = AerBS0[inan[0],inan[1]]
+#    nan_count_last = nan_count
+#    nan_count = np.sum(np.isnan(AerBS0))
+
+
+
+## upper and lower thresholding
+#Aer_threshold_lo = np.log(1e-9)  # backscatter coefficient threshold
+#Aer_threshold_hi = np.log(1e-3)  # backscatter coefficient threshold
+#
+#AerBS0 = np.log(profs2D['Aerosol_Backscatter_Coefficient'].profile.copy())
+#nan_count_last = 0
+#nan_count = np.sum((AerBS0 < Aer_threshold_lo) + (AerBS0 > Aer_threshold_hi))
+#while nan_count != nan_count_last:
+#    inan = np.nonzero((AerBS0[:,1:] < Aer_threshold_lo)+(AerBS0[:,1:] >Aer_threshold_hi))
+#    AerBS0[inan[0],inan[1]+1] = AerBS0[inan[0],inan[1]]
+#    nan_count_last = nan_count
+#    nan_count = np.sum((AerBS0[:,1:] < Aer_threshold_lo)+(AerBS0[:,1:] >Aer_threshold_hi))
+
+
+# single threshold
 Aer_threshold = np.log(1e-8)  # backscatter coefficient threshold
 
 AerBS0 = np.log(profs2D['Aerosol_Backscatter_Coefficient'].profile.copy())
@@ -538,6 +618,8 @@ while nan_count != nan_count_last:
     AerBS0[inan[0],inan[1]+1] = AerBS0[inan[0],inan[1]]
     nan_count_last = nan_count
     nan_count = np.sum(AerBS0 < Aer_threshold)
+    
+AerBS0 = np.exp(AerBS0)
 
 """
 # Show thresholding results
@@ -633,17 +715,23 @@ opt_exit_mode = np.zeros(tdim)
 
 
 errRecord = []
+stepRecord = []
 
 if verify:
     if np.isnan(lam_array).any():
-        lam_array = np.logspace(-1,2,1000)  # 47
+        lam_array = np.logspace(-1,2,1)  # 47
 else:
     lam_array = np.array([0])
-fitErrors = np.zeros(lam_array.size)
+#fitErrors = np.zeros(lam_array.size)
+fitErrors = np.zeros(Num_reg_iter)
 sol_List = []
 lam_List = []
 tv_list = []
-out_cond_array = np.zeros(lam_array.size)    
+#out_cond_array = np.zeros(lam_array.size)    
+out_cond_array = np.zeros(Num_reg_iter)
+
+
+
 
 lam_names = ['xB','xS','xP']  # variable names that have TV regularizer assigned to them
 
@@ -653,20 +741,43 @@ for lvar in lam_names:
     lam0[lvar] = 0
 
 ### Optimization Routine ###
-for i_lam in range(lam_array.size):    
+#for i_lam in range(lam_array.size):  
+for i_lam in range(Num_reg_iter):   
     
     if verify:
         lam = {}
+        
+        if Num_reg_iter > 1:
+            for var in lam_range.keys():
+                lam[var] = 10**(np.random.rand()*(lam_range[var][1]-lam_range[var][0])+lam_range[var][0])
+        else:
+            for var in lam_set.keys():
+                lam[var] = lam_set[var]
+
+        
+#        lam['xB'] = 1e-3
+#        lam['xS'] = 1e5
+#        lam['xP'] = 1e5
+        
+#        lam['xB'] = 10**(np.random.rand()*1.0+1.5)
+#        lam['xS'] = 10**(np.random.rand()*1.0-2.5)
+#        lam['xP'] = 10**(np.random.rand()*1.0+0.0)
+        
+#        lam['xB'] = 69.9
+#        lam['xS'] = 6.26e-3
+#        lam['xP'] = 4.32
+        
 #        r1 = 10**(np.random.rand()*4.0-2.0)
 #        r2 = 10**(np.random.rand()*4.0-2.0)
-        for lvar in lam_names:
+#        for lvar in lam_names:
 #            if lvar == 'xS':
 #                lam[lvar] = r2
 #            else:
 #                lam[lvar] = r1
                 
-            lam[lvar] = 10**(np.random.rand()*4.0-2.0)
+#            lam[lvar] = 10**(np.random.rand()*4.0-2.0)
 #            lam[lvar] = lam_array[i_lam]
+#            lam[lvar] = 1e5
 
     else:
         lam = {}
@@ -675,12 +786,9 @@ for i_lam in range(lam_array.size):
         lam['xP'] = 10**1.0
 
     
-    #nonlinear
-    # GVHSRL_FitError(x,fit_profs,Const,lam,meshTV,dt=1.0,ix=8,weights=np.array([1])):
-    FitProf = lambda x: mle.GVHSRL_sparsa_Error(x,fit_profs,ConstTerms,lam,dt=rate_adj)
-    #GVHSRL_FitError(x,fit_profs,ConstTerms,lam,mesh_pts,dt=rate_adj)
-    FitProfDeriv = lambda x: mle.GVHSRL_sparsa_Error_Gradient(x,fit_profs,ConstTerms,lam,dt=rate_adj)
-    #GVHSRL_FitError_Gradient(x,fit_profs,ConstTerms,lam,mesh_pts,dt=rate_adj)
+
+
+
     
     
 #    bndsP = np.zeros((ix+2*xvalid.size*tdim,2))
@@ -719,25 +827,73 @@ for i_lam in range(lam_array.size):
     
 #    x02D[:,:rdim] = np.log(25.0-1)  # lidar ratio
 #    x0['xS'] = np.log(np.random.rand(tdim,rdim)*30+20)  # lidar ratio
-    x0['xS'] = np.ones((tdim,rdim))*np.log(30.0-1)  # lidar ratio
-    x0['xS'][np.nonzero(np.isnan(x0['xS']))] = np.log(1.0)  # get rid of invalid numbers
+    x0['xS'] = 20*np.ones((tdim,rdim)) #  np.ones((tdim,rdim))*np.log(30.0-1)  # lidar ratio
+    x0['xS'][np.nonzero(np.isnan(x0['xS']))] = opt_bounds['xS'][0] #np.log(1.0)  # get rid of invalid numbers
 
-#    x0['xB'] = np.log(profs2D['Aerosol_Backscatter_Coefficient'].profile)  # aerosol backscatter
-    x0['xB'] = AerBS0  # aerosol backscatter
-    x0['xB'][np.nonzero(np.isnan(x0['xB']))] = np.log(1e-12)    # get rid of invalid numbers
-    x0['xB'][np.nonzero(x0['xB']<np.log(1e-12))] = np.log(1e-12)    # get rid of invalid numbers
-    x0['xP'] = np.tan((0.5-profs2D['Particle_Depolarization'].profile)*np.pi)  # aerosol depolarization
-    x0['xP'][np.nonzero(np.isnan(x0['xP']))] = -1e4    # get rid of invalid numbers
+    #    x0['xB'] = np.log(profs2D['Aerosol_Backscatter_Coefficient'].profile)  # aerosol backscatter
+    x0['xB'] = AerBS0.copy()  # aerosol backscatter
+    x0['xB'][np.nonzero(np.isnan(x0['xB']))] = opt_bounds['xB'][0]   # get rid of invalid numbers
+#    x0['xB'][np.nonzero(x0['xB']<1e-9)] = 1e-9    # get rid of invalid numbers
+#    x0['xB'][np.nonzero(x0['xB']>1e-2)] = 1e-2    # get rid of invalid numbers
+    x0['xP'] = 1-profs2D['Particle_Depolarization'].profile #np.tan((0.5-profs2D['Particle_Depolarization'].profile)*np.pi)  # aerosol depolarization
+    x0['xP'][np.nonzero(np.isnan(x0['xP']))] = opt_bounds['xP'][1] #np.tan((0.5-0.05)*np.pi)    # get rid of invalid numbers
+#    x0['xP'][np.nonzero(x0['xP'] > 0.99)] = 0.99 #np.tan((0.5-0.01)*np.pi)    # get rid of invalid numbers
+#    x0['xP'][np.nonzero(x0['xP'] < 0.2)] = 0.2 #np.tan((0.5-0.01)*np.pi)    # get rid of invalid numbers
+#    x0['xP'][np.nonzero(x0['xP'] >= 32)] = np.tan((0.5-0.01)*np.pi)    # get rid of invalid numbers
+    
+    
+#    condition_functions = {'xB':lambda x,y: mle.cond_exp(x,np.nanstd(np.log(x0['xB'])),-np.nanmean(np.log(x0['xB'])),operation=y),
+#                       'xS':lambda x,y: mle.cond_linear(x,40,-20,operation=y),
+#                       'xP':lambda x,y: mle.cond_arctan(x,np.nanstd(x0['xP']),-np.nanmean(x0['xP']),0,1.0,operation=y)}    
+    
+    condition_functions = {'xB':lambda x,y: mle.cond_exp(x,np.log(opt_bounds['xB'][1])-np.log(opt_bounds['xB'][0]),np.log(opt_bounds['xB'][0])/(np.log(opt_bounds['xB'][1])-np.log(opt_bounds['xB'][0])),operation=y),
+                       'xS':lambda x,y: mle.cond_linear(x,opt_bounds['xS'][1]-opt_bounds['xS'][0],1/(opt_bounds['xS'][1]-opt_bounds['xS'][0]),operation=y),
+                       'xP':lambda x,y: mle.cond_linear(x,1.0,0.0,operation=y)}   
+    
+#    bnds = {'xS':sorted([condition_functions['xS'](1,'inverse'),condition_functions['xS'](100,'inverse')]),
+#            'xB':sorted([condition_functions['xB'](1e-9,'inverse'),condition_functions['xB'](1e-2,'inverse')]),
+#            'xP':sorted([condition_functions['xP'](0,'inverse'),condition_functions['xP'](1,'inverse')])} 
+    
+    # apply condition functions to initial conditions and variable bounds
+    bnds = {}
+    for var in condition_functions:
+        x0[var] = condition_functions[var](x0[var],'inverse')
+        bnds[var] = sorted([condition_functions[var](opt_bounds[var][0],'inverse'),condition_functions[var](opt_bounds[var][1],'inverse')])
+        x0[var][x0[var] < bnds[var][0]] = bnds[var][0]
+        x0[var][x0[var] > bnds[var][1]] = bnds[var][1]
+        
+    FitProf = lambda x: mle.GVHSRL_sparsa_Error(x,fit_profs,ConstTerms,lam,dt=rate_adj,cond_fun=condition_functions)
+
+    FitProfDeriv = lambda x: mle.GVHSRL_sparsa_Error_Gradient(x,fit_profs,ConstTerms,lam,dt=rate_adj,cond_fun=condition_functions)
+    
+#    scale = {}
+#    scale['xS'] = 40 #np.abs(np.log(40.0-1)) #np.nanmean(np.abs(x0['xS']))
+#    scale['xB'] = np.nanmean(np.abs(x0['xB']))  # 7.0
+#    scale['xP'] = 10.0 #350; #np.nanmean(np.abs(x0['xP']))
+    
+#    bnds = {'xS':sorted([1.0/scale['xS'],100.0/scale['xS']]),
+#            'xB':sorted([np.log(1e-9/scale['xB']),np.log(1e-2/scale['xB'])]),
+#            'xP':sorted([0,1.0/scale['xP']])}    
+    
+#    for var in scale.keys():
+#        x0[var] = x0[var]/scale[var]
+        
+#    FitProf = lambda x: mle.GVHSRL_sparsa_Error(x,fit_profs,ConstTerms,lam,dt=rate_adj,scale=scale)
+#
+#    FitProfDeriv = lambda x: mle.GVHSRL_sparsa_Error_Gradient(x,fit_profs,ConstTerms,lam,dt=rate_adj,scale=scale)
     
     
 #    prof_sol = Build_GVHSRL_Profiles(x0,ConstTerms,dt=rate_adj,ix=ix,return_params=True)
     
     """
     #Test code for Gradient
-    gradNum = mle.Num_Gradient(FitProf,x0)
-    plt.figure()
-    plt.plot(gradNum)
-    plt.plot(FitProfDeriv(x0),'--')
+    gradAnalytic = FitProfDeriv(x0)
+    gradNum = mle.Num_Gradient_Dict(FitProf,x0)
+    for var in gradNum.keys():
+        plt.figure()
+        plt.plot(gradNum[var].flatten())
+        plt.plot(gradAnalytic[var].flatten(),'--')
+        plt.title(str(var))
     """
     
     
@@ -753,16 +909,17 @@ for i_lam in range(lam_array.size):
     
  
     
-    sol,error_hist= mle.GVHSRL_sparsa_optimizor(FitProf,FitProfDeriv,x0,lam,sub_eps=1e-5,step_eps=1e-30,opt_cnt_min=10,opt_cnt_max=10000,cnt_alpha_max=10,sigma=1e-5,verbose=False,alpha = 1e4)
+    sol,[error_hist,step_hist]= mle.GVHSRL_sparsa_optimizor(FitProf,FitProfDeriv,x0,lam,sub_eps=1e-5,step_eps=step_eps,opt_cnt_min=10,opt_cnt_max=max_iter,cnt_alpha_max=10,sigma=1e-5,verbose=False,alpha = 1e5,bnds=bnds)
     
     if not verify:
-        prof_sol = mle.Build_GVHSRL_sparsa_Profiles(sol,ConstTerms,dt=rate_adj,return_params=True)
+        prof_sol = mle.Build_GVHSRL_sparsa_Profiles(sol,ConstTerms,dt=rate_adj,return_params=True,cond_fun=condition_functions)
 
     
     ProfileLogError = mle.GVHSRL_sparsa_Error(sol,verify_profs,ConstTerms,lam0,dt=rate_adj)    
     
 
     errRecord.extend([error_hist])
+    stepRecord.extend([step_hist])
     lam_List.extend([lam.copy()])
     lam_sets.extend([[lam['xB'],lam['xS'],lam['xP'],ProfileLogError]])
     tv_sublist = []
@@ -782,7 +939,13 @@ for i_lam in range(lam_array.size):
 
 lam_sets = np.array(lam_sets)
 tv_list = np.array(tv_list)
-np.savez('3D_opt_results_'+datetime.datetime.now().strftime('%Y%m%dT%H%M'),lam_sets=lam_sets,tv_list=tv_list)
+xG = sol['xG']
+xDT = sol['xDT']
+xB = sol['xB']
+xS = sol['xS']
+xP = sol['xP']
+if save_results:
+    np.savez(savefigpath+'_3D_opt_results_'+datetime.datetime.now().strftime('%Y%m%dT%H%M'),lam_sets=lam_sets,tv_list=tv_list,xG=xG,xDT=xDT,xB=xB,xS=xS,xP=xP,step_eps=step_eps)
 
 ## 1D regularizer
 #plt.figure()
@@ -790,7 +953,8 @@ np.savez('3D_opt_results_'+datetime.datetime.now().strftime('%Y%m%dT%H%M'),lam_s
 #plt.xlabel('Regularizer')
 #plt.ylabel('Fit Error')
 #plt.grid(b=True)
-
+#if save_results:
+#    plt.savefig(savefigpath+'Regularizer_GV_HSRL.png',dpi=300)
 
 ## 2D regularizer
 #plt.figure()
@@ -808,7 +972,8 @@ mx.set_xlabel(r'$\log_{10} \lambda_{\beta}$')
 mx.set_ylabel(r'$\log_{10} \lambda_{s}$')
 mx.set_zlabel(r'$\log_{10} \lambda_{p}$')
 pdata = mx.scatter(np.log10(lam_sets[:,0]),np.log10(lam_sets[:,1]),np.log10(lam_sets[:,2]),c=lam_sets[:,3])
-
+if save_results:
+    plt.savefig(savefigpath+'_RegularizerSpace_GV_HSRL.png',dpi=300)
 
 isol = np.argmin(fitErrors)
 
@@ -821,10 +986,28 @@ plt.plot(errRecord[isol])
 plt.xlabel('Iterations')
 plt.ylabel('Log-likelihood')
 plt.grid(b=True)
+if save_results:
+    plt.savefig(savefigpath+'_Loglikelihood_GV_HSRL.png',dpi=300)
 
-prof_sol = mle.Build_GVHSRL_sparsa_Profiles(sol_List[isol],ConstTerms,dt=rate_adj,return_params=True)
+plt.figure()
+plt.semilogy(stepRecord[isol][1:])
+plt.xlabel('Iterations')
+plt.ylabel('Step Evaluation')
+plt.grid(b=True)
+if save_results:
+    plt.savefig(savefigpath+'_StepEvaluation_GV_HSRL.png',dpi=300)
+    
+plt.figure(); 
+plt.plot([len(x) for x in errRecord],[x[-1] for x in errRecord],'.')
+plt.xlabel('Number of Iterations')
+plt.ylabel('LogLikelihood')
+plt.grid(b=True)
 
-tind = np.int(np.round(np.random.rand()*sol['xB'].shape[0]))
+prof_sol = mle.Build_GVHSRL_sparsa_Profiles(sol_List[isol],ConstTerms,dt=rate_adj,return_params=True,cond_fun=condition_functions)
+
+prof_x0 = mle.Build_GVHSRL_sparsa_Profiles(x0,ConstTerms,dt=rate_adj,return_params=True,cond_fun=condition_functions)
+
+tind = np.int(np.round(np.random.rand()*sol['xB'].shape[0]))-1
 subnum = 410
 plt.figure()
 for ifig,var in enumerate(fit_profs.keys()):
@@ -832,26 +1015,40 @@ for ifig,var in enumerate(fit_profs.keys()):
     plt.semilogy(fit_profs[var].profile[tind,:])
     plt.semilogy(verify_profs[var].profile[tind,:])
     plt.semilogy(prof_sol[var][tind,:])
-
-
+if save_results:
+    plt.savefig(savefigpath+'Fit_%d_index_GV_HSRL.png'%tind,dpi=300)
 
 plt.figure()
-plt.subplot(411)
-plt.semilogy(profs2D['Aerosol_Backscatter_Coefficient'].profile[tind,:])
-plt.semilogy(prof_sol['Backscatter_Coefficient'][tind,:])
-plt.ylim([1e-9,1e-3])
-plt.subplot(412)
-plt.semilogy(profs2D['Aerosol_Extinction_Coefficient'].profile[tind,:])
-plt.semilogy(prof_sol['Backscatter_Coefficient'][tind,:]*prof_sol['Lidar_Ratio'][tind,:])
-plt.ylim([1e-7,1e-1])
-plt.subplot(413)
-plt.plot(profs2D['Aerosol_Extinction_Coefficient'].profile[tind,:]/profs2D['Aerosol_Backscatter_Coefficient'].profile[tind,:])
-plt.plot(prof_sol['Lidar_Ratio'][tind,:])
-plt.ylim([0,100])
-plt.subplot(414)
-plt.plot(profs2D['Particle_Depolarization'].profile[tind,:])
-plt.plot(1-prof_sol['Polarization'][tind,:])
-plt.ylim([0,1])
+plt.subplot(141)
+range_mask = np.ones(profs2D['Aerosol_Backscatter_Coefficient'].range_array.size)
+range_mask[profs2D['Aerosol_Backscatter_Coefficient'].range_array==0] = np.nan
+plt.semilogx(profs2D['Aerosol_Backscatter_Coefficient'].profile[tind,:],profs2D['Aerosol_Backscatter_Coefficient'].range_array*range_mask)
+plt.semilogx(prof_sol['Backscatter_Coefficient'][tind,:],profs2D['Aerosol_Backscatter_Coefficient'].range_array*range_mask)
+plt.xlim([1e-7,1e-2])
+plt.xlabel(r'$\beta_a$')
+plt.ylabel(r'Range [m]')
+plt.grid(b=True)
+plt.subplot(142)
+plt.semilogx(profs2D['Aerosol_Extinction_Coefficient'].profile[tind,:],profs2D['Aerosol_Extinction_Coefficient'].range_array*range_mask)
+plt.semilogx(prof_sol['Backscatter_Coefficient'][tind,:]*prof_sol['Lidar_Ratio'][tind,:],profs2D['Aerosol_Extinction_Coefficient'].range_array*range_mask)
+plt.xlim([1e-5,1e0])
+plt.xlabel(r'$\alpha_a$')
+plt.grid(b=True)
+plt.subplot(143)
+plt.plot(profs2D['Aerosol_Extinction_Coefficient'].profile[tind,:]/profs2D['Aerosol_Backscatter_Coefficient'].profile[tind,:],profs2D['Aerosol_Extinction_Coefficient'].range_array*range_mask)
+plt.plot(prof_sol['Lidar_Ratio'][tind,:],profs2D['Aerosol_Extinction_Coefficient'].range_array*range_mask)
+plt.xlim([0,50])
+plt.xlabel(r'$s_{LR}$')
+plt.grid(b=True)
+plt.subplot(144)
+plt.plot(profs2D['Particle_Depolarization'].profile[tind,:],profs2D['Particle_Depolarization'].range_array*range_mask)
+plt.plot(1-prof_sol['Polarization'][tind,:],profs2D['Particle_Depolarization'].range_array*range_mask)
+plt.xlim([0,1])
+plt.xlabel(r'$d_{a}$')
+plt.grid(b=True)
+
+if save_results:
+    plt.savefig(savefigpath+'_FitParams_%d_index_GV_HSRL.png'%tind,dpi=300)
 
 #plt.show()
 
@@ -887,146 +1084,33 @@ for plt_var in denoise_profs.keys():
     lplt.scatter_z(denoise_profs[plt_var],lidar_pointing=lidar_data['lidar_pointing'],
                lidar_alt=aircraft_data['GGALT'],climits=plot_settings[plt_var]['climits'],
                cmap=plot_settings[plt_var]['colormap'],scale=plot_settings[plt_var]['scale'],s=2,t_axis_scale=5.0)
+    if save_results:
+        plt.savefig(savefigpath+plt_var+'_PTV_GV_HSRL.png',dpi=600)
+        
     if plt_var in profs.keys():
         lplt.scatter_z(profs[plt_var],lidar_pointing=lidar_data['lidar_pointing'],
                lidar_alt=aircraft_data['GGALT'],climits=plot_settings[plt_var]['climits'],
                cmap=plot_settings[plt_var]['colormap'],scale=plot_settings[plt_var]['scale'],s=2,t_axis_scale=5.0)
+        
+        if save_results:
+            plt.savefig(savefigpath+'_'+plt_var+'_GV_HSRL.png',dpi=600)
 
 plt.show()
 
-
-
-#beta_a_denoise = profs['Aerosol_Backscatter_Coefficient'].copy()
-#beta_a_denoise.profile = prof_sol['Backscatter_Coefficient'].copy()
-#beta_a_denoise.label = 'Denoised ' + beta_a_denoise.label
-#
-#s_LR_denoise = profs['Aerosol_Backscatter_Coefficient'].copy()
-#s_LR_denoise.profile = prof_sol['Lidar_Ratio'].copy()
-#s_LR_denoise.label = 'Denoised Lidar Ratio'
-#s_LR_denoise.profile_type = '$sr$'
-#
-#dPart_denoise = profs['Particle_Depolarization'].copy()
-#dPart_denoise.profile = 2*(1-prof_sol['Polarization'].copy())
-#dPart_denoise.label = 'Denoised ' + dPart_denoise.label
-#
-#
-#var = 'Aerosol_Backscatter_Coefficient'
-#lplt.scatter_z(profs[var],lidar_pointing=lidar_data['lidar_pointing'],
-#               lidar_alt=aircraft_data['GGALT'],climits=plot_settings[var]['climits'],
-#               cmap=plot_settings[var]['colormap'],scale=plot_settings[var]['scale'],s=2,t_axis_scale=5.0)
-#
-#lplt.scatter_z(beta_a_denoise,lidar_pointing=lidar_data['lidar_pointing'],
-#               lidar_alt=aircraft_data['GGALT'],climits=plot_settings[var]['climits'],
-#               cmap=plot_settings[var]['colormap'],scale=plot_settings[var]['scale'],s=2,t_axis_scale=5.0)
-#
-#var = 'Lidar_Ratio'               
-#lplt.scatter_z(s_LR_denoise,lidar_pointing=lidar_data['lidar_pointing'],
-#               lidar_alt=aircraft_data['GGALT'],climits=plot_settings[var]['climits'],
-#               cmap=plot_settings[var]['colormap'],scale=plot_settings[var]['scale'],s=2,t_axis_scale=5.0)
-#
-#var = 'Particle_Depolarization'
-#lplt.scatter_z(dPart_denoise,lidar_pointing=lidar_data['lidar_pointing'],
-#               lidar_alt=aircraft_data['GGALT'],climits=plot_settings[var]['climits'],
-#               cmap=plot_settings[var]['colormap'],scale=plot_settings[var]['scale'],s=2,t_axis_scale=5.0)
- 
-"""
+if save_results:
+    for var in denoise_profs.keys():
+        denoise_profs[var].write2nc(save_path+savencfile)
     
-fit_mol_2D,fit_comb_2D = ProfilesTotalxvalid_2D(sol_List[isol],xvalid,tdim,beta_mol.profile,ConstTerms,Mprof_bg=FitMol_bg,Cprof_bg=FitComb_bg,dt=rate_adj)
-
-Cam = sol_List[isol][0]
-Gm = sol_List[isol][1]
-Gc = sol_List[isol][2]      
-if print_sol and verify:
-    print('Final Solution:')
-    print('lam: %f\nCam = %f\nGm = %f\nGc = %f\nMol DT = %f ns\nComb DT = %f ns\nFitError:%f'%(lam_array[isol],Cam,Gm,Gc,sol_List[isol][3]*1e9,sol_List[isol][4]*1e9,fitErrors[isol]))
-    print('Output Flag: %d'%out_cond_array[isol])
-    print('Output Flag Definition: %s'%scipy.optimize.tnc.RCSTRINGS[out_cond_array[isol]])
-
-if plotfigs:
-    if verify:
-        plt.figure()
-        plt.semilogx(lam_array,fitErrors)
-        plt.ylabel('Log Error')
-        plt.xlabel('Fit Index')       
-
-sol2D = sol_List[isol][ix:].reshape((tdim,2*xvalid.size))
-beta_a_2D[:,xvalid] = np.exp(sol2D[:,xvalid.size:])
-sLR2D[:,xvalid] = np.exp(sol2D[:,:xvalid.size])/dR
-
-#    Cam = sol1D[0]
-#    Gm = sol1D[1]
-#    Gc = sol1D[2]
-#    DTmol = sol1D[3]
-#    DTcomb = sol1D[4]
-
-cal_params = {'Cam':sol_List[isol][0],'Gm':sol_List[isol][1],'Gc':sol_List[isol][2],'DTmol':sol_List[isol][3],'DTcomb':sol_List[isol][4]}
+    for var in profs.keys():
+        profs[var].write2nc(save_path+savencfile)
+    
+    for var in lidar_data.keys():
+        lp.write_var2nc(lidar_data[var],var,save_path+savencfile)
+        
+    for var in aircraft_data.keys():
+        lp.write_var2nc(aircraft_data[var],var,save_path+savencfile)
+        
+    lp.write_var2nc(lam_sets,'regularizer_data',save_path+savencfile,description='Regularizer values organized by [Backscatter, Lidar Ratio, Depolarization, Log-Likelihood]')
+    lp.write_var2nc(tv_list,'tv_data',save_path+savencfile,description='Profile total variation organized by [Backscatter, Lidar Ratio, Depolarization]')
 
 
-#    fit_mol_2D[pI,:],fit_comb_2D[pI,:] = ProfilesTotalxvalid(wMol,xvalid,beta_m_sonde.profile[pI,:],ConstTerms[pI,:],Mprof_bg=FitMol_bg[pI],Cprof_bg=FitComb_bg[pI])
-#ProfilesTotalxvalid_2D(x,xvalid,tdim,mol_bs_coeff,Const,Mprof_bg=0,Cprof_bg=0,dt=np.array([1.0]))
-
-
-alpha_a_2D = beta_a_2D*sLR2D
-
-
-
-#    # attempt to remove profiles where the fit was bad
-#    pbad = np.nonzero(np.abs(np.diff(ProfileError)/ProfileError[:-1])>3)[0]+1
-#    xvalid2D[pbad,:]= 0
-#    pbad = np.nonzero(np.abs(np.diff(ProfileError)/ProfileError[1:])>3)[0]
-#    xvalid2D[pbad,:]= 0
-
-
-# Merge with original aerosol data set
-beta_merge = beta_aer.copy()
-beta_a_2D_adj = beta_a_2D[:,:beta_aer.profile.shape[1]]
-iMLE = np.nonzero(xvalid2D)
-beta_merge.profile[iMLE] = beta_a_2D_adj[iMLE]
-beta_merge.descript = 'Maximum Likelihood Estimate of Aerosol Backscatter Coefficient in m^-1 sr^-1'
-
-sLR_mle = beta_aer.copy()
-sLR_mle.profile = sLR2D[:,:beta_aer.profile.shape[1]].copy()
-sLR_mle.descript = 'Maximum Likelihood Estimate of Aerosol Lidar Ratio sr'
-sLR_mle.label = 'Aerosol Lidar Ratio'
-sLR_mle.profile_type = '$sr$'
-sLR_mle.profile_variance = sLR_mle.profile_variance*0.0
-
-beta_a_mle = beta_aer.copy()
-beta_a_mle.profile = beta_a_2D[:,:beta_aer.profile.shape[1]].copy()
-beta_a_mle.descript = 'Maximum Likelihood Estimate of Aerosol Backscatter Coefficient in m^-1 sr^-1'
-beta_a_mle.label = 'Aerosol Backscatter Coefficient'
-beta_a_mle.profile_type = '$m^{-1}sr^{-1}$'
-beta_a_mle.profile_variance = beta_a_mle.profile_variance*0.0
-
-alpha_a_mle = beta_aer.copy()
-alpha_a_mle.profile = alpha_a_2D[:,:beta_aer.profile.shape[1]].copy()
-alpha_a_mle.descript = 'Maximum Likelihood Estimate of Aerosol Extinction Coefficient in m^-1'
-alpha_a_mle.label = 'Aerosol Extinction Coefficient'
-alpha_a_mle.profile_type = '$m^{-1}$'
-alpha_a_mle.profile_variance = alpha_a_mle.profile_variance*0.0
-
-fit_mol_mle = MolRawE.copy()
-fit_mol_mle.profile = fit_mol_2D.copy()
-fit_mol_mle.slice_range_index(range_lim=[0,beta_aer.profile.shape[1]])
-fit_mol_mle.descript = 'Maximum Likelihood Estimate of ' + fit_mol_mle.descript
-fit_comb_mle = CombRawE.copy()
-fit_comb_mle.profile = fit_comb_2D.copy()
-fit_comb_mle.slice_range_index(range_lim=[0,beta_aer.profile.shape[1]])
-fit_comb_mle.descript = 'Maximum Likelihood Estimate of ' + fit_comb_mle.descript
-
-xvalid_mle = beta_aer.copy()
-xvalid_mle.profile = xvalid2D[:,:beta_aer.profile.shape[1]].copy()
-xvalid_mle.descript = 'Maximum Likelihood Estimated Data Points'
-xvalid_mle.label = 'MLE Data Point Mask'
-xvalid_mle.profile_type = 'MLE Data Point Mask'
-xvalid_mle.profile_variance = xvalid_mle.profile*0
-
-
-#    if use_mask:
-#        NanMask = np.logical_or(Molecular.profile < 4.0,CombHi.profile < 4.0)
-#        beta_merge.profile = np.ma.array(beta_merge,mask=NanMask)
-
-
-#return beta_merge,beta_a_mle,sLR_mle,alpha_a_mle,fit_mol_mle,fit_comb_mle,xvalid_mle,ProfileLogError,cal_params
-
-"""
