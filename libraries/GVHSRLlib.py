@@ -1483,7 +1483,8 @@ def load_GVHSRL_processed_files(nclist,prof_list,lidar_vars=['lidar_pointing'],
                                 air_vars = ['GGALT','ROLL','PITCH','GGLAT','GGLON'],
                                 load_mask = True,
                                 time_start = datetime.datetime(year=1900,month=1,day=1),
-                                time_stop = datetime.datetime(year=2100,month=1,day=1)):
+                                time_stop = datetime.datetime(year=2100,month=1,day=1),
+                                path = ''):
     """
     load_GVHSRL_processed_files(nclist,prof_list,lidar_vars=['lidar_pointing'],
                                 air_vars = ['GGALT','ROLL','PITCH','GGLAT','GGLON'],
@@ -1502,12 +1503,17 @@ def load_GVHSRL_processed_files(nclist,prof_list,lidar_vars=['lidar_pointing'],
                 will not be loaded.
     time_stop (datetime) - allows the user to set the stop time of the desired
                 data.  
-    
+    path - optional path to the files.  This will be concatenated onto each file
+            name.
     returns dicts of 
     profs,lidar_data,aircraft_data
     where the entries are the same as the passed in variable names
     
     """
+    
+    if len(path) > 0:
+        for ai in range(len(nclist)):
+            nclist[ai] = path+nclist[ai]
     
     findex = []
     aircraft_data = {}
@@ -1542,7 +1548,7 @@ def load_GVHSRL_processed_files(nclist,prof_list,lidar_vars=['lidar_pointing'],
                 else:
                     profs[var] = prof0.copy()        
 
-        
+#        print(ncfilename)
         f = nc4.Dataset(ncfilename,'r')
 #        aircraft_data = {}
         for a_var in air_vars:
