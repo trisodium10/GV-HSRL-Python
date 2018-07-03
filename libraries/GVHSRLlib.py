@@ -679,7 +679,11 @@ def delete_indices(in_dict,indices):
     """
     out_dict = {}
     for var in in_dict.keys():
-        out_dict[var] = np.delete(in_dict[var],indices)
+        if in_dict[var].ndim==1:
+            out_dict[var] = np.delete(in_dict[var],indices)
+        elif in_dict[var].ndim==2:
+            # assume the time axis is 1
+            out_dict[var] = np.delete(in_dict[var],indices,axis=1)
     return out_dict
     
     
