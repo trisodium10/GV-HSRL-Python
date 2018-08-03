@@ -11,8 +11,8 @@ import LidarProfileFunctions as lp
 import datetime
 import glob
 
-import ptv.hsrl.denoise as denoise
-from ptv.estimators.poissonnoise import poissonmodel0
+#import ptv.hsrl.denoise as denoise
+#from ptv.estimators.poissonnoise import poissonmodel0
 
 import scipy.optimize
 
@@ -719,6 +719,8 @@ def DenoiseMolecular(MolRaw,beta_m_sonde=np.array([np.nan]),
     tv_bound - bound optimization limits to those given in tv_lim.  Only used
         if accel = True.  Otherwise the accelerated tv_lims are unbounded.
     """
+    import ptv.hsrl.denoise as denoise
+    from ptv.estimators.poissonnoise import poissonmodel0
     
 #    bg_index = -50    
     if not np.isnan(end_time):
@@ -930,6 +932,9 @@ def DenoiseTime(ProfRaw,MinAlt=0,MaxAlt=1e8,n=1,start_time=-1,end_time=1e16,
     N_tv_pts - number of tv points to evalute in the tv_lim space.  Defaults
         to 48 used in WV-DIAL
     """ 
+
+    import ptv.hsrl.denoise as denoise
+    from ptv.estimators.poissonnoise import poissonmodel0
 
     ProfDenoise = ProfRaw.copy()
 #    ProfDenoise.slice_time([start_time,end_time])
