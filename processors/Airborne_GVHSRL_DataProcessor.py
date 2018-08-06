@@ -66,6 +66,8 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         'mol_smooth':False, # smooth molecular profile
         't_mol_smooth':0.0, # smoothing in time of molecular profile
         'z_mol_smooth':30.0, # smoothing in range of molecular profile
+        
+        'use_BM3D':False, # use BM3D denoised raw data where it is available
 
         'range_min':150.0,  # closest range in m where data is treated as valid
         
@@ -260,7 +262,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
 
     
     # grab raw data from netcdf files
-    time_list,var_1d_data, profs = gv.load_raw_data(time_start,time_stop,var_2d_list,var_1d_list,basepath=basepath,verbose=True,as_prof=True,loadQWP=settings['loadQWP'],date_reference=date_reference,time_shift=settings['aircraft_time_shift'],bin0=bin0)
+    time_list,var_1d_data, profs = gv.load_raw_data(time_start,time_stop,var_2d_list,var_1d_list,basepath=basepath,verbose=True,as_prof=True,loadQWP=settings['loadQWP'],date_reference=date_reference,time_shift=settings['aircraft_time_shift'],bin0=bin0,loadBM3D=settings['use_BM3D'])
     
     run_processing = len(profs) > 0  
     

@@ -114,7 +114,7 @@ def fit_high_range(profile,profile_var,i_min,i_max,order=1):
     return profile_out
     
     
-def load_raw_data(start_time,stop_time,var_2d_list,var_1d_list,basepath = '/scr/eldora1/rsfdata/hsrl/raw/',verbose=True,as_prof=True,loadQWP='fixed',date_reference=0,time_shift=0,bin0=37):
+def load_raw_data(start_time,stop_time,var_2d_list,var_1d_list,basepath = '/scr/eldora1/rsfdata/hsrl/raw/',verbose=True,as_prof=True,loadQWP='fixed',date_reference=0,time_shift=0,bin0=37,loadBM3D=False):
     """
     loads GVHSRL raw data from netcdf files stored in basepath
     accepts a list of the variables to be loaded (their netcdf names)
@@ -140,6 +140,8 @@ def load_raw_data(start_time,stop_time,var_2d_list,var_1d_list,basepath = '/scr/
         aircraft data
     
     bin0 - MCS bin where time/range = 0
+    
+    loadBM3D - try to load BM3D denoised profile data if it is available in the netcdf file
     """
     
     var_1d_data = dict(zip(var_1d_list,[np.array([])]*len(var_1d_list)))
@@ -231,10 +233,17 @@ def load_raw_data(start_time,stop_time,var_2d_list,var_1d_list,basepath = '/scr/
                     
                 
                 for var in var_2d_data.keys():
+                    # check if we are supposed to load denoised data and
+                    # if there is denoised data available
+                    if loadBM3D and var+'_BM3D' in f.variables.keys():
+                        load_var = var+'_BM3D'
+                    else:
+                        load_var = var
+                    
                     if len(var_2d_data[var]) == 0:
                         var_2d_data[var] = f.variables[var][:].copy()
                     else:
-                        var_2d_data[var] = np.vstack((var_2d_data[var],f.variables[var][:]))
+                        var_2d_data[var] = np.vstack((var_2d_data[var],f.variables[load_var][:]))
             elif verbose:
                 print( 'Skipping %d UT' %Hour)
                 print( '['+SubFiles[idir]+']')
