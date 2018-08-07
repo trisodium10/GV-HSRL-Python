@@ -237,11 +237,12 @@ def load_raw_data(start_time,stop_time,var_2d_list,var_1d_list,basepath = '/scr/
                     # if there is denoised data available
                     if loadBM3D and var+'_BM3D' in f.variables.keys():
                         load_var = var+'_BM3D'
+                        print('   found ' + load_var)
                     else:
                         load_var = var
                     
                     if len(var_2d_data[var]) == 0:
-                        var_2d_data[var] = f.variables[var][:].copy()
+                        var_2d_data[var] = f.variables[load_var][:].copy()
                     else:
                         var_2d_data[var] = np.vstack((var_2d_data[var],f.variables[load_var][:]))
             elif verbose:
