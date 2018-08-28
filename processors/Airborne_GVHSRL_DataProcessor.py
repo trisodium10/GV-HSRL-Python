@@ -67,7 +67,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
         't_mol_smooth':0.0, # smoothing in time of molecular profile
         'z_mol_smooth':30.0, # smoothing in range of molecular profile
         
-        'use_BM3D':False, # use BM3D denoised raw data where it is available
+        'use_BM3D':True, # use BM3D denoised raw data where it is available
 
         'range_min':150.0,  # closest range in m where data is treated as valid
         
@@ -263,6 +263,16 @@ def ProcessAirborneDataChunk(time_start,time_stop,
     
     # grab raw data from netcdf files
     time_list,var_1d_data, profs = gv.load_raw_data(time_start,time_stop,var_2d_list,var_1d_list,basepath=basepath,verbose=True,as_prof=True,loadQWP=settings['loadQWP'],date_reference=date_reference,time_shift=settings['aircraft_time_shift'],bin0=bin0,loadBM3D=settings['use_BM3D'])
+    
+    if settings['use_BM3D']:
+        # if using BM3D data, try to load the pthinned denoised profiles for 
+        # filter optimization
+        thin_list = ['molecular_pthin_fit_BM3D','molecular_pthin_ver_BM3D']
+        _,_, thin_profs = gv.load_raw_data(time_start,time_stop,thin_list,[],basepath=basepath,verbose=True,as_prof=True,loadQWP=settings['loadQWP'],date_reference=date_reference,time_shift=settings['aircraft_time_shift'],bin0=bin0,loadBM3D=False)
+        for tvar in thin_profs.keys():
+            if type(thin_profs[tvar])== lp.LidarProfile:
+                print('found '+tvar)
+                profs[tvar] = thin_profs[tvar]
     
     run_processing = len(profs) > 0  
     
@@ -528,11 +538,17 @@ def ProcessAirborneDataChunk(time_start,time_stop,
             if settings['deadtime_correct']:
 #                if var == 'combined_hi':
 #                    p_before = profs[var].copy()
-                if hasattr(profs[var],'NumProfsList'):
+                if hasattr(profs[var],'NumProfsList') and (var in dead_time.keys()):
                     profs[var].nonlinear_correct(dead_time[var],laser_shot_count=2000*profs[var].NumProfsList[:,np.newaxis],std_deadtime=5e-9)
                 else:
                     # number of laser shots is based on an assumption that there is one 0.5 second profile per time bin
                     profs[var].nonlinear_correct(dead_time[var],laser_shot_count=2000,std_deadtime=5e-9)
+                    
+            if 'molecular_pthin' in var:
+                if 'fit' in var:
+                    fit_mol = profs[var].copy()
+                elif 'ver' in var:
+                    ver_mol = profs[var].copy()
 
             if settings['save_raw']:
                 raw_profs[var]=profs[var].copy()
@@ -557,7 +573,14 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                 profs[var+'_denoise'] = profs[var].copy()
             
             if var == 'molecular' and settings['Denoise_Mol']:
-                MolRaw = profs['molecular'].copy()    
+                MolRaw = profs['molecular'].copy() 
+                
+            if var == 'molecular' and settings['get_extinction']:
+                mol_ext = profs['molecular'].copy()
+                if (not 'molecular_pthin_fit_BM3D' in profs.keys()) or (not 'molecular_pthin_ver_BM3D' in profs.keys()):
+                    print('No Poisson thinned data provided.  Poisson thinning for extinction estimation now.')
+                    mol_ext.multiply_piecewise(mol_ext.NumProfList[:,np.newaxis])
+                    fit_mol,ver_mol = mol_ext.p_thin()
     
             if settings['baseline_subtract']:        
                 # baseline subtract  profiles
@@ -816,6 +839,13 @@ def ProcessAirborneDataChunk(time_start,time_stop,
             print('Terminating processing due to empty profiles')
             break
         
+#        print('optimizing extinction filter design')
+#        settings['ext_sg_width'],settings['ext_sg_order']=lp.optimize_sg_raw(raw_profs['molecular'],axis=1,full=True,order=[1,5],window=[3,23],range_lim=[300,5e3])
+##        ext_sg_wid = settings['ext_sg_width']
+##        ext_sg_order = settings['ext_sg_order']
+#        if not hasattr(settings['ext_sg_width'],'__iter__'):
+#            print('   window width: %d'%settings['ext_sg_width'])
+#            print('   order: %d'%settings['ext_sg_order'])
 
         
         # merge high and low gain combined profiles if option is true
@@ -963,7 +993,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
 #            plt.colorbar()
 #            plt.title('\eta_mc')
 #            plt.show()
-            
+
             beta_a,dPart,BSR,param_profs = gv.AerosolBackscatter(profs['molecular'],profs['combined'],profs['cross'],beta_m, \
                 eta_am=Tam,eta_ac=Tac,eta_mm=eta_i2,eta_mc=eta_c,eta_x=0.0,gm=1.0)            
             
@@ -1004,10 +1034,190 @@ def ProcessAirborneDataChunk(time_start,time_stop,
             beta_a_denoise.label = 'Denoised Aerosol Backscatter Coefficient'
         
         if settings['get_extinction']:
-            ext_sg_wid = settings['ext_sg_width']
-            ext_sg_order = settings['ext_sg_order']
-            ext_tres = settings['ext_tres']
-            ext_zres = settings['ext_zres']
+            print('Estimating Extinction')
+#            ext_sg_wid = settings['ext_sg_width']
+#            ext_sg_order = settings['ext_sg_order']
+#            ext_tres = settings['ext_tres']
+#            ext_zres = settings['ext_zres']
+            
+#            beta_m_ext = beta_m.copy()
+            beta_m_ext.slice_range(range_lim=[settings['range_min'],range_trim])
+            
+#            print('geo_pre')
+#            print(geo_data['geo_mol'].shape)
+            
+#            plt.figure()
+#            plt.plot(fit_mol.profile[10,:])
+#            plt.plot(ver_mol.profile[10,:])
+            
+            t_geo = fit_mol.time.copy()
+            r_geo = fit_mol.range_array.copy()
+            
+            
+            if tres_post > 0 or tres <= 0.5:
+                fit_mol.time_resample(tedges=master_time_post,update=True,remainder=False,average=False)
+                ver_mol.time_resample(tedges=master_time_post,update=True,remainder=False,average=False)
+#                beta_m_ext.time_resample(tedges=master_time_post,update=True,remainder=False,average=True)
+            if not settings['use_BM3D'] or (not 'molecular_pthin_fit_BM3D' in profs.keys() and not 'molecular_pthin_ver_BM3D' in profs.keys()):
+                # if not using BM3D, run a filter optimization on the photon counts
+                print('Using filter optimization on raw profiles instead of BM3D')
+                t_window0,t_ord0=lp.optimize_sg_raw(fit_mol,axis=0,full=False,order=[1,5],window=[3,23],range_lim=[],bg_subtract=True)         
+                r_window0,r_ord0=lp.optimize_sg_raw(fit_mol,axis=1,full=False,order=[1,5],window=[3,23],range_lim=[settings['range_min'],range_trim],bg_subtract=True)
+                fit_mol.sg_filter(t_window0,t_ord0,axis=0)
+                ver_mol.sg_filter(r_window0,r_ord0,axis=1)
+            
+#            plt.plot(fit_mol.profile[10,:])
+#            plt.plot(ver_mol.profile[10,:])
+            if t_geo.size > fit_mol.time.size:
+                igeo_t = np.nonzero(np.in1d(np.round(2*t_geo).astype(np.int),np.round(2*fit_mol.time).astype(np.int)))[0]
+                geo_new = geo_data['geo_mol'][igeo_t[0]:igeo_t[-1]+1,:]
+                geo_trim_case = 0
+                print('case 0')
+            else:
+                igeo_t = np.nonzero(np.in1d(np.round(2*t_geo).astype(np.int),np.round(2*fit_mol.time).astype(np.int)))[0]
+                igeo_t2 = np.nonzero(np.in1d(np.round(2*fit_mol.time).astype(np.int),np.round(2*t_geo).astype(np.int)))[0]
+                geo_new = np.ones(fit_mol.profile.shape)
+#                print('geo 1');
+#                print(geo_new.shape)
+                geo_new[igeo_t2,:]=geo_data['geo_mol'][igeo_t,:]
+#                print('geo 2')
+#                print(geo_new.shape)
+                t_geo = fit_mol.time.copy()
+                geo_trim_case = 1
+                print('case 1')
+            
+            fit_mol.bg_subtract(BGIndex)
+            fit_mol.multiply_piecewise(geo_new)
+            
+            
+#            fit_mol.multiply_piecewise(geo_data['geo_mol'])
+#            print('eta-pre')
+#            print(eta_i2_ext.shape)
+            
+            
+            fit_mol.slice_range(range_lim=[0,range_trim])
+            ver_mol.slice_range(range_lim=[settings['range_min'],range_trim])
+            
+            
+            fit_mol.slice_range(range_lim=[settings['range_min'],range_trim])
+            
+            fit_mol.multiply_piecewise(1.0/eta_i2_ext)
+            r_eta = fit_mol.range_array.copy()
+            
+            fit_mol.range_correct()
+            
+            
+            fit_mol.multiply_piecewise(1.0/beta_m_ext.profile)
+            fit_mol.log(update=True)
+            
+#            geo_forward = np.interp(fit_mol.range_array,r_geo,geo_data['geo_mol'])
+            
+            iforward_r = np.nonzero(np.in1d(np.round(2*r_geo).astype(np.int),np.round(2*fit_mol.range_array).astype(np.int)))[0]
+            iforward_t = np.nonzero(np.in1d(np.round(2*t_geo).astype(np.int),np.round(2*fit_mol.time).astype(np.int)))[0]
+            if geo_trim_case == 0:
+                geo_forward = geo_data['geo_mol'][iforward_t[0]:iforward_t[-1]+1,iforward_r[0]:iforward_r[-1]+1]
+            elif geo_trim_case == 1:
+                geo_forward = geo_new[iforward_t[0]:iforward_t[-1]+1,iforward_r[0]:iforward_r[-1]+1]
+            
+#            geo_forward = geo_data['geo_mol'][iforward_t[0]:iforward_t[-1]+1,iforward_r[0]:iforward_r[-1]+1]
+#            geo_forward = geo_data['geo_mol'][:,iforward_r[0]:iforward_r[-1]+1]
+            iforward = np.nonzero(np.in1d(np.round(2*r_eta).astype(np.int),np.round(2*fit_mol.range_array).astype(np.int)))[0]
+            eta_i2_forward = eta_i2_ext[:,iforward[0]:iforward[-1]+1]
+            
+            
+            print('optimizing extinction filter design')
+            fit_error_t =[]
+            fit_error_r =[]
+            twin = []
+            rwin = []
+            tord = []
+            rord = []
+            tord_max = 13
+            rord_max = 13
+            twin_max = 21
+            rwin_max = 21
+            iterations_t = np.sum(np.minimum(np.arange(3,twin_max,2)-2,tord_max))
+            iterations_r = np.sum(np.minimum(np.arange(3,rwin_max,2)-2,rord_max))
+            print('expected time evaluations: %d'%iterations_t)
+            iternum = 0
+            itertarg = 10  # point  (in percent) at which we update the completion status
+            for ext_sg_wid_t in range(3,twin_max,2):
+                for ext_sg_ord_t in range(1,min([ext_sg_wid_t-1,tord_max])):
+                    filt_mol = fit_mol.copy()
+                    filt_mol.sg_filter(ext_sg_wid_t,ext_sg_ord_t,axis=0)
+#                    print('profile')
+#                    print(filt_mol.profile.shape)
+#                    print('beta_m')
+#                    print(beta_m_ext.profile.shape)
+#                    print('eta')
+#                    print(eta_i2_forward.shape)
+#                    print('geo')
+#                    print(geo_forward.shape)
+                    
+                    
+                    forward_model = np.exp(filt_mol.profile)*beta_m_ext.profile*eta_i2_forward/(filt_mol.range_array[np.newaxis,:]**2)/geo_forward+filt_mol.bg[:,np.newaxis]
+                    fit_error_fm = np.nansum(forward_model-ver_mol.profile*np.log(forward_model),axis=0)
+                    tord+=[ext_sg_ord_t]
+                    twin+=[ext_sg_wid_t]
+                    fit_error_t+=[fit_error_fm]
+                    
+                    iternum+=1                   
+                    if iternum*100.0/iterations_t >= itertarg:
+                        print('time: %d %%'%itertarg)
+                        itertarg+=10
+            
+            
+            imin_t = np.nanargmin(np.array(fit_error_t),axis=0)
+#            print(imin_t.shape)
+#            print(len(twin))
+#            print(np.array(twin).shape)
+            ext_sg_wid_t = np.array(twin)[imin_t]
+            ext_sg_order_t = np.array(tord)[imin_t]
+            
+            print('expected range evaluations: %d'%iterations_r)
+            iternum = 0
+            itertarg = 10
+#            fit_error_min = 0
+            for ext_sg_wid_r in range(3,rwin_max,2):
+                for ext_sg_ord_r in range(1,min([ext_sg_wid_r-1,rord_max])):
+                    filt_mol = fit_mol.copy()
+                    filt_mol.sg_filter(ext_sg_wid_r,ext_sg_ord_r,axis=1)
+
+                    forward_model = np.exp(filt_mol.profile)*beta_m_ext.profile*eta_i2_forward/(filt_mol.range_array[np.newaxis,:]**2)/geo_forward+filt_mol.bg[:,np.newaxis]
+                    
+                    fit_error_fm = np.nansum(forward_model-ver_mol.profile*np.log(forward_model),axis=1)
+                    fit_error_r+=[fit_error_fm]
+                    rwin+=[ext_sg_wid_r]
+                    rord+=[ext_sg_ord_r]
+                    
+                    iternum+=1                   
+                    if iternum*100.0/iterations_r >= itertarg:
+                        print('range: %d %%'%itertarg)
+                        itertarg+=10
+                    
+#                    if fit_error_fm[10] < fit_error_min or len(fit_error_r) == 1:
+#                        fit_error_min = fit_error_fm[10]
+#                        print('new min min at %d:  %f'%(iternum,fit_error_fm[10]))
+#                        plt.figure()
+#                        plt.plot(ver_mol.profile[10,:])
+#                        plt.plot(forward_model[10,:])
+#                        plt.title('%d window, %d order'%(ext_sg_wid_r,ext_sg_ord_r))
+#                        
+#                        plt.figure()
+#                        plt.plot(fit_mol.profile[10,:])
+#                        plt.plot(filt_mol.profile[10,:])
+#                        plt.title('%d window, %d order'%(ext_sg_wid_r,ext_sg_ord_r))
+                                
+                            
+            imin_r = np.nanargmin(np.array(fit_error_r),axis=0)
+            ext_sg_wid_r = np.array(rwin)[imin_r]
+            ext_sg_order_r = np.array(rord)[imin_r]
+            
+            
+#            print('optimized sg filter parameters:')
+#            print('   range (width,order) : %d,  %d'%(ext_sg_wid_r,ext_sg_order_r))
+#            print('   time (width,order)  : %d,  %d'%(ext_sg_wid_t,ext_sg_order_t))
+            
 #            ext_sg_wid = 21
 #            ext_sg_order = 4
 #            ext_tres = 20  # extinction time resolution in seconds
@@ -1017,19 +1227,31 @@ def ProcessAirborneDataChunk(time_start,time_stop,
 #            beta_m_ext.conv(ext_tres/beta_m_ext.mean_dt,ext_zres/beta_m_ext.mean_dR)
 #            print(mol_ext.profile.shape)
 #            print(beta_m_ext.profile.shape)
-            OD = mol_ext/beta_m_ext
-            OD.conv(ext_tres/OD.mean_dt,ext_zres/OD.mean_dR)
+#            OD = mol_ext/beta_m_ext
+#            OD.conv(ext_tres/OD.mean_dt,ext_zres/OD.mean_dR)
+            
+            OD = fit_mol.copy()
             OD.descript = 'Total optical depth from aircraft altitude'
             OD.label = 'Optical Depth'
             OD.profile_type = 'unitless'
             alpha_a = OD.copy()
-            OD.profile_variance = OD.profile_variance/OD.profile**2
-            OD.profile = -0.5*(np.log(OD.profile)-np.nanmean(np.log(OD.profile[:,0:3]),axis=1)[:,np.newaxis])
+            OD.sg_filter(ext_sg_wid_t,ext_sg_order_t,axis=0)
+            OD.sg_filter(ext_sg_wid_r,ext_sg_order_r,axis=1)
+#            OD.profile_variance = OD.profile_variance/OD.profile**2
+#            OD.profile = np.log(OD.profile)
+#            ODdata = OD.profile.copy()
+#            OD.sg_filter(ext_sg_wid,ext_sg_order,deriv=0)
+            OD.profile = -0.5*(OD.profile-np.nanmean(OD.profile[:,0:3],axis=1)[:,np.newaxis])
             
-            for ai in range(alpha_a.profile.shape[0]):
-                alpha_a.profile[ai,:] = -0.5*gv.savitzky_golay(np.log(alpha_a.profile[ai,:].flatten()), ext_sg_wid, ext_sg_order, deriv=1)
-            alpha_a = alpha_a/alpha_a.mean_dR # not sure this is the right scaling factor
+#            for ai in range(alpha_a.profile.shape[0]):
+#                alpha_a.profile[ai,:] = -0.5*gv.savitzky_golay(np.log(alpha_a.profile[ai,:].flatten()), ext_sg_wid, ext_sg_order, deriv=1)
+            alpha_a.sg_filter(ext_sg_wid_t,ext_sg_order_t,axis=0)
+            alpha_a.sg_filter(ext_sg_wid_r,ext_sg_order_r,axis=1,deriv=1)
+            alpha_a = 0.5*alpha_a/alpha_a.mean_dR # not sure this is the right scaling factor
             alpha_a = alpha_a - beta_m_ext*(8*np.pi/3)  # remove molecular extinction
+#            alpha_a.profile = ODdata.copy()
+#            alpha_a.sg_filter(ext_sg_wid,ext_sg_order,deriv=0)
+#            alpha_a.gain_scale(-0.5)
             if settings['as_altitude']:
                 alpha_a.range2alt(master_alt,air_data_post,telescope_direction=var_post['TelescopeDirection'])
                 
