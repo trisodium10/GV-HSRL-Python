@@ -1430,10 +1430,10 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                          'GGLAT': {'description':'latitude','units':'degrees'},
                          'PITCH': {'description':'aircraft pitch angle','units':'degrees'},
                          'GGALT': {'description':'altitude','units':'meters'},
-                         'PSXC': {'description':'ambiant pressure','units':'hPa'},
+                         'PSXC': {'description':'ambient pressure','units':'hPa'},
                          'ROLL': {'description':'aircraft roll angle','units':'degrees'},
                          'GGLON': {'description':'longitude','units':'degrees'},
-                         'ATX': {'description':'ambiant temperature', 'units':'C'}}
+                         'ATX': {'description':'ambient temperature', 'units':'C'}}
 
         if settings['save_data']:
             print('saving profiles to')
