@@ -137,7 +137,7 @@ day_in = np.int(input("Day: "))
 
 cal_date = datetime.datetime(year_in,month_in,day_in)
 
-basepath = '/scr/eldora1/HSRL_data/'
+#basepath = '/scr/eldora1/HSRL_data/'
 
 FilePath0 = basepath+cal_date.strftime('%Y/%m/%d/raw/')
 
