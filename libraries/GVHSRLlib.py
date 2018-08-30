@@ -320,7 +320,7 @@ def load_raw_data(start_time,stop_time,var_2d_list,var_1d_list,basepath = '/scr/
                 prof_list = prof_list+[lp.LidarProfile(var_2d_data[var],\
                     time_sec,label=plabel,\
                     descript = pdescript,\
-                    bin0=bin0,lidar='GV-HSRL',StartDate=start_time.date())]
+                    bin0=bin0,lidar='GV-HSRL',StartDate=start_date.date())]
                 prof_names = prof_names + [var]
                 
             profs_2d = dict(zip(prof_names,prof_list))
