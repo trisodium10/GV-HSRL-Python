@@ -1075,10 +1075,10 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                 print('Using filter optimization on raw profiles instead of BM3D')
                 # check to make sure the profiles are of reasonable size before trying to optimize a filter for them
                 if ext_time_filt:
-                    t_window0,t_ord0=lp.optimize_sg_raw(fit_mol,axis=0,full=False,order=[1,5],window=[3,23],range_lim=[],bg_subtract=True)    
+                    t_window0,t_ord0=lp.optimize_sg_raw(fit_mol,axis=0,full=False,order=[1,5],window=[3,23],range_lim=[],bg_subtract=True,AdjCounts=False)    
                     
                 if ext_range_filt:
-                    r_window0,r_ord0=lp.optimize_sg_raw(fit_mol,axis=1,full=False,order=[1,5],window=[3,23],range_lim=[settings['range_min'],range_trim],bg_subtract=True)
+                    r_window0,r_ord0=lp.optimize_sg_raw(fit_mol,axis=1,full=False,order=[1,5],window=[3,23],range_lim=[settings['range_min'],range_trim],bg_subtract=True,AdjCounts=False)
                     fit_mol.sg_filter(r_window0,r_ord0,axis=1)
                     ver_mol.sg_filter(r_window0,r_ord0,axis=1)
                 
@@ -1092,8 +1092,10 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                 igeo_t = np.nonzero(np.in1d(np.round(2*t_geo).astype(np.int),np.round(2*fit_mol.time).astype(np.int)))[0]
                 geo_new = geo_data['geo_mol'][igeo_t[0]:igeo_t[-1]+1,:]
                 geo_trim_case = 0
-#                print('case 0')
-            else:
+                print('extinction geo case 0')
+                print(t_geo.size)
+                print(fit_mol.time.size)
+            elif t_geo.size == fit_mol.time.size:
                 igeo_t = np.nonzero(np.in1d(np.round(2*t_geo).astype(np.int),np.round(2*fit_mol.time).astype(np.int)))[0]
                 igeo_t2 = np.nonzero(np.in1d(np.round(2*fit_mol.time).astype(np.int),np.round(2*t_geo).astype(np.int)))[0]
                 geo_new = np.ones(fit_mol.profile.shape)
@@ -1104,7 +1106,15 @@ def ProcessAirborneDataChunk(time_start,time_stop,
 #                print(geo_new.shape)
                 t_geo = fit_mol.time.copy()
                 geo_trim_case = 1
-#                print('case 1')
+                print('extinction geo case 1')
+                print(t_geo.size)
+                print(fit_mol.time)
+            else:
+                geo_new = geo_data['geo_mol'].copy()
+                geo_trim_case = 2
+                print('extinction geo case 2')
+                print(t_geo.size)
+                print(fit_mol.time)
             
             fit_mol.bg_subtract(BGIndex)
             fit_mol.multiply_piecewise(geo_new)
@@ -1136,7 +1146,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
             iforward_t = np.nonzero(np.in1d(np.round(2*t_geo).astype(np.int),np.round(2*fit_mol.time).astype(np.int)))[0]
             if geo_trim_case == 0:
                 geo_forward = geo_data['geo_mol'][iforward_t[0]:iforward_t[-1]+1,iforward_r[0]:iforward_r[-1]+1]
-            elif geo_trim_case == 1:
+            elif geo_trim_case > 0:
                 geo_forward = geo_new[iforward_t[0]:iforward_t[-1]+1,iforward_r[0]:iforward_r[-1]+1]
             
 #            geo_forward = geo_data['geo_mol'][iforward_t[0]:iforward_t[-1]+1,iforward_r[0]:iforward_r[-1]+1]
