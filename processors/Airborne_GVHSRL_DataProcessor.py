@@ -1286,7 +1286,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                 alpha_a.sg_filter(ext_sg_wid_r,ext_sg_order_r,axis=1,deriv=1)
             else:
                 alpha_a.sg_filter(3,1,axis=1,deriv=1)
-            alpha_a = 0.5*alpha_a/alpha_a.mean_dR # not sure this is the right scaling factor
+            alpha_a = alpha_a/alpha_a.mean_dR # not sure this is the right scaling factor
             alpha_a = alpha_a - beta_m_ext*(8*np.pi/3)  # remove molecular extinction
 #            alpha_a.profile = ODdata.copy()
 #            alpha_a.sg_filter(ext_sg_wid,ext_sg_order,deriv=0)
