@@ -665,7 +665,7 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                         try:
                             for ri in range(i_offset.size):
             
-                                i0 = np.ceil(np.abs(i_offset[ri]))
+                                i0 = np.int(np.ceil(np.abs(i_offset[ri])))
             
                                 
                                 if i_offset[ri] < 0:
@@ -1088,33 +1088,40 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                     
 #            plt.plot(fit_mol.profile[10,:])
 #            plt.plot(ver_mol.profile[10,:])
-            if t_geo.size > fit_mol.time.size:
-                igeo_t = np.nonzero(np.in1d(np.round(2*t_geo).astype(np.int),np.round(2*fit_mol.time).astype(np.int)))[0]
-                geo_new = geo_data['geo_mol'][igeo_t[0]:igeo_t[-1]+1,:]
-                geo_trim_case = 0
-                print('extinction geo case 0')
-                print(t_geo.size)
-                print(fit_mol.time.size)
-            elif t_geo.size == fit_mol.time.size:
-                igeo_t = np.nonzero(np.in1d(np.round(2*t_geo).astype(np.int),np.round(2*fit_mol.time).astype(np.int)))[0]
-                igeo_t2 = np.nonzero(np.in1d(np.round(2*fit_mol.time).astype(np.int),np.round(2*t_geo).astype(np.int)))[0]
-                geo_new = np.ones(fit_mol.profile.shape)
-#                print('geo 1');
-#                print(geo_new.shape)
-                geo_new[igeo_t2,:]=geo_data['geo_mol'][igeo_t,:]
-#                print('geo 2')
-#                print(geo_new.shape)
-                t_geo = fit_mol.time.copy()
-                geo_trim_case = 1
-                print('extinction geo case 1')
-                print(t_geo.size)
-                print(fit_mol.time)
-            else:
-                geo_new = geo_data['geo_mol'].copy()
-                geo_trim_case = 2
-                print('extinction geo case 2')
-                print(t_geo.size)
-                print(fit_mol.time)
+            
+            # update the geo array using nearest neighbor
+            igeo_t = np.argmin(np.abs(t_geo[:,np.newaxis]-fit_mol.time[np.newaxis,:]),axis=0)
+            geo_new = geo_data['geo_mol'][igeo_t,:]
+#            t_geo = fit_mol.time.copy()                    
+                    
+#            if t_geo.size > fit_mol.time.size:
+#                igeo_t = np.nonzero(np.in1d(np.round(2*t_geo).astype(np.int),np.round(2*fit_mol.time).astype(np.int)))[0]
+#                geo_new = geo_data['geo_mol'][igeo_t[0]:igeo_t[-1]+1,:]
+#                geo_trim_case = 0
+#                print('extinction geo case 0')
+#                print(t_geo.size)
+#                print(fit_mol.time.size)
+#                print(igeo_t.shape)
+#            elif t_geo.size == fit_mol.time.size:
+#                igeo_t = np.nonzero(np.in1d(np.round(2*t_geo).astype(np.int),np.round(2*fit_mol.time).astype(np.int)))[0]
+#                igeo_t2 = np.nonzero(np.in1d(np.round(2*fit_mol.time).astype(np.int),np.round(2*t_geo).astype(np.int)))[0]
+#                geo_new = np.ones(fit_mol.profile.shape)
+##                print('geo 1');
+##                print(geo_new.shape)
+#                geo_new[igeo_t2,:]=geo_data['geo_mol'][igeo_t,:]
+##                print('geo 2')
+##                print(geo_new.shape)
+#                t_geo = fit_mol.time.copy()
+#                geo_trim_case = 1
+#                print('extinction geo case 1')
+#                print(t_geo.size)
+#                print(fit_mol.time)
+#            else:
+#                geo_new = geo_data['geo_mol'].copy()
+#                geo_trim_case = 2
+#                print('extinction geo case 2')
+#                print(t_geo.size)
+#                print(fit_mol.time)
             
             fit_mol.bg_subtract(BGIndex)
             fit_mol.multiply_piecewise(geo_new)
@@ -1140,19 +1147,29 @@ def ProcessAirborneDataChunk(time_start,time_stop,
             fit_mol.multiply_piecewise(1.0/beta_m_ext.profile)
             fit_mol.log(update=True)
             
+            
+            # update the geo array using nearest neighbor
+            iforward_t = np.argmin(np.abs(t_geo[:,np.newaxis]-fit_mol.time[np.newaxis,:]),axis=0)
+            iforward_r = np.argmin(np.abs(r_geo[:,np.newaxis]-fit_mol.range_array[np.newaxis,:]),axis=0)
+            geo_forward = geo_data['geo_mol'][iforward_t,:][:,iforward_r]  # two step indexing (grab profiles in time, then range)
+            
+            # update molecular efficiency using nearest neighbor
+            iforward = np.argmin(np.abs(r_eta[:,np.newaxis]-fit_mol.range_array[np.newaxis,:]),axis=0)
+            eta_i2_forward = eta_i2_ext[:,iforward]
+            
 #            geo_forward = np.interp(fit_mol.range_array,r_geo,geo_data['geo_mol'])
             
-            iforward_r = np.nonzero(np.in1d(np.round(2*r_geo).astype(np.int),np.round(2*fit_mol.range_array).astype(np.int)))[0]
-            iforward_t = np.nonzero(np.in1d(np.round(2*t_geo).astype(np.int),np.round(2*fit_mol.time).astype(np.int)))[0]
-            if geo_trim_case == 0:
-                geo_forward = geo_data['geo_mol'][iforward_t[0]:iforward_t[-1]+1,iforward_r[0]:iforward_r[-1]+1]
-            elif geo_trim_case > 0:
-                geo_forward = geo_new[iforward_t[0]:iforward_t[-1]+1,iforward_r[0]:iforward_r[-1]+1]
-            
-#            geo_forward = geo_data['geo_mol'][iforward_t[0]:iforward_t[-1]+1,iforward_r[0]:iforward_r[-1]+1]
-#            geo_forward = geo_data['geo_mol'][:,iforward_r[0]:iforward_r[-1]+1]
-            iforward = np.nonzero(np.in1d(np.round(2*r_eta).astype(np.int),np.round(2*fit_mol.range_array).astype(np.int)))[0]
-            eta_i2_forward = eta_i2_ext[:,iforward[0]:iforward[-1]+1]
+#            iforward_r = np.nonzero(np.in1d(np.round(2*r_geo).astype(np.int),np.round(2*fit_mol.range_array).astype(np.int)))[0]
+#            iforward_t = np.nonzero(np.in1d(np.round(2*t_geo).astype(np.int),np.round(2*fit_mol.time).astype(np.int)))[0]
+#            if geo_trim_case == 0:
+#                geo_forward = geo_data['geo_mol'][iforward_t[0]:iforward_t[-1]+1,iforward_r[0]:iforward_r[-1]+1]
+#            elif geo_trim_case > 0:
+#                geo_forward = geo_new[iforward_t[0]:iforward_t[-1]+1,iforward_r[0]:iforward_r[-1]+1]
+#            
+##            geo_forward = geo_data['geo_mol'][iforward_t[0]:iforward_t[-1]+1,iforward_r[0]:iforward_r[-1]+1]
+##            geo_forward = geo_data['geo_mol'][:,iforward_r[0]:iforward_r[-1]+1]
+#            iforward = np.nonzero(np.in1d(np.round(2*r_eta).astype(np.int),np.round(2*fit_mol.range_array).astype(np.int)))[0]
+#            eta_i2_forward = eta_i2_ext[:,iforward[0]:iforward[-1]+1]
             
             
             print('optimizing extinction filter design')
