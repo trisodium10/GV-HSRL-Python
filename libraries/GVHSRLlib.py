@@ -387,7 +387,21 @@ def interp_aircraft_data(master_time,aircraft_data):
     air_data_new = {}
     for var in aircraft_data.keys():
         if var != 'Time':
-            air_data_new[var] = np.interp(master_time,aircraft_data['Time'],aircraft_data[var])
+            if aircraft_data[var].ndim == 1:
+                air_data_new[var] = np.interp(master_time,aircraft_data['Time'],aircraft_data[var])
+            elif aircraft_data[var].ndim == 2:
+                if aircraft_data[var].shape[0] == aircraft_data['Time'].size:
+                    air_data_new[var] = np.zeros((master_time.size,aircraft_data[var].shape[1]))
+                    for di in range(aircraft_data[var].shape[1]):
+                        air_data_new[var][:,di] = np.interp(master_time,aircraft_data['Time'],aircraft_data[var][:,di])
+                elif aircraft_data[var].shape[1] == aircraft_data['Time'].size:
+                    air_data_new[var] = np.zeros((aircraft_data[var].shape[0],master_time.size))
+                    for di in range(aircraft_data[var].shape[0]):
+                        air_data_new[var][di,:] = np.interp(master_time,aircraft_data['Time'],aircraft_data[var][di,:])
+                else:
+                    print('In interp_aircraft_data(), the variable ' + var)
+                    print('  has no dimension that matches the supplied Time variabel')
+                
     air_data_new['Time'] = master_time.copy()  # update the time variable
     return air_data_new
 
