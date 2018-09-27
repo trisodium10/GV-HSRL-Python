@@ -17,10 +17,14 @@ import os
 
 ProcessFile = os.path.abspath(__file__+'/../')+'/gv_hsrl_socrates_process_hour.py'
 PlotFile = os.path.abspath(__file__+'/../')+'/gv_hsrl_socrates_plot_ncdata.py'
+PlotFile2 = os.path.abspath(__file__+'/../')+'/gv_hsrl_socrates_plot_ncdata_fiveminute.py'
 
 # Process the data (and save it)
 exec(open(ProcessFile).read())
 
-# Plot the data (and save the plots)
+# Plot the data (and save the plots) in 1 hour rolling profiles
 exec(open(PlotFile).read())
+
+# Plot the data (and save the plots) in five minute profiles with kft altitude
+exec(open(PlotFile2).read())
 

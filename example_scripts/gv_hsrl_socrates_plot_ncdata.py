@@ -30,15 +30,15 @@ MaxAlt = 49e3
 MinAlt = -2e3
 
 # size of each processing step
-time_increment = datetime.timedelta(hours=0,minutes=5)
+time_increment = datetime.timedelta(hours=0,minutes=30)
 # size of a processesed data set
-time_duration = datetime.timedelta(hours=0,minutes=5)
+time_duration = datetime.timedelta(hours=0,minutes=10)
 #time_duration = time_increment
 
 
 new_settings = {
             'plot_date':True,
-	    'plot_kft':True,
+	    'plot_kft':False,
             'time_axis_scale':5.0,
             'alt_axis_scale':1.0,
             'save_data':True,

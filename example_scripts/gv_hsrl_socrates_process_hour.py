@@ -71,7 +71,8 @@ settings = {
     'time_axis_scale':5.0,  # scale for horizontal axis on pcolor plots    
     'count_mask_threshold':2.0,  # count mask threshold (combined_hi).  If set to zero, no mask applied 
     
-    'Estimate_Mol_Gain':False, # use statistics on BSR to estimate the molecular gain
+    'Estimate_Mol_Gain':True, # use statistics on BSR to estimate the molecular gain
+    'save_mol_gain_plot':True,  # save the plots used to estimate molecular gain
     
     'hsrl_rb_adjust':True, # adjust for Rayleigh Brillouin Spectrum
     
