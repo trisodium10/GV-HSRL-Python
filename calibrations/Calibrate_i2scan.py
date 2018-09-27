@@ -41,7 +41,7 @@ import os
 import datetime
 
 def Tetalon(x,nu):
-    T = (1-x[0])**2/((1-x[0])**2+4*x[0]*np.sin(x[2]*freq+x[1])**2)
+    T = (1-x[0])**2/((1-x[0])**2+4*x[0]*np.sin(x[2]*nu+x[1])**2)
     return T
 
 def Fit_Error(x,comb,mol,freq,i2,i2f,plotres=False):
@@ -54,12 +54,18 @@ def Fit_Error(x,comb,mol,freq,i2,i2f,plotres=False):
     x[5] molecular multiplier
     x[6] combined multiplier
     """
+    
+    if x.size < 8:
+        c_offset = 0
+    else:
+        c_offset = np.exp(x[7])
+    
     freq2 = x[0]*freq+x[1]
 #    Cfft = np.fft.fft(np.log(comb))
 #    Mfft = np.fft.fft(np.log(mol))
     Te = Tetalon(x[2:5],freq2)
     i2spec = np.interp(freq2,i2f,i2)
-    Mideal = x[5]*i2spec*Te
+    Mideal = x[5]*(i2spec+c_offset)*Te
     Cideal = x[6]*Te
 #    Mideal_fft = np.fft.fft(np.log(Mideal))
 #    Cideal_fft = np.fft.fft(np.log(Cideal))
@@ -107,9 +113,14 @@ def get_i2_write_values(x,comb,mol,freq,i2,i2f,plotres=False):
     x[5] molecular multiplier
     x[6] combined multiplier
     """
+    if x.size < 8:
+        c_offset = 0
+    else:
+        c_offset = np.exp(x[7])
     freq2 = x[0]*freq+x[1]
     Te = Tetalon(x[2:5],freq2)
-    molecular = x[5]/x[6]*np.interp(i2f,freq2,mol)
+#    molecular = x[5]/x[6]*np.interp(i2f,freq2,mol) # changed 9/6/2018 - scaling is backward
+    molecular = x[6]/x[5]*np.interp(i2f,freq2,mol)
     combined = np.interp(i2f,freq2,comb)
     i2_measured = np.interp(i2f,freq2,mol/Te)
     i2_theory = i2
@@ -224,11 +235,13 @@ if file_select != -1 and file_select < len(file_list):
     #plt.semilogy(molcal[i_narrow]*1e-3)
     
     #  Load I2 spectrum
-    i2file = os.path.abspath(__file__+'/../../reference_files/')+'/I2cell_272_31_extended_freq.txt'
+    i2file = paths['software_path']+'reference_files/I2cell_272_31_extended_freq.txt'
+#    i2file = os.path.abspath(__file__+'/../../reference_files/')+'/I2cell_272_31_extended_freq.txt'
 #    i2file = '/h/eol/mhayman/PythonScripts/HSRL_Processing/NewHSRLPython/I2cell_272_31_extended_freq.txt'
     i2spec = np.loadtxt(i2file)  #,skiprows=4
     
-    save_ez_file_path = os.path.abspath(__file__+'/../cal_files/')+'/'
+    save_ez_file_path = paths['software_path']+'calibrations/cal_files/'
+#    save_ez_file_path = os.path.abspath(__file__+'/../cal_files/')+'/'
 #    save_file_path = '/h/eol/mhayman/HSRL/hsrl_processing/hsrl_configuration/projDir/calfiles/'
     
     MZfft = np.fft.fft(interferometer,axis=1)
@@ -255,6 +268,9 @@ if file_select != -1 and file_select < len(file_list):
     molwide = np.interp(phase_wide_interp,phase_wide,molcal[i_wide])
     norm_factor = np.max(molwide)
     
+    nar_phase_offset = 0.5*(phase_wide[0]+phase_wide[-1])-0.5*(phase_narrow[0]+phase_narrow[-1])
+    phase_narrow+=nar_phase_offset
+    
     ip0 = np.argmin(np.abs(phase_wide_interp-phase_narrow[0]))
     if phase_wide_interp[ip0] < phase_narrow[0]:
         ip0 = ip0+1
@@ -267,21 +283,56 @@ if file_select != -1 and file_select < len(file_list):
     
     corMolNar = np.log(molnar)
     corMolNar[np.isinf(corMolNar)] = -5.0
+    corMolNar = corMolNar-np.nanmean(corMolNar)
     corMolWide = np.log(molwide)
     corMolWide[np.isinf(corMolWide)] = -5.0
+    corMolWide = corMolWide-np.nanmean(corMolWide)
     
     cormol = np.correlate(corMolNar,corMolWide)
     imid = np.int(cormol.size/2)
     ipkcor = -30+np.argmax(cormol[imid-30:imid+30])
     
-    #plt.figure(); 
-    #plt.semilogy(phase_nar_interp+ipkcor*dphase,molnar*1e-3/norm_factor)
-    #plt.semilogy(phase_wide_interp,molwide/norm_factor)
+#    plt.figure(); 
+#    plt.semilogy(molnar*1e-3,label='narrow scan'); 
+#    plt.semilogy(molwide[ip0-ipkcor:ip1+1-ipkcor],label='wide scan')
+#    plt.grid(b=True)
+#    plt.legend()
     
-    iswap = np.nonzero(molnar*1e-3>molwide[ip0:ip1])[0]
+#    plt.figure(); 
+#    plt.semilogy(phase_nar_interp+ipkcor*dphase,molnar*1e-3/norm_factor)
+#    plt.semilogy(phase_wide_interp,molwide/norm_factor)
     
-    mol_merge = molwide
-    mol_merge[iswap[0]+ip0:iswap[-1]+ip0] = 1e-3*molnar[iswap[0]:iswap[-1]]
+    merge_error = np.log(np.abs(molnar*1e-3-molwide[ip0-ipkcor:ip1+1-ipkcor]))
+    derror = np.diff(np.abs(np.log(molnar*1e-3)-np.log(molwide[ip0-ipkcor:ip1+1-ipkcor])))
+    izero_cross = np.nonzero(derror[1:]*derror[:-1] <= 0)[0]+1
+    dleft = np.zeros(izero_cross.size)
+    dright = np.zeros(izero_cross.size)
+    for ki,index in enumerate(izero_cross):
+        imin = max([0,index-5])
+        imax = min([derror.size+1,index+6])
+        dleft[ki] = np.mean(derror[imin:index])
+        if np.isinf(dleft[ki]):
+            dleft[ki] = 0
+        dright[ki] = np.mean(derror[index+1:imax])
+        if np.isinf(dright[ki]):
+            dright[ki] = 0
+    iswap_min = izero_cross[np.nanargmin(dleft)]-ipkcor
+    iswap_max = izero_cross[np.nanargmax(dright)]-ipkcor
+    
+    
+#    iswap = np.nonzero(molnar*1e-3>molwide[ip0-ipkcor:ip1+1-ipkcor])[0]
+    
+    mol_merge = molwide.copy()
+    mol_merge[iswap_min+ip0:iswap_max+ip0] = 1e-3*molnar[iswap_min+ipkcor:iswap_max+ipkcor]
+#    mol_merge[iswap[0]+ip0:iswap[-1]+ip0] = 1e-3*molnar[iswap[0]:iswap[-1]]
+    
+    plt.figure(); 
+    plt.semilogy(molnar*1e-3,label='narrow scan'); 
+    plt.semilogy(molwide[ip0-ipkcor:ip1+1-ipkcor],label='wide scan')
+    plt.semilogy(mol_merge[ip0-ipkcor:ip1+1-ipkcor],'--',label='merged scan')
+    plt.grid(b=True)
+    plt.legend()
+    
     mol_merge = mol_merge/norm_factor
     
     #plt.figure()
@@ -308,6 +359,7 @@ if file_select != -1 and file_select < len(file_list):
         x[4] etalon phase multiplier
         x[5] molecular multiplier
         x[6] combined multiplier
+        x[7] offset to account for spectral purity
     """
     
     
@@ -315,7 +367,7 @@ if file_select != -1 and file_select < len(file_list):
     #Tetalon = (1-R)**2/((1-R)**2+4*R*np.sin(delta))
     #Fit_Error(x,comb,mol,freq,i2,i2f,plotres=False):
     fit_fun = lambda x: Fit_Error(x,comb,mol_merge,freq,i2spec[:,2],i2spec[:,0])
-    x0 = np.array([0.85,-0.8,0.90,0.0,0.01,1.0,1.0])
+    x0 = np.array([0.85,-0.8,0.90,0.0,0.01,1.0,1.0,-5])
     bnds = np.zeros((x0.size,2))
     bnds[0,1] = 10
     bnds[1,0] = -10
@@ -326,15 +378,26 @@ if file_select != -1 and file_select < len(file_list):
     bnds[4,1] = 10
     bnds[5,1] = 100
     bnds[6,1] = 100
+    bnds[7,0] = -10
+    bnds[7,1] = 0
     
     sol = scipy.optimize.fmin_slsqp(fit_fun,x0,bounds=bnds)
     Fit_Error(sol,comb,mol_merge,freq,i2spec[:,2],i2spec[:,0],plotres=True)
     
     
-    print('Phase to frequency conversion: %f'%(phase_to_GHz*sol[0]))
-    print('Phase to frequnecy offset: %f'%sol[1])
     
     write_data,Te = get_i2_write_values(sol,comb,mol_merge,freq,i2spec[:,2],i2spec[:,0],plotres=True)
+    
+    mol_fit = sol[5]*(i2spec[:,2]+np.exp(sol[7]))*Te
+    comb_fit = sol[6]*Te
+    
+    i_center = np.argmin(np.abs(i2spec[:,0]))
+    Cam = mol_fit[i_center]*sol[6]/sol[5]/comb_fit[i_center]
+    
+    print('Phase to frequency conversion: %f'%(phase_to_GHz*sol[0]))
+    print('Phase to frequnecy offset: %f'%sol[1])
+    print('Molecular gain: %f'%(sol[6]/sol[5]))
+    print('Cross talk (Cam): %e'%Cam)
     
     plt.show(block=False)
     
@@ -344,6 +407,7 @@ if file_select != -1 and file_select < len(file_list):
         np.savez(save_ez_file_path+save_ez_filename,freq_mult = sol[0], \
             freq_offset = sol[1], etalon_refl = sol[2], etalon_freq_offset = sol[3], \
             etalon_phase_mult = sol[4], molecular_mult = sol[5], combined_mult = sol[6], \
+            i2_offset = np.exp(sol[7]), mol_fit = mol_fit*sol[6]/sol[5],comb_fit=comb_fit, Cam=Cam, \
             freq=write_data[:,0],combined_scan=write_data[:,1],mol_scan=write_data[:,2],\
             i2_theory=write_data[:,4],Tetalon = Te,created_str = datetime.datetime.today().strftime('%d-%b-%y at %H:%m UT'))
         
@@ -356,7 +420,7 @@ if file_select != -1 and file_select < len(file_list):
         header_str = header_str+'t_end_cal_pulse=   %1.2e ;  end time of cal pulse (sec).\n'%tend
         header_str = header_str+'pulse_durration=   5.00e-08 ;  laser pulse durration (sec).\n'
         header_str = header_str+'ratio of mol to combined channel gain =   %.1f \n' %(sol[5]/sol[6])
-        header_str = header_str+'Cam = %1.3e \n'%(np.min(mol_merge)*sol[6]/sol[5])
+        header_str = header_str+'Cam = %1.3e \n'%Cam
         header_str = header_str+'Min iodine transmission =    %1.1e,  1/(min_trans) =  %1.1e\n\n'%(np.min(mol_merge),1/np.min(mol_merge))
         header_str = header_str+'freq(GHz)  combined  molecular i2_measured i2_theory'
         

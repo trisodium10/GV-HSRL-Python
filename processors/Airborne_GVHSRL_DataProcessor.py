@@ -970,17 +970,30 @@ def ProcessAirborneDataChunk(time_start,time_stop,
             dnu = 20e6  # resolution
             nu_max = 10e9 # max frequency relative to line center
             nu = np.arange(-nu_max,nu_max,dnu)
-            Ti2 = np.interp(nu,i2_data['freq']*1e9,i2_data['mol_scan'])  # molecular transmission
-            Tam = np.interp(0,i2_data['freq']*1e9,i2_data['mol_scan'])  # aersol transmission into molecular channel
             
-            Tc2 = np.interp(nu,i2_data['freq']*1e9,i2_data['combined_scan'])  # combined transmission
-            Tac = np.interp(0,i2_data['freq']*1e9,i2_data['combined_scan'])  # aersol transmission into combined channel
+            if 'mol_fit' in i2_data.keys():
+                Ti2 = np.interp(nu,i2_data['freq']*1e9,i2_data['mol_fit'])  # molecular transmission
+                Tam = np.interp(0,i2_data['freq']*1e9,i2_data['mol_fit'])  # aersol transmission into molecular channel
+                
+                Tc2 = np.interp(nu,i2_data['freq']*1e9,i2_data['comb_fit'])  # combined transmission
+                Tac = np.interp(0,i2_data['freq']*1e9,i2_data['comb_fit'])  # aersol transmission into combined channel
+                
+                mol_gain = mol_gain*(i2_data['combined_mult']/i2_data['molecular_mult'])
+            else:
+                Ti2 = np.interp(nu,i2_data['freq']*1e9,i2_data['mol_scan'])  # molecular transmission
+                Tam = np.interp(0,i2_data['freq']*1e9,i2_data['mol_scan'])  # aersol transmission into molecular channel
+                
+                Tc2 = np.interp(nu,i2_data['freq']*1e9,i2_data['combined_scan'])  # combined transmission
+                Tac = np.interp(0,i2_data['freq']*1e9,i2_data['combined_scan'])  # aersol transmission into combined channel
+            
+            
             
             [eta_i2,eta_c] = lp.RB_Efficiency([Ti2,Tc2],temp.profile.flatten(),pres.profile.flatten()*9.86923e-6,profs['molecular'].wavelength,nu=nu,norm=True,max_size=10000)
             
         #    beta_mol_norm = lp.RB_Spectrum(temp.profile.flatten(),pres.profile.flatten()*9.86923e-6,profs['molecular'].wavelength,nu=nu,norm=True)
         #    eta_i2 = np.sum(Ti2[:,np.newaxis]*beta_mol_norm,axis=0)
             eta_i2 = eta_i2.reshape(temp.profile.shape)
+            
             
             profs['molecular'].gain_scale(mol_gain,gain_var = (mol_gain*0.05)**2)
         

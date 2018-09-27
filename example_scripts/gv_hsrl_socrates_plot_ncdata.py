@@ -38,7 +38,7 @@ time_duration = datetime.timedelta(hours=0,minutes=10)
 
 new_settings = {
             'plot_date':True,
-	    'plot_kft':False,
+            'plot_kft':False,
             'time_axis_scale':5.0,
             'alt_axis_scale':1.0,
             'save_data':True,
