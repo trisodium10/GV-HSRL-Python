@@ -1222,6 +1222,9 @@ def ProcessAirborneDataChunk(time_start,time_stop,
     #            print(np.array(twin).shape)
                 ext_sg_wid_t = np.array(twin)[imin_t]
                 ext_sg_order_t = np.array(tord)[imin_t]
+                
+                save_other_data['ext_sg_width_t'] = {'data':ext_sg_wid_t,'description':'window width of Savitzky-Golay filter applied in time','units':'bins'}
+                save_other_data['ext_sg_order_t'] = {'data':ext_sg_order_t,'description':'polynomial order of Savitzky-Golay filter applied in time','units':'unitless'}
             
             if ext_range_filt:
                 print('expected range evaluations: %d'%iterations_r)
@@ -1263,7 +1266,8 @@ def ProcessAirborneDataChunk(time_start,time_stop,
                 ext_sg_wid_r = np.array(rwin)[imin_r]
                 ext_sg_order_r = np.array(rord)[imin_r]
             
-            
+                save_other_data['ext_sg_width_r'] = {'data':ext_sg_wid_r,'description':'window width of Savitzky-Golay filter applied in range','units':'bins'}
+                save_other_data['ext_sg_order_r'] = {'data':ext_sg_order_r,'description':'polynomial order of Savitzky-Golay filter applied in range','units':'unitless'}
 #            print('optimized sg filter parameters:')
 #            print('   range (width,order) : %d,  %d'%(ext_sg_wid_r,ext_sg_order_r))
 #            print('   time (width,order)  : %d,  %d'%(ext_sg_wid_t,ext_sg_order_t))
