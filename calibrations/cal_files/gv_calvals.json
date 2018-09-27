@@ -23,7 +23,8 @@
 		{"date": "12-Oct-2017 0:0","value": 1.0728915, "down_gain":1.0728915, "diff_geo": "diff_geo_GVHSRL20171025.npz", "change_type": "abrupt", "RB_Corrected":"False","down_diff":""},
 		{"date": "27-Oct-2017 0:0","value": 1.133915, "down_gain":1.133915, "diff_geo": "diff_geo_GVHSRL20171025.npz", "change_type": "gradual", "RB_Corrected":"False","down_diff":""},
 		{"date": "27-Oct-2017 0:0","value": 0.784546, "down_gain":0.784546, "diff_geo": "diff_geo_GVHSRL20171025.npz", "change_type": "gradual", "RB_Corrected":"True","down_diff":""},
-           {"date": "20-Dec-2017 18:00","value": 0.62, "down_gain":0.66, "diff_geo": "diff_geo_GVHSRL20171220.npz", "change_type": "gradual", "RB_Corrected":"True","down_diff":"diff_geo_GVHSRL20180102.npz"}
+           {"date": "20-Dec-2017 18:00","value": 0.62, "down_gain":0.66, "diff_geo": "diff_geo_GVHSRL20171220.npz", "change_type": "gradual", "RB_Corrected":"True","down_diff":"diff_geo_GVHSRL20180102.npz"},
+           {"date": "12-Jan-2018 22:28","value": 0.558, "down_gain":0.598, "diff_geo": "diff_geo_GVHSRL20171220.npz", "change_type": "gradual", "RB_Corrected":"True","down_diff":"diff_geo_GVHSRL20180102.npz"}
 
 	],
 	"Baseline_File": [
@@ -42,7 +43,8 @@
            {"date": "1-Jul-2017 0:0","value": "i2-default-scan-20150701T0000.npz", "change_type": "abrupt"},
 		{"date": "18-Oct-2017 19:02","value": "i2-default-scan-20171018T1901.npz", "change_type": "gradual"},
 		{"date": "21-Nov-2017 20:00","value": "i2-default-scan-20171121T2000.npz", "change_type": "gradual"},
-           {"date": "20-Dec-2017 19:39","value": "i2-default-scan-20171220T1939.npz", "change_type": "gradual"}
+           {"date": "20-Dec-2017 19:39","value": "i2-default-scan-20171220T1939.npz", "change_type": "gradual"},
+           {"date": "12-Jan-2018 22:28","value": "i2-default-scan-20180112T2228.npz", "change_type": "gradual"}
 	],
 
 	"Polarization": [
@@ -103,7 +105,8 @@
 	],
 
 	"Comments": [
-		{"date": "7-Dec-2013 0:0", "value": "Made up start date"}
+		{"date": "7-Dec-2013 0:0", "value": "Made up start date"},
+		{"date": "6-Sep-2018 0:0", "value": "Changed I2 scan data scaling so that mol_gain is now slightly lower than before.  The change is for i2cals after 12-Jan-2018 22:28"}
 	]
 
 }
