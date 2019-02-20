@@ -1302,6 +1302,8 @@ def ProcessAirborneDataChunk(time_start,time_stop,
             OD.label = 'Optical Depth'
             OD.profile_type = 'unitless'
             alpha_a = OD.copy()
+            # Optical depth is temporarily the optimally filtered molecular channel
+            # apply those filters to the molecular observations
             if ext_time_filt:
                 OD.sg_filter(ext_sg_wid_t,ext_sg_order_t,axis=0)
             if ext_range_filt:
@@ -1314,14 +1316,61 @@ def ProcessAirborneDataChunk(time_start,time_stop,
             
 #            for ai in range(alpha_a.profile.shape[0]):
 #                alpha_a.profile[ai,:] = -0.5*gv.savitzky_golay(np.log(alpha_a.profile[ai,:].flatten()), ext_sg_wid, ext_sg_order, deriv=1)
+            """
             if ext_time_filt:
                 alpha_a.sg_filter(ext_sg_wid_t,ext_sg_order_t,axis=0)
             if ext_range_filt:
                 alpha_a.sg_filter(ext_sg_wid_r,ext_sg_order_r,axis=1,deriv=1)
             else:
                 alpha_a.sg_filter(3,1,axis=1,deriv=1)
+            """    
+            alpha_a.sg_filter(3,1,axis=1,deriv=1)
             alpha_a = 0.5*alpha_a/alpha_a.mean_dR # not sure this is the right scaling factor
             alpha_a = alpha_a - beta_m_ext*(8*np.pi/3)  # remove molecular extinction
+            
+            """
+            optimize lidar ratio filters
+            """
+                
+                
+            lidar_ratio = alpha_a.copy()
+            lidar_ratio.descript = 'Estimated lidar ratio of aerosols and clouds'
+            lidar_ratio.label = 'Lidar Ratio'
+            lidar_ratio.units = 'sr'
+            lidar_ratio.profile = alpha_a.profile/beta_a.profile
+            
+#            # dummy settings for development
+#            lr_sg_ord_t = 3
+#            lr_sg_wid_t = 5
+#            lr_sg_ord_r = 4
+#            lr_sg_wid_r = 7
+#            
+#            # placeholder for optimization loop in time
+#            lidar_ratio.sg_filter(lr_sg_wid_t,lr_sg_ord_t,axis=1)
+#
+#            # placeholder for optimization loop in range
+#            lidar_ratio.sg_filter(lr_sg_wid_r,lr_sg_ord_r,axis=0)
+
+            
+            # forward model the filtered lidar ratio
+            forward_model = np.exp(-2*np.cumsum(lidar_ratio.profile*beta_a.profile+beta_m_ext*8*np.pi/3,axis=1)*alpha_a.mean_dR)*beta_m_ext.profile*eta_i2_forward/(filt_mol.range_array[np.newaxis,:]**2)/geo_forward
+            Gm = np.nansum(forward_model[:,3:],axis=1)/np.nansum(ver_mol[:,3:].profile,axis=1)  # estimate gain between forward model and actual data
+            forward_model*=Gm[:,np.newaxis] # rescale forward model to match verification data
+            forward_model+=filt_mol.bg[:,np.newaxis]  # add background after scaling
+            
+            plt.figure()
+            plt.plot(ver_mol.profile[20,:],label='verification data')
+            plt.plot(forward_model[20,:],label='forward model')
+            plt.legend()
+            plt.show()
+            
+            # evaluate inverse log-likelihood
+            ver_error = np.nansum(forward_model-ver_mol.profile*np.log(forward_model),axis=1)
+                
+            """
+            end optimize lidar ratio filters
+            """
+            
 #            alpha_a.profile = ODdata.copy()
 #            alpha_a.sg_filter(ext_sg_wid,ext_sg_order,deriv=0)
 #            alpha_a.gain_scale(-0.5)
