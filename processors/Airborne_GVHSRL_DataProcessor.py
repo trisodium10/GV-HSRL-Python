@@ -1334,6 +1334,12 @@ def ProcessAirborneDataChunk(time_start,time_stop,
             alpha_a.descript = 'Aerosol Extinction Coefficient'
             alpha_a.label = 'Aerosol Extinction Coefficient'
             alpha_a.profile_type = '$m^{-1}$'
+            
+            # set OD profile to accumulate past valid data
+            # and avoid saving nans to the final dataset
+            OD.mask(np.isnan(profs['Optical_Depth'].profile))
+            OD.profile = np.maximum.accumulate(OD.profile.filled(0),axis=1)
+            OD.remove_mask()
         
 #        BSR = (profs['combined']+profs['cross'])/profs['molecular']
 #        BSR.descript = 'Ratio of combined to molecular backscatter'
