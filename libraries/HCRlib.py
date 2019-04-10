@@ -61,6 +61,7 @@ def load_hcr_processed_files(time_start,time_stop,prof_hcr,data_path = None,verb
     
     
     dir_time = time_start
+    filefound = False # flag to indicate if a data file was ever loaded
     while dir_time <= time_stop:
         file_dir = data_path+dir_time.strftime('%Y%m%d')+'/'
         # typical file
@@ -78,6 +79,7 @@ def load_hcr_processed_files(time_start,time_stop,prof_hcr,data_path = None,verb
                 (file_stop_time < time_stop and file_stop_time > time_start)  
     
             if load_cond:
+                filefound = True  # at least one file was found
                 if verbose:
                     print( 'Loading '+file_start_time.strftime('%Y-%b-%d %H:%M:%S to ')+file_stop_time.strftime('%Y-%b-%d %H:%M:%S'))
                     print( '['+filestr+']')
@@ -105,16 +107,21 @@ def load_hcr_processed_files(time_start,time_stop,prof_hcr,data_path = None,verb
                             
         
         dir_time+=datetime.timedelta(days=1)
-    
-    if not date_reference is None:
-        for pvar in hcr_profs.keys():
-            time_diff = hcr_profs[pvar].StartDate-date_reference
-            hcr_profs[pvar].time += time_diff.total_seconds()
-            hcr_profs[pvar].StartDate = date_reference
-            
-    hcr_tdata['time'] = hcr_profs[pvar].time.copy()  # change time variable so it doesn't reference the file start time
-    
-    hcr_tdata['radar_pointing'] = np.array([-np.cos(hcr_tdata['elevation']*np.pi/180)*np.cos(hcr_tdata['azimuth']*np.pi/180),
-                                           -np.cos(hcr_tdata['elevation']*np.pi/180)*np.sin(hcr_tdata['azimuth']*np.pi/180),
-                                           -np.sin(hcr_tdata['elevation']*np.pi/180)])
+    if filefound:
+        if not date_reference is None:
+            for pvar in hcr_profs.keys():
+                time_diff = hcr_profs[pvar].StartDate-date_reference
+                hcr_profs[pvar].time += time_diff.total_seconds()
+                hcr_profs[pvar].StartDate = date_reference
+                
+        hcr_tdata['time'] = hcr_profs[pvar].time.copy()  # change time variable so it doesn't reference the file start time
+        
+        hcr_tdata['radar_pointing'] = np.array([-np.cos(hcr_tdata['elevation']*np.pi/180)*np.cos(hcr_tdata['azimuth']*np.pi/180),
+                                               -np.cos(hcr_tdata['elevation']*np.pi/180)*np.sin(hcr_tdata['azimuth']*np.pi/180),
+                                               -np.sin(hcr_tdata['elevation']*np.pi/180)])
+    else:
+        # no file was found for requested time period
+        hcr_profs = None
+        hcr_tdata = None
+        
     return hcr_profs,hcr_tdata
