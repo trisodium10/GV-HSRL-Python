@@ -60,7 +60,7 @@ def load_hcr_processed_files(time_start,time_stop,prof_hcr,data_path = None,verb
         print('   time grid matching is not implemented yet')
     
     
-    dir_time = time_start
+    dir_time = datetime.datetime(year=time_start.year,month=time_start.month,day=time_start.day)
     filefound = False # flag to indicate if a data file was ever loaded
     while dir_time <= time_stop:
         file_dir = data_path+dir_time.strftime('%Y%m%d')+'/'
