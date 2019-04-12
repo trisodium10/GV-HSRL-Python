@@ -386,7 +386,7 @@ def interp_aircraft_data(master_time,aircraft_data):
     """
     air_data_new = {}
     for var in aircraft_data.keys():
-        if var != 'Time':
+        if var != 'Time' and 'Time' in aircraft_data.keys():
             if aircraft_data[var].ndim == 1:
                 if aircraft_data[var].size == aircraft_data['Time'].size:
                     air_data_new[var] = np.interp(master_time,aircraft_data['Time'],aircraft_data[var])
