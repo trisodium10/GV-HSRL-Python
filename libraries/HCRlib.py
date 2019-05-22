@@ -76,7 +76,8 @@ def load_hcr_processed_files(time_start,time_stop,prof_hcr,data_path = None,verb
             
              # check if this file is in the search time period
             load_cond = (file_start_time >= time_start and file_start_time < time_stop) or \
-                (file_stop_time < time_stop and file_stop_time > time_start)  
+                (file_stop_time < time_stop and file_stop_time > time_start) or \
+                (file_start_time <= time_start) and (file_stop_time >= time_stop)
     
             if load_cond:
                 filefound = True  # at least one file was found
@@ -123,5 +124,6 @@ def load_hcr_processed_files(time_start,time_stop,prof_hcr,data_path = None,verb
         # no file was found for requested time period
         hcr_profs = None
         hcr_tdata = None
+        print('No HCR data found for '+time_start.strftime('%Y-%m-%d %H:%M:%S to ')+time_stop.strftime('%Y-%m-%d %H:%M:%S'))
         
     return hcr_profs,hcr_tdata
