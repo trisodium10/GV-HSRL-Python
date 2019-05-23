@@ -29,7 +29,7 @@ hcr_data_defs = {'DBZ':
                      'descript':'Log backscatter'},
                 'LDR':
                     {'label':'LDR',
-                     'units':'unitless',
+                     'units':'dB',
                      'descript':'Ratio of cross polarization to transmit polarization power'}
                     }
                     
