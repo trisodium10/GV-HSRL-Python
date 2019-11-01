@@ -106,7 +106,8 @@
 
 	"Comments": [
 		{"date": "7-Dec-2013 0:0", "value": "Made up start date"},
-		{"date": "6-Sep-2018 0:0", "value": "Changed I2 scan data scaling so that mol_gain is now slightly lower than before.  The change is for i2cals after 12-Jan-2018 22:28"}
+		{"date": "6-Sep-2018 0:0", "value": "Changed I2 scan data scaling so that mol_gain is now slightly lower than before.  The change is for i2cals after 12-Jan-2018 22:28"},
+		{"date": "9-May-2019 0:0", "value": "Packed and shipped to U. Wisc. for Cheesehead"}
 	]
 
 }
